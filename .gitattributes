@@ -1,0 +1,42 @@
+# Auto-detect text files and normalize line endings on commit
+* text=auto
+
+# .NET source — use CRLF in working copy on Windows (Visual Studio default)
+*.cs            text diff=csharp eol=crlf
+*.csproj        text eol=crlf
+*.sln           text eol=crlf
+*.slnx          text eol=crlf
+*.props         text eol=crlf
+*.targets       text eol=crlf
+*.xaml          text eol=crlf
+*.config        text eol=crlf
+*.manifest      text eol=crlf
+
+# Web/text — keep LF
+*.md            text eol=lf
+*.json          text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# Shell vs batch — must match the host OS that runs them
+*.sh            text eol=lf
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# Binary — never touch
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.pdf           binary
+*.xlsx          binary
+*.xls           binary
+*.docx          binary
+*.zip           binary
+*.dll           binary
+*.exe           binary
+*.db            binary
+*.db-wal        binary
+*.db-shm        binary

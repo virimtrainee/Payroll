@@ -1,0 +1,158 @@
+<Window x:Class="SalaryManager.App.AddEmployeeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="New Employee"
+        Width="460" SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- Payment mode radio button styled as a segment pill -->
+        <Style x:Key="SegmentRadio" TargetType="RadioButton">
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd"
+                                Background="#F1F5F9"
+                                CornerRadius="99"
+                                Padding="{TemplateBinding Padding}">
+                            <TextBlock x:Name="txt"
+                                       Text="{TemplateBinding Content}"
+                                       Foreground="#64748B"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter TargetName="txt" Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="New Employee" FontSize="20" FontWeight="Bold"
+                       Foreground="{StaticResource TextBrush}"/>
+            <TextBlock Text="Fill in the details below. Bank fields appear for non-cash payment."
+                       FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Name + Base Salary row -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="140"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="EMPLOYEE NAME" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="NameBox"
+                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                         TabIndex="0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="BASE SALARY (₹)" Style="{StaticResource FieldLabel}"/>
+                <TextBox Text="{Binding BaseSalary, UpdateSourceTrigger=PropertyChanged}"
+                         TabIndex="1"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Joining Date -->
+        <StackPanel Grid.Row="4">
+            <TextBlock Text="JOINING DATE" Style="{StaticResource FieldLabel}"/>
+            <DatePicker SelectedDate="{Binding JoiningDate, Mode=TwoWay}"
+                        TabIndex="2"/>
+        </StackPanel>
+
+        <!-- Payment Mode label -->
+        <TextBlock Grid.Row="6" Text="PAYMENT MODE" Style="{StaticResource FieldLabel}"/>
+
+        <!-- Segmented selector -->
+        <StackPanel Grid.Row="8" Orientation="Horizontal">
+            <RadioButton Style="{StaticResource SegmentRadio}"
+                         Content="Cash"
+                         IsChecked="{Binding IsCash, Mode=TwoWay}"
+                         TabIndex="3"/>
+            <RadioButton Style="{StaticResource SegmentRadio}"
+                         Content="ICICI Bank"
+                         IsChecked="{Binding IsIcici, Mode=TwoWay}"
+                         Margin="8,0,0,0" TabIndex="4"/>
+            <RadioButton Style="{StaticResource SegmentRadio}"
+                         Content="Other Bank"
+                         IsChecked="{Binding IsOther, Mode=TwoWay}"
+                         Margin="8,0,0,0" TabIndex="5"/>
+        </StackPanel>
+
+        <!-- Bank fields — hidden when Cash is selected -->
+        <Grid Grid.Row="9"
+              Visibility="{Binding ShowBankFields, Converter={StaticResource BoolToVis}}"
+              Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="140"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="ACCOUNT NO" Style="{StaticResource FieldLabel}"/>
+                <TextBox Text="{Binding AccountNumber, UpdateSourceTrigger=PropertyChanged}"
+                         TabIndex="6"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="IFSC CODE" Style="{StaticResource FieldLabel}"/>
+                <TextBox Text="{Binding IfscCode, UpdateSourceTrigger=PropertyChanged}"
+                         TabIndex="7"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Divider -->
+        <Border Grid.Row="10" Height="1" Background="{StaticResource BorderBrush}"
+                VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+
+        <!-- Action buttons -->
+        <Grid Grid.Row="11">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Style="{StaticResource SecondaryButton}"
+                    Content="Cancel" Click="Cancel_Click" TabIndex="9"/>
+            <Button Grid.Column="2" Style="{StaticResource PrimaryButton}"
+                    Content="Add Employee" Click="Add_Click"
+                    IsDefault="True" TabIndex="8"/>
+        </Grid>
+    </Grid>
+</Window>

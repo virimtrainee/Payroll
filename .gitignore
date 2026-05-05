@@ -1,0 +1,83 @@
+# --- .NET / Visual Studio ---------------------------------------------------
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Bb]uild/
+build/
+
+# Project files / user-specific
+*.user
+*.suo
+*.userprefs
+*.userosscache
+*.sln.docstates
+*.dbmdl
+*.jfm
+*.svclog
+*.scc
+
+# Build artefacts
+*.binlog
+*.tlog
+*.log
+*.pdb
+*.exe
+*.dll
+*.cache
+
+# Visual Studio + Rider + VS Code
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.iml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.coverage
+*.coveragexml
+*.trx
+
+# Rider
+*.swp
+
+# --- Salary Manager specifics ----------------------------------------------
+# Live database + SQLite sidecars (per-user data, never commit)
+salary.db
+salary.db-wal
+salary.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# Generated Excel artefacts
+TestSheet_extracted/
+
+# Plans / scratch (kept out of source repo)
+.claude/
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

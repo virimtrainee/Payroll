@@ -1,0 +1,207 @@
+<UserControl x:Class="SalaryManager.App.Views.EmployeesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="20,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Employees" Style="{StaticResource PageTitle}"/>
+            <TextBlock Text="Add and manage your workforce. Inactive employees stay in records but disappear from payroll screens."
+                       Style="{StaticResource PageSubtitle}" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource FilterBar}" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                <TextBlock Text="All employees" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Border CornerRadius="99" Background="#334155" Padding="9,3"
+                        Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Employees.Count}"
+                               FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"/>
+                </Border>
+
+                <!-- spacer -->
+                <StackPanel Width="1" Margin="0,0,0,0" HorizontalAlignment="Stretch" x:Name="Spacer"/>
+                <CheckBox Content="Show inactive"
+                          Foreground="#CBD5E1"
+                          VerticalAlignment="Center"
+                          Margin="16,0,0,0"
+                          IsChecked="{Binding ShowInactive}"/>
+
+                <Separator Style="{StaticResource VSep}"/>
+
+                <Button Style="{StaticResource SecondaryButton}" Content="Import Excel"
+                        Margin="0,0,8,0" Command="{Binding ImportFromExcelCommand}"/>
+                <Button Style="{StaticResource SecondaryButton}" Content="Save Changes"
+                        Margin="0,0,8,0" Command="{Binding SaveChangesCommand}"/>
+                <Button Style="{StaticResource PrimaryButton}" Content="+ Add Employee"
+                        Command="{Binding OpenAddEmployeeCommand}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Grid -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+            <DataGrid ItemsSource="{Binding Employees}"
+                      SelectedItem="{Binding Selected}"
+                      CanUserSortColumns="True">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Base Salary"
+                                        Binding="{Binding BaseSalary, StringFormat=N2}"
+                                        Width="120"/>
+                    <DataGridTextColumn Header="Account No"
+                                        Binding="{Binding AccountNumber}"
+                                        Width="150"/>
+                    <DataGridTextColumn Header="IFSC"
+                                        Binding="{Binding IfscCode}"
+                                        Width="100"/>
+
+                    <!-- Payment mode cycling pill -->
+                    <DataGridTemplateColumn Header="Payment" Width="96" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Height="26" Margin="5,3"
+                                        Cursor="Hand" FocusVisualStyle="{x:Null}"
+                                        Command="{Binding DataContext.CyclePaymentModeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="bd" CornerRadius="99"
+                                                                Background="{TemplateBinding Background}"
+                                                                Padding="10,0">
+                                                            <ContentPresenter HorizontalAlignment="Center"
+                                                                              VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <!-- Default: OtherBank = green -->
+                                            <Setter Property="Background" Value="#D1FAE5"/>
+                                            <Setter Property="Foreground" Value="#065F46"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PaymentMode}" Value="Cash">
+                                                    <Setter Property="Background" Value="#F1F5F9"/>
+                                                    <Setter Property="Foreground" Value="#475569"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding PaymentMode}" Value="IciciBank">
+                                                    <Setter Property="Background" Value="#2563EB"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <Button.Content>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Other"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PaymentMode}" Value="Cash">
+                                                            <Setter Property="Text" Value="Cash"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding PaymentMode}" Value="IciciBank">
+                                                            <Setter Property="Text" Value="ICICI"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Button.Content>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Status pill -->
+                    <DataGridTemplateColumn Header="Status" Width="100" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="99" Padding="8,3" HorizontalAlignment="Left" Margin="2,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#DCFCE7"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                    <Setter Property="Background" Value="#F1F5F9"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,5,0">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="#16A34A"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                            <Setter Property="Fill" Value="#94A3B8"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Active"/>
+                                                    <Setter Property="Foreground" Value="#166534"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                            <Setter Property="Text" Value="Inactive"/>
+                                                            <Setter Property="Foreground" Value="#64748B"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Joined"
+                                        Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd}"
+                                        IsReadOnly="True" Width="110"/>
+
+                    <!-- Deactivate / Reactivate -->
+                    <DataGridTemplateColumn Header="" Width="100" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Padding="10,4" Margin="6,2"
+                                        Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                            <Setter Property="Content" Value="Deactivate"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                    <Setter Property="Content" Value="Reactivate"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </Grid>
+</UserControl>

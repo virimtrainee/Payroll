@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SalaryManager.App/SalaryManager.App.csproj" />
+    <Project Path="src/SalaryManager.Data/SalaryManager.Data.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SalaryManager.Tests/SalaryManager.Tests.csproj" />
+  </Folder>
+</Solution>

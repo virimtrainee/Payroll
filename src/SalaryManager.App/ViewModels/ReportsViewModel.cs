@@ -39,6 +39,7 @@ public partial class ReportsViewModel : ObservableObject
     [ObservableProperty] private string kpiGross          = "₹0.00";
     [ObservableProperty] private string kpiDeductions     = "₹0.00";
     [ObservableProperty] private int    kpiActiveEmployees;
+    [ObservableProperty] private bool   isLoading;
 
     public ReportsViewModel(IDbContextFactory<AppDbContext> dbf,
                             DatabaseInitializer dbInit,
@@ -52,9 +53,17 @@ public partial class ReportsViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
-        await _dbInit.ReadyTask;
-        await LoadEmployeesAsync();
-        await LoadKpisAsync();
+        IsLoading = true;
+        try
+        {
+            await _dbInit.ReadyTask;
+            await LoadEmployeesAsync();
+            await LoadKpisAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private async Task LoadEmployeesAsync()

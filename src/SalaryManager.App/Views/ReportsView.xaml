@@ -1,6 +1,9 @@
 <UserControl x:Class="SalaryManager.App.Views.ReportsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <ProgressBar Style="{StaticResource LoadingBar}"
+                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
     <Grid Margin="20,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -126,7 +129,28 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid/>
+                    <!-- Period preview -->
+                    <Border Background="#F8FAFC" CornerRadius="6" Padding="14,12" Margin="0,4,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="NET PAYABLE" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="{Binding KpiTotalPayable}"
+                                           FontSize="20" FontWeight="Bold"
+                                           Foreground="{StaticResource PrimaryBrush}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="ACTIVE EMPLOYEES" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="{Binding KpiActiveEmployees}"
+                                           FontSize="20" FontWeight="Bold"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </DockPanel>
             </Border>
 
@@ -176,9 +200,23 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid/>
+                    <!-- Selected employee preview -->
+                    <Border Background="#F8FAFC" CornerRadius="6" Padding="14,12" Margin="0,4,0,0">
+                        <StackPanel>
+                            <TextBlock Text="SELECTED" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Text="{Binding SelectedEmployee.Name, FallbackValue='—', TargetNullValue='—'}"
+                                       FontSize="15" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                            <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                       Margin="0,4,0,0">
+                                <Run Text="Base"/>
+                                <Run Text="{Binding SelectedEmployee.BaseSalary, StringFormat={}₹{0:N0}, FallbackValue='—'}"
+                                     FontWeight="Medium" Foreground="{StaticResource TextBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
                 </DockPanel>
             </Border>
         </Grid>
+    </Grid>
     </Grid>
 </UserControl>

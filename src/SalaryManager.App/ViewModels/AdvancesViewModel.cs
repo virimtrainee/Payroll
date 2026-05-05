@@ -45,6 +45,7 @@ public partial class AdvancesViewModel : ObservableObject
     [ObservableProperty] private string                  searchText = string.Empty;
     [ObservableProperty] private bool                    showOnlyWithAdvances;
     [ObservableProperty] private int                     filteredCount;
+    [ObservableProperty] private bool                    isLoading;
 
     partial void OnSearchTextChanged(string value)          => RefreshFilter();
     partial void OnShowOnlyWithAdvancesChanged(bool value)  => RefreshFilter();
@@ -92,6 +93,9 @@ public partial class AdvancesViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
+        IsLoading = true;
+        try
+        {
         await _dbInit.ReadyTask;
 
         var prevId = SelectedEmployee?.Id;
@@ -131,6 +135,11 @@ public partial class AdvancesViewModel : ObservableObject
             : null;
         toSelect ??= EmployeeRailView.Cast<EmployeeWithBalanceVm>().FirstOrDefault();
         SelectedRailItem = toSelect;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     [RelayCommand]

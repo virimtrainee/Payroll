@@ -1,6 +1,9 @@
 <UserControl x:Class="SalaryManager.App.Views.DashboardView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <ProgressBar Style="{StaticResource LoadingBar}"
+                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
     <Grid Margin="20,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -113,9 +116,37 @@
                         <TextBlock Text="Recent Advances" FontSize="13" FontWeight="SemiBold"/>
                     </Border>
 
+                    <!-- Empty state -->
+                    <StackPanel DockPanel.Dock="Bottom"
+                                VerticalAlignment="Top" Margin="20,32,20,20">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RecentAdvances.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Style="{StaticResource EmptyStateTitle}"
+                                   Text="No advances yet"/>
+                        <TextBlock Style="{StaticResource EmptyStateSubtitle}"
+                                   Text="Given/deducted entries will appear here as you record them on the Advances tab."/>
+                    </StackPanel>
+
                     <DataGrid ItemsSource="{Binding RecentAdvances}"
                               IsReadOnly="True" AutoGenerateColumns="False"
                               BorderThickness="0" GridLinesVisibility="Horizontal">
+                        <DataGrid.Style>
+                            <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RecentAdvances.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Style>
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Employee"
                                                 Binding="{Binding EmployeeName}" Width="*"/>
@@ -266,5 +297,6 @@
                         Command="{Binding RestoreDatabaseCommand}"/>
             </StackPanel>
         </Border>
+    </Grid>
     </Grid>
 </UserControl>

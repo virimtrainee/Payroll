@@ -29,6 +29,7 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty] private int    attendanceSavedThisMonth;
     [ObservableProperty] private int    totalEmployees;
     [ObservableProperty] private string currentPeriod = DateTime.Now.ToString("MMMM yyyy");
+    [ObservableProperty] private bool   isLoading;
 
     public ObservableCollection<RecentAdvanceVm> RecentAdvances  { get; } = new();
     public ObservableCollection<RevisionVm>      RecentRevisions { get; } = new();
@@ -44,37 +45,45 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
-        await _dbInit.ReadyTask;
+        IsLoading = true;
+        try
+        {
+            await _dbInit.ReadyTask;
 
-        CurrentPeriod = DateTime.Now.ToString("MMMM yyyy");
-        using var db  = await _dbf.CreateDbContextAsync();
-        var now       = DateTime.Now;
+            CurrentPeriod = DateTime.Now.ToString("MMMM yyyy");
+            using var db  = await _dbf.CreateDbContextAsync();
+            var now       = DateTime.Now;
 
-        TotalEmployees      = await db.Employees.CountAsync();
-        ActiveEmployees     = await db.Employees.CountAsync(e => e.IsActive);
-        GrossPayroll        = await db.Employees.Where(e => e.IsActive).SumAsync(e => e.BaseSalary);
-        OutstandingAdvances = await db.Advances.AsNoTracking().SumOutstandingAsync();
+            TotalEmployees      = await db.Employees.CountAsync();
+            ActiveEmployees     = await db.Employees.CountAsync(e => e.IsActive);
+            GrossPayroll        = await db.Employees.Where(e => e.IsActive).SumAsync(e => e.BaseSalary);
+            OutstandingAdvances = await db.Advances.AsNoTracking().SumOutstandingAsync();
 
-        AttendanceSavedThisMonth = await db.AttendanceRecords.CountAsync(
-            a => a.Year == now.Year && a.Month == now.Month);
+            AttendanceSavedThisMonth = await db.AttendanceRecords.CountAsync(
+                a => a.Year == now.Year && a.Month == now.Month);
 
-        var recentAdv = await db.Advances.AsNoTracking()
-            .Include(a => a.Employee)
-            .OrderByDescending(a => a.Date).ThenByDescending(a => a.Id)
-            .Take(7)
-            .ToListAsync();
-        RecentAdvances.Clear();
-        foreach (var a in recentAdv)
-            RecentAdvances.Add(new RecentAdvanceVm(a.Employee?.Name ?? "", a.Amount, a.EntryType, a.Date));
+            var recentAdv = await db.Advances.AsNoTracking()
+                .Include(a => a.Employee)
+                .OrderByDescending(a => a.Date).ThenByDescending(a => a.Id)
+                .Take(7)
+                .ToListAsync();
+            RecentAdvances.Clear();
+            foreach (var a in recentAdv)
+                RecentAdvances.Add(new RecentAdvanceVm(a.Employee?.Name ?? "", a.Amount, a.EntryType, a.Date));
 
-        var recentRev = await db.SalaryRevisions.AsNoTracking()
-            .Include(r => r.Employee)
-            .OrderByDescending(r => r.ChangedAt)
-            .Take(8)
-            .ToListAsync();
-        RecentRevisions.Clear();
-        foreach (var r in recentRev)
-            RecentRevisions.Add(new RevisionVm(r.Employee.Name, r.OldSalary, r.NewSalary, r.ChangedAt));
+            var recentRev = await db.SalaryRevisions.AsNoTracking()
+                .Include(r => r.Employee)
+                .OrderByDescending(r => r.ChangedAt)
+                .Take(8)
+                .ToListAsync();
+            RecentRevisions.Clear();
+            foreach (var r in recentRev)
+                RecentRevisions.Add(new RevisionVm(r.Employee.Name, r.OldSalary, r.NewSalary, r.ChangedAt));
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     [RelayCommand]

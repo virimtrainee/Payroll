@@ -9,8 +9,6 @@
         Background="{StaticResource BackgroundBrush}">
 
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
         <!-- Payment mode radio button styled as a segment pill -->
         <Style x:Key="SegmentRadio" TargetType="RadioButton">
             <Setter Property="Padding" Value="16,0"/>

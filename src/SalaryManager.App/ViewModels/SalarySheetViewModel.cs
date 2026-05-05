@@ -78,6 +78,8 @@ public partial class SalarySheetViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(EditButtonText))]
     private bool isEditMode;
 
+    [ObservableProperty] private bool isLoading;
+
     public bool IsGridReadOnly => !IsEditMode;
     public string EditButtonText => IsEditMode ? "Done" : "Edit";
 
@@ -101,6 +103,9 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
+        IsLoading = true;
+        try
+        {
         await _dbInit.ReadyTask;
 
         using var db = await _dbf.CreateDbContextAsync();
@@ -179,6 +184,11 @@ public partial class SalarySheetViewModel : ObservableObject
         TotalGross     = Rows.Sum(r => r.BaseSalary);
         TotalDeduction = Rows.Sum(r => r.Deduction + Math.Max(0, r.AdvanceDeductionEntry));
         EmployeeCount  = Rows.Count;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     [RelayCommand]

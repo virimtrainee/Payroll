@@ -18,7 +18,7 @@
             <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,0">
                 <Run Text="Press"/>
                 <Run Text="Edit" FontWeight="SemiBold"/>
-                <Run Text="to unlock the sheet. Absent · ESIC · PF · Adv. Deduction update Net Salary live. Enter moves between columns, Ctrl+S saves."/>
+                <Run Text="to unlock the sheet. Absent · ESIC · PF · TDS · Adv. Deduction update Net Salary live. Enter moves between columns, Ctrl+S saves."/>
             </TextBlock>
         </StackPanel>
 
@@ -32,6 +32,10 @@
                           SelectedItem="{Binding SelectedMonth}" DisplayMemberPath="Name"/>
                 <ComboBox Width="76" ItemsSource="{Binding Years}"
                           SelectedItem="{Binding SelectedYear}" Margin="8,0,0,0"/>
+
+                <ComboBox Width="150" ItemsSource="{Binding GroupFilterOptions}"
+                          SelectedItem="{Binding SelectedGroupFilter}"
+                          DisplayMemberPath="Name" Margin="8,0,0,0"/>
 
                 <Separator Style="{StaticResource VSep}"/>
 
@@ -184,6 +188,7 @@
                         <DataGridTemplateColumn.CellEditingTemplate>
                             <DataTemplate>
                                 <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesEsicPf}"
                                          TextAlignment="Right"
                                          VerticalContentAlignment="Center"
                                          BorderThickness="0" Padding="8,0"/>
@@ -205,6 +210,29 @@
                         <DataGridTemplateColumn.CellEditingTemplate>
                             <DataTemplate>
                                 <TextBox Text="{Binding PfDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesEsicPf}"
+                                         TextAlignment="Right"
+                                         VerticalContentAlignment="Center"
+                                         BorderThickness="0" Padding="8,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Editable: TDS -->
+                    <DataGridTemplateColumn Header="TDS" Width="85"
+                                            CellStyle="{StaticResource EditableCell}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Padding="0,0,10,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding TdsDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesTds}"
                                          TextAlignment="Right"
                                          VerticalContentAlignment="Center"
                                          BorderThickness="0" Padding="8,0"/>

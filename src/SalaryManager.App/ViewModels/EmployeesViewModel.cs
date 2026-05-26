@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using SalaryManager.App.Services;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
+using SalaryManager.Data.Services;
 
 namespace SalaryManager.App.ViewModels;
 
@@ -20,9 +21,14 @@ public partial class EmployeesViewModel : ObservableObject
     private readonly ExcelImportService _importer;
 
     public Helpers.RangeObservableCollection<Employee> Employees { get; } = new();
+    public Helpers.RangeObservableCollection<EmployeeGroup> Groups { get; } = new();
+    public Helpers.RangeObservableCollection<GroupEmployeeAssignmentVm> GroupAssignmentRows { get; } = new();
 
     [ObservableProperty] private bool showInactive;
     [ObservableProperty] private Employee? selected;
+    [ObservableProperty] private EmployeeGroup? selectedGroup;
+    [ObservableProperty] private string newGroupName = string.Empty;
+    [ObservableProperty] private string selectedGroupName = string.Empty;
 
     public Window? OwnerWindow { get; set; }
 
@@ -39,6 +45,11 @@ public partial class EmployeesViewModel : ObservableObject
     }
 
     partial void OnShowInactiveChanged(bool value) => _ = LoadAsync();
+    partial void OnSelectedGroupChanged(EmployeeGroup? value)
+    {
+        SelectedGroupName = value?.Name ?? string.Empty;
+        _ = LoadGroupAssignmentsAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -48,8 +59,14 @@ public partial class EmployeesViewModel : ObservableObject
         IQueryable<Employee> query = db.Employees.AsNoTracking().OrderBy(e => e.Name);
         if (!ShowInactive) query = query.Where(e => e.IsActive);
         var list = await query.ToListAsync();
+        var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
 
         Employees.ReplaceAll(list);
+        Groups.ReplaceAll(groups);
+        SelectedGroup = SelectedGroup is null
+            ? Groups.FirstOrDefault()
+            : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
+        await LoadGroupAssignmentsAsync();
     }
 
     [RelayCommand]
@@ -110,6 +127,9 @@ public partial class EmployeesViewModel : ObservableObject
     private async Task OpenAddEmployeeAsync()
     {
         var vm = new AddEmployeeViewModel();
+        using (var loadDb = await _dbf.CreateDbContextAsync())
+            await PopulateGroupOptionsAsync(loadDb, vm);
+
         var dialog = new AddEmployeeWindow(vm)
         {
             Owner = OwnerWindow ?? Application.Current.MainWindow
@@ -126,7 +146,7 @@ public partial class EmployeesViewModel : ObservableObject
         try
         {
             using var db = await _dbf.CreateDbContextAsync();
-            db.Employees.Add(new Employee
+            var employee = new Employee
             {
                 Name          = vm.Name.Trim(),
                 BaseSalary    = vm.BaseSalary,
@@ -134,13 +154,79 @@ public partial class EmployeesViewModel : ObservableObject
                 IfscCode      = string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant(),
                 PaymentMode   = vm.PaymentMode,
                 JoiningDate   = vm.JoiningDate,
-                IsActive      = true,
+                IsActive      = vm.IsActive,
                 CreatedAt     = DateTime.UtcNow
-            });
+            };
+            db.Employees.Add(employee);
+            await db.SaveChangesAsync();
+            await SaveMembershipsAsync(db, employee.Id, vm.Groups.Where(g => g.IsSelected).Select(g => g.Id));
             await db.SaveChangesAsync();
             await LoadAsync();
         }
         catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task OpenEditEmployeeAsync(Employee? emp)
+    {
+        if (emp is null) return;
+
+        using var db = await _dbf.CreateDbContextAsync();
+        var tracked = await db.Employees
+            .Include(e => e.GroupMemberships)
+            .FirstOrDefaultAsync(e => e.Id == emp.Id);
+        if (tracked is null) return;
+
+        var vm = new AddEmployeeViewModel
+        {
+            EmployeeId = tracked.Id,
+            WindowTitle = "Edit Employee",
+            SaveButtonText = "Save Employee",
+            Name = tracked.Name,
+            BaseSalary = tracked.BaseSalary,
+            AccountNumber = tracked.AccountNumber ?? string.Empty,
+            IfscCode = tracked.IfscCode ?? string.Empty,
+            JoiningDate = tracked.JoiningDate,
+            IsActive = tracked.IsActive,
+            PaymentMode = tracked.PaymentMode
+        };
+        await PopulateGroupOptionsAsync(db, vm, tracked.GroupMemberships.Select(m => m.EmployeeGroupId).ToHashSet());
+
+        var dialog = new AddEmployeeWindow(vm)
+        {
+            Owner = OwnerWindow ?? Application.Current.MainWindow
+        };
+
+        if (dialog.ShowDialog() != true) return;
+        if (string.IsNullOrWhiteSpace(vm.Name))
+        {
+            _dialogs.Error("Employee name is required.");
+            return;
+        }
+
+        var oldSalary = tracked.BaseSalary;
+        tracked.Name = vm.Name.Trim();
+        tracked.BaseSalary = vm.BaseSalary;
+        tracked.IsActive = vm.IsActive;
+        tracked.AccountNumber = string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim();
+        tracked.IfscCode = string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant();
+        tracked.PaymentMode = vm.PaymentMode;
+        tracked.JoiningDate = vm.JoiningDate;
+
+        if (oldSalary != vm.BaseSalary)
+        {
+            db.SalaryRevisions.Add(new SalaryRevision
+            {
+                EmployeeId = tracked.Id,
+                OldSalary = oldSalary,
+                NewSalary = vm.BaseSalary,
+                ChangedAt = DateTime.UtcNow
+            });
+        }
+
+        await SaveMembershipsAsync(db, tracked.Id, vm.Groups.Where(g => g.IsSelected).Select(g => g.Id));
+        await db.SaveChangesAsync();
+        await LoadAsync();
     }
 
     [RelayCommand]
@@ -213,5 +299,157 @@ public partial class EmployeesViewModel : ObservableObject
         };
         await db.SaveChangesAsync();
         await LoadAsync();
+    }
+
+    [RelayCommand]
+    private async Task CreateGroupAsync()
+    {
+        var name = NewGroupName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { _dialogs.Error("Group name is required."); return; }
+
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            db.EmployeeGroups.Add(new EmployeeGroup { Name = name });
+            await db.SaveChangesAsync();
+            NewGroupName = string.Empty;
+            await LoadAsync();
+            SelectedGroup = Groups.FirstOrDefault(g => GroupNameNormalizer.Normalize(g.Name) == GroupNameNormalizer.Normalize(name));
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task RenameGroupAsync()
+    {
+        if (SelectedGroup is null) return;
+        var name = SelectedGroupName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { _dialogs.Error("Group name is required."); return; }
+
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var group = await db.EmployeeGroups.FindAsync(SelectedGroup.Id);
+            if (group is null) return;
+            group.Name = name;
+            await db.SaveChangesAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task DeleteGroupAsync()
+    {
+        if (SelectedGroup is null) return;
+        if (!_dialogs.Confirm($"Delete group '{SelectedGroup.Name}'? Employees will not be deleted.")) return;
+
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var group = await db.EmployeeGroups.FindAsync(SelectedGroup.Id);
+            if (group is null) return;
+            db.EmployeeGroups.Remove(group);
+            await db.SaveChangesAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task SaveGroupAssignmentsAsync()
+    {
+        if (SelectedGroup is null) return;
+
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var current = await db.EmployeeGroupMemberships
+                .Where(m => m.EmployeeGroupId == SelectedGroup.Id)
+                .ToListAsync();
+            var visibleEmployeeIds = GroupAssignmentRows.Select(r => r.EmployeeId).ToHashSet();
+            var selectedIds = GroupAssignmentRows
+                .Where(r => r.IsMember)
+                .Select(r => r.EmployeeId)
+                .ToHashSet();
+
+            db.EmployeeGroupMemberships.RemoveRange(current.Where(m =>
+                visibleEmployeeIds.Contains(m.EmployeeId) && !selectedIds.Contains(m.EmployeeId)));
+            var existingIds = current.Select(m => m.EmployeeId).ToHashSet();
+            foreach (var employeeId in selectedIds.Where(id => !existingIds.Contains(id)))
+            {
+                db.EmployeeGroupMemberships.Add(new EmployeeGroupMembership
+                {
+                    EmployeeId = employeeId,
+                    EmployeeGroupId = SelectedGroup.Id
+                });
+            }
+
+            await db.SaveChangesAsync();
+            _dialogs.Info("Group assignments saved.");
+            await LoadAsync();
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    private async Task LoadGroupAssignmentsAsync()
+    {
+        if (SelectedGroup is null)
+        {
+            GroupAssignmentRows.ReplaceAll(Array.Empty<GroupEmployeeAssignmentVm>());
+            return;
+        }
+
+        using var db = await _dbf.CreateDbContextAsync();
+        var memberIds = await db.EmployeeGroupMemberships.AsNoTracking()
+            .Where(m => m.EmployeeGroupId == SelectedGroup.Id)
+            .Select(m => m.EmployeeId)
+            .ToHashSetAsync();
+
+        var rows = Employees
+            .OrderBy(e => e.Name)
+            .Select(e => new GroupEmployeeAssignmentVm
+            {
+                EmployeeId = e.Id,
+                EmployeeName = e.Name,
+                IsMember = memberIds.Contains(e.Id)
+            })
+            .ToList();
+        GroupAssignmentRows.ReplaceAll(rows);
+    }
+
+    private static async Task PopulateGroupOptionsAsync(AppDbContext db, AddEmployeeViewModel vm, HashSet<int>? selectedIds = null)
+    {
+        selectedIds ??= new HashSet<int>();
+        var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+        vm.Groups.Clear();
+        foreach (var group in groups)
+        {
+            vm.Groups.Add(new GroupMembershipOptionVm
+            {
+                Id = group.Id,
+                Name = group.Name,
+                IsSelected = selectedIds.Contains(group.Id)
+            });
+        }
+    }
+
+    private static async Task SaveMembershipsAsync(AppDbContext db, int employeeId, IEnumerable<int> selectedGroupIds)
+    {
+        var selected = selectedGroupIds.ToHashSet();
+        var current = await db.EmployeeGroupMemberships
+            .Where(m => m.EmployeeId == employeeId)
+            .ToListAsync();
+
+        db.EmployeeGroupMemberships.RemoveRange(current.Where(m => !selected.Contains(m.EmployeeGroupId)));
+        var existing = current.Select(m => m.EmployeeGroupId).ToHashSet();
+        foreach (var groupId in selected.Where(id => !existing.Contains(id)))
+        {
+            db.EmployeeGroupMemberships.Add(new EmployeeGroupMembership
+            {
+                EmployeeId = employeeId,
+                EmployeeGroupId = groupId
+            });
+        }
     }
 }

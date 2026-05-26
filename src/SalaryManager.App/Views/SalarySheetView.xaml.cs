@@ -57,7 +57,7 @@ public partial class SalarySheetView : UserControl
         if (e.Key != Key.Enter) return;
         if (sender is not DataGrid dg || dg.IsReadOnly) return;
 
-        var editableHeaders = new[] { "Absent", "ESIC", "PF", "Adv. Ded" };
+        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv. Ded" };
         var editableCols = dg.Columns
             .Where(c => editableHeaders.Contains(c.Header?.ToString()))
             .OrderBy(c => c.DisplayIndex)
@@ -67,23 +67,9 @@ public partial class SalarySheetView : UserControl
 
         dg.CommitEdit(DataGridEditingUnit.Cell, exitEditingMode: true);
 
-        var curCol    = dg.CurrentColumn;
-        var curRowIdx = dg.Items.IndexOf(dg.CurrentItem);
-        var colIdx    = editableCols.IndexOf(curCol);
-
-        int nextRowIdx;
-        DataGridColumn nextCol;
-
-        if (colIdx >= 0 && colIdx < editableCols.Count - 1)
-        {
-            nextCol    = editableCols[colIdx + 1];
-            nextRowIdx = curRowIdx;
-        }
-        else
-        {
-            nextCol    = editableCols[0];
-            nextRowIdx = curRowIdx + 1 < dg.Items.Count ? curRowIdx + 1 : 0;
-        }
+        var curRowIdx = Math.Max(0, dg.Items.IndexOf(dg.CurrentItem));
+        var colIdx = Math.Max(-1, editableCols.IndexOf(dg.CurrentColumn));
+        var (nextRowIdx, nextCol) = FindNextEditableCell(dg, editableCols, curRowIdx, colIdx);
 
         e.Handled = true;
 
@@ -97,6 +83,8 @@ public partial class SalarySheetView : UserControl
 
     private static void BeginEditAndFocus(DataGrid dg)
     {
+        if (!IsEditableCell(dg.CurrentCell.Item, dg.CurrentCell.Column)) return;
+
         dg.BeginEdit();
 
         // Find the TextBox inside the editing template and focus it
@@ -109,6 +97,40 @@ public partial class SalarySheetView : UserControl
                 tb.SelectAll();
             }
         }
+    }
+
+    private static (int RowIndex, DataGridColumn Column) FindNextEditableCell(
+        DataGrid dg,
+        System.Collections.Generic.IReadOnlyList<DataGridColumn> editableCols,
+        int rowIndex,
+        int colIndex)
+    {
+        var itemCount = dg.Items.Count;
+        for (var step = 1; step <= itemCount * editableCols.Count; step++)
+        {
+            var flat = rowIndex * editableCols.Count + colIndex + step;
+            var nextRow = (flat / editableCols.Count) % itemCount;
+            var nextCol = editableCols[flat % editableCols.Count];
+            var item = dg.Items[nextRow];
+            if (IsEditableCell(item, nextCol))
+                return (nextRow, nextCol);
+        }
+
+        return (rowIndex, editableCols[0]);
+    }
+
+    private static bool IsEditableCell(object? item, DataGridColumn? column)
+    {
+        if (item is not SalaryRowVm row || column is null) return false;
+        return column.Header?.ToString() switch
+        {
+            "Absent" => true,
+            "ESIC" => row.UsesEsicPf,
+            "PF" => row.UsesEsicPf,
+            "TDS" => row.UsesTds,
+            "Adv. Ded" => true,
+            _ => false
+        };
     }
 
     private static DataGridCell? GetCurrentCell(DataGrid dg)

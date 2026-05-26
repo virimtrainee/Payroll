@@ -15,7 +15,8 @@ public record SalarySlipData(
     int Year,
     int Month,
     SalaryBreakdown Breakdown,
-    decimal AdvanceBalance);
+    decimal AdvanceBalance,
+    decimal SalaryAdvanceDeduction);
 
 public record MonthlySummaryRow(
     string EmployeeName,
@@ -24,6 +25,8 @@ public record MonthlySummaryRow(
     decimal Deduction,
     decimal EsicDeduction,
     decimal PfDeduction,
+    decimal TdsDeduction,
+    decimal AdvanceDeduction,
     decimal NetSalary);
 
 public class PdfSlipService
@@ -105,12 +108,17 @@ public class PdfSlipService
                         DetailRow(box, "ESIC deduction", $"- {d.Breakdown.EsicDeduction:N2}");
                     if (d.Breakdown.PfDeduction > 0)
                         DetailRow(box, "PF deduction",   $"- {d.Breakdown.PfDeduction:N2}");
+                    if (d.Breakdown.TdsDeduction > 0)
+                        DetailRow(box, "TDS deduction",  $"- {d.Breakdown.TdsDeduction:N2}");
+                    if (d.SalaryAdvanceDeduction > 0)
+                        DetailRow(box, "Advance deduction", $"- {d.SalaryAdvanceDeduction:N2}");
                 });
 
                 col.Item().PaddingTop(8).Background("#2563EB").Padding(12).Row(r =>
                 {
-                    r.RelativeItem().Text("NET SALARY").FontSize(11).Bold().FontColor("white");
-                    r.ConstantItem(140).AlignRight().Text($"₹ {d.Breakdown.NetSalary:N2}")
+                    var payable = d.Breakdown.NetSalary - Math.Max(0, d.SalaryAdvanceDeduction);
+                    r.RelativeItem().Text("PAYABLE NET").FontSize(11).Bold().FontColor("white");
+                    r.ConstantItem(140).AlignRight().Text($"₹ {payable:N2}")
                         .FontSize(16).Bold().FontColor("white");
                 });
 
@@ -118,7 +126,7 @@ public class PdfSlipService
                 {
                     t.Span("Outstanding advance balance: ").FontColor("#64748B");
                     t.Span($"₹ {d.AdvanceBalance:N2}").Bold();
-                    t.Span("  (tracked separately, not deducted from this slip).").FontColor("#64748B");
+                    t.Span("  (tracked in the advance ledger).").FontColor("#64748B");
                 });
             });
 
@@ -170,6 +178,8 @@ public class PdfSlipService
                     cd.RelativeColumn(2);
                     cd.RelativeColumn(2);
                     cd.RelativeColumn(2);
+                    cd.RelativeColumn(2);
+                    cd.RelativeColumn(2);
                 });
 
                 t.Header(h =>
@@ -180,10 +190,12 @@ public class PdfSlipService
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Deduction").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("ESIC").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("PF").Bold();
+                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("TDS").Bold();
+                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Adv. Ded").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Net Salary").Bold();
                 });
 
-                decimal totalBase = 0, totalDed = 0, totalEsic = 0, totalPf = 0, totalNet = 0;
+                decimal totalBase = 0, totalDed = 0, totalEsic = 0, totalPf = 0, totalTds = 0, totalAdvance = 0, totalNet = 0;
                 foreach (var r in rows)
                 {
                     t.Cell().Padding(6).Text(r.EmployeeName);
@@ -192,11 +204,15 @@ public class PdfSlipService
                     t.Cell().Padding(6).AlignRight().Text(r.Deduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.PfDeduction.ToString("N2"));
+                    t.Cell().Padding(6).AlignRight().Text(r.TdsDeduction.ToString("N2"));
+                    t.Cell().Padding(6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
                     totalBase += r.BaseSalary;
                     totalDed  += r.Deduction;
                     totalEsic += r.EsicDeduction;
                     totalPf   += r.PfDeduction;
+                    totalTds  += r.TdsDeduction;
+                    totalAdvance += r.AdvanceDeduction;
                     totalNet  += r.NetSalary;
                 }
 
@@ -206,6 +222,8 @@ public class PdfSlipService
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor("white");
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor("white");
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor("white");
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor("white");
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor("white");
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor("white");
             });
 

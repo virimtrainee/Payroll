@@ -11,4 +11,5 @@ public class AttendanceRecord
     public int DaysAbsent { get; set; }
     public decimal EsicDeduction { get; set; }
     public decimal PfDeduction { get; set; }
+    public decimal TdsDeduction { get; set; }
 }

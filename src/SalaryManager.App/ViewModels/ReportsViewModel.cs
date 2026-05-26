@@ -33,13 +33,16 @@ public partial class ReportsViewModel : ObservableObject
     [ObservableProperty] private int selectedYear = DateTime.Now.Year;
 
     public RangeObservableCollection<Employee> Employees { get; } = new();
+    public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
     [ObservableProperty] private Employee? selectedEmployee;
+    [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
 
     [ObservableProperty] private string kpiTotalPayable   = "₹0.00";
     [ObservableProperty] private string kpiGross          = "₹0.00";
     [ObservableProperty] private string kpiDeductions     = "₹0.00";
     [ObservableProperty] private int    kpiActiveEmployees;
     [ObservableProperty] private bool   isLoading;
+    private bool _updatingGroupFilter;
 
     public ReportsViewModel(IDbContextFactory<AppDbContext> dbf,
                             DatabaseInitializer dbInit,
@@ -57,6 +60,8 @@ public partial class ReportsViewModel : ObservableObject
         try
         {
             await _dbInit.ReadyTask;
+            using (var db = await _dbf.CreateDbContextAsync())
+                await LoadGroupFiltersAsync(db);
             await LoadEmployeesAsync();
             await LoadKpisAsync();
         }
@@ -69,13 +74,23 @@ public partial class ReportsViewModel : ObservableObject
     private async Task LoadEmployeesAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
-        var list = await db.Employees.AsNoTracking().OrderBy(e => e.Name).ToListAsync();
+        var query = db.Employees.AsNoTracking();
+        if (SelectedGroupFilter?.Id is int groupId)
+            query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+        var list = await query.OrderBy(e => e.Name).ToListAsync();
         Employees.ReplaceAll(list);
         SelectedEmployee = Employees.FirstOrDefault();
     }
 
     partial void OnSelectedMonthChanged(MonthOption value) => _ = LoadKpisAsync();
     partial void OnSelectedYearChanged(int value)          => _ = LoadKpisAsync();
+    partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
+    {
+        if (_updatingGroupFilter) return;
+        _ = LoadEmployeesAsync();
+        _ = LoadKpisAsync();
+    }
 
     private async Task LoadKpisAsync()
     {
@@ -87,7 +102,10 @@ public partial class ReportsViewModel : ObservableObject
             var ded   = gross - net;
 
             using var db = await _dbf.CreateDbContextAsync();
-            var active = await db.Employees.CountAsync(e => e.IsActive);
+            var activeQuery = db.Employees.Where(e => e.IsActive);
+            if (SelectedGroupFilter?.Id is int groupId)
+                activeQuery = activeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+            var active = await activeQuery.CountAsync();
 
             KpiTotalPayable   = $"₹{net:N0}";
             KpiGross          = $"₹{gross:N0}";
@@ -188,11 +206,22 @@ public partial class ReportsViewModel : ObservableObject
     private async Task<List<MonthlySummaryRow>> BuildSummaryRowsAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
-        var employees = await db.Employees.AsNoTracking().Where(e => e.IsActive).OrderBy(e => e.Name).ToListAsync();
+        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+        if (SelectedGroupFilter?.Id is int groupId)
+            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
         var ids = employees.Select(e => e.Id).ToList();
+        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
         var attendance = await db.AttendanceRecords.AsNoTracking()
             .Where(a => ids.Contains(a.EmployeeId) && a.Year == SelectedYear && a.Month == SelectedMonth.Number)
             .ToDictionaryAsync(a => a.EmployeeId, a => a);
+
+        var advanceDeductions = await db.Advances.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId)
+                     && a.SourceKey == sourceKey
+                     && a.EntryType == AdvanceEntryType.Deducted)
+            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
 
         var list = new List<MonthlySummaryRow>(employees.Count);
         foreach (var e in employees)
@@ -201,8 +230,12 @@ public partial class ReportsViewModel : ObservableObject
             var absent = rec?.DaysAbsent ?? 0;
             var esic = rec?.EsicDeduction ?? 0m;
             var pf = rec?.PfDeduction ?? 0m;
-            var b = SalaryCalculator.Compute(e.BaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf);
-            list.Add(new MonthlySummaryRow(e.Name, e.BaseSalary, absent, b.Deduction, esic, pf, b.NetSalary));
+            var tds = rec?.TdsDeduction ?? 0m;
+            var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
+            var b = SalaryCalculator.Compute(e.BaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
+            list.Add(new MonthlySummaryRow(e.Name, e.BaseSalary, absent, b.Deduction,
+                b.EsicDeduction, b.PfDeduction, b.TdsDeduction, advanceDeduction,
+                b.NetSalary - advanceDeduction));
         }
         return list;
     }
@@ -223,5 +256,28 @@ public partial class ReportsViewModel : ObservableObject
     private static void OpenFile(string path)
     {
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
+    }
+
+    private async Task LoadGroupFiltersAsync(AppDbContext db)
+    {
+        var selectedId = SelectedGroupFilter?.Id;
+        var groups = await db.EmployeeGroups.AsNoTracking()
+            .OrderBy(g => g.Name)
+            .Select(g => new GroupFilterOptionVm(g.Id, g.Name))
+            .ToListAsync();
+
+        var options = new List<GroupFilterOptionVm> { new(null, "All Groups") };
+        options.AddRange(groups);
+
+        _updatingGroupFilter = true;
+        try
+        {
+            GroupFilterOptions.ReplaceAll(options);
+            SelectedGroupFilter = options.FirstOrDefault(g => g.Id == selectedId) ?? options[0];
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
     }
 }

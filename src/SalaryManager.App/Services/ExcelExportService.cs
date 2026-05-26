@@ -21,9 +21,9 @@ public class ExcelExportService
         var ws = wb.AddWorksheet($"{monthName} {year}");
 
         ws.Cell(1, 1).Value = $"Payroll Summary — {monthName} {year}";
-        ws.Range(1, 1, 1, 7).Merge().Style.Font.SetBold().Font.SetFontSize(14);
+        ws.Range(1, 1, 1, 9).Merge().Style.Font.SetBold().Font.SetFontSize(14);
 
-        var headers = new[] { "Employee", "Base Salary", "Days Absent", "Deduction", "ESIC", "PF", "Net Salary" };
+        var headers = new[] { "Employee", "Base Salary", "Days Absent", "Deduction", "ESIC", "PF", "TDS", "Advance Deduction", "Net Salary" };
         for (int i = 0; i < headers.Length; i++)
         {
             var c = ws.Cell(3, i + 1);
@@ -33,7 +33,7 @@ public class ExcelExportService
         }
 
         int r = 4;
-        decimal tBase = 0, tDed = 0, tEsic = 0, tPf = 0, tNet = 0;
+        decimal tBase = 0, tDed = 0, tEsic = 0, tPf = 0, tTds = 0, tAdvance = 0, tNet = 0;
         foreach (var row in rows)
         {
             ws.Cell(r, 1).Value = row.EmployeeName;
@@ -42,12 +42,16 @@ public class ExcelExportService
             ws.Cell(r, 4).Value = row.Deduction;
             ws.Cell(r, 5).Value = row.EsicDeduction;
             ws.Cell(r, 6).Value = row.PfDeduction;
-            ws.Cell(r, 7).Value = row.NetSalary;
+            ws.Cell(r, 7).Value = row.TdsDeduction;
+            ws.Cell(r, 8).Value = row.AdvanceDeduction;
+            ws.Cell(r, 9).Value = row.NetSalary;
 
             tBase += row.BaseSalary;
             tDed  += row.Deduction;
             tEsic += row.EsicDeduction;
             tPf   += row.PfDeduction;
+            tTds  += row.TdsDeduction;
+            tAdvance += row.AdvanceDeduction;
             tNet  += row.NetSalary;
             r++;
         }
@@ -57,15 +61,17 @@ public class ExcelExportService
         ws.Cell(r, 4).Value = tDed;
         ws.Cell(r, 5).Value = tEsic;
         ws.Cell(r, 6).Value = tPf;
-        ws.Cell(r, 7).Value = tNet;
-        ws.Range(r, 1, r, 7).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
+        ws.Cell(r, 7).Value = tTds;
+        ws.Cell(r, 8).Value = tAdvance;
+        ws.Cell(r, 9).Value = tNet;
+        ws.Range(r, 1, r, 9).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
             .Font.SetFontColor(XLColor.White);
 
         ws.Range(4, 2, r, 2).Style.NumberFormat.Format = "#,##0.00";
         ws.Range(4, 4, r, 4).Style.NumberFormat.Format = "#,##0.00";
         ws.Range(4, 5, r, 5).Style.NumberFormat.Format = "#,##0.00";
         ws.Range(4, 6, r, 6).Style.NumberFormat.Format = "#,##0.00";
-        ws.Range(4, 7, r, 7).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(4, 7, r, 9).Style.NumberFormat.Format = "#,##0.00";
         ws.Columns().AdjustToContents();
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);

@@ -39,6 +39,12 @@
                     <ComboBox ItemsSource="{Binding Years}"
                               SelectedItem="{Binding SelectedYear}"/>
                 </StackPanel>
+                <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                    <TextBlock Text="GROUP" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Width="160" ItemsSource="{Binding GroupFilterOptions}"
+                              SelectedItem="{Binding SelectedGroupFilter}"
+                              DisplayMemberPath="Name"/>
+                </StackPanel>
 
                 <Button Grid.Column="3" Style="{StaticResource SecondaryButton}"
                         Content="Reload" Margin="8,18,8,0"
@@ -116,6 +122,7 @@
                         <DataGridTemplateColumn.CellEditingTemplate>
                             <DataTemplate>
                                 <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesEsicPf}"
                                          TextAlignment="Right"
                                          VerticalContentAlignment="Center"
                                          BorderThickness="0"
@@ -137,6 +144,29 @@
                         <DataGridTemplateColumn.CellEditingTemplate>
                             <DataTemplate>
                                 <TextBox Text="{Binding PfDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesEsicPf}"
+                                         TextAlignment="Right"
+                                         VerticalContentAlignment="Center"
+                                         BorderThickness="0"
+                                         Padding="8,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- TDS: formatted display, raw edit -->
+                    <DataGridTemplateColumn Header="TDS Deduction" Width="140">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Padding="0,0,12,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding TdsDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding UsesTds}"
                                          TextAlignment="Right"
                                          VerticalContentAlignment="Center"
                                          BorderThickness="0"

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,16 @@ public class EmployeeWithBalanceVm
     public decimal Balance     { get; init; }
 }
 
+public partial class AdvanceEntryEditVm : ObservableObject
+{
+    public AdvanceEntryType[] EntryTypes { get; } = [AdvanceEntryType.Given, AdvanceEntryType.Deducted];
+
+    [ObservableProperty] private DateTime? date = DateTime.Today;
+    [ObservableProperty] private AdvanceEntryType entryType = AdvanceEntryType.Given;
+    [ObservableProperty] private decimal amount;
+    [ObservableProperty] private string? note;
+}
+
 public partial class AdvancesViewModel : ObservableObject
 {
     private readonly IDbContextFactory<AppDbContext> _dbf;
@@ -35,6 +46,7 @@ public partial class AdvancesViewModel : ObservableObject
     public RangeObservableCollection<EmployeeWithBalanceVm> EmployeeRail { get; } = new();
     public ICollectionView                             EmployeeRailView { get; }
     public RangeObservableCollection<LedgerRow>        Ledger       { get; } = new();
+    public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
 
     [ObservableProperty] private EmployeeWithBalanceVm? selectedRailItem;
     [ObservableProperty] private Employee?               selectedEmployee;
@@ -46,9 +58,15 @@ public partial class AdvancesViewModel : ObservableObject
     [ObservableProperty] private bool                    showOnlyWithAdvances;
     [ObservableProperty] private int                     filteredCount;
     [ObservableProperty] private bool                    isLoading;
+    [ObservableProperty] private GroupFilterOptionVm?     selectedGroupFilter;
+    private bool _updatingGroupFilter;
 
     partial void OnSearchTextChanged(string value)          => RefreshFilter();
     partial void OnShowOnlyWithAdvancesChanged(bool value)  => RefreshFilter();
+    partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
+    {
+        if (!_updatingGroupFilter) _ = LoadAsync();
+    }
 
     private void RefreshFilter()
     {
@@ -101,10 +119,13 @@ public partial class AdvancesViewModel : ObservableObject
         var prevId = SelectedEmployee?.Id;
 
         using var db = await _dbf.CreateDbContextAsync();
-        var list = await db.Employees.AsNoTracking()
-            .Where(e => e.IsActive)
-            .OrderBy(e => e.Name)
-            .ToListAsync();
+        await LoadGroupFiltersAsync(db);
+
+        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+        if (SelectedGroupFilter?.Id is int groupId)
+            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+        var list = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
 
         var ids = list.Select(e => e.Id).ToList();
         var balances = await db.Advances.AsNoTracking()
@@ -183,6 +204,69 @@ public partial class AdvancesViewModel : ObservableObject
         NewAmount = 0;
         NewNote   = null;
         await LoadAsync();
+    }
+
+    [RelayCommand]
+    private async Task EditEntryAsync(LedgerRow? row)
+    {
+        if (row?.Entry is null) return;
+
+        var vm = new AdvanceEntryEditVm
+        {
+            Date = row.Entry.Date,
+            EntryType = row.Entry.EntryType,
+            Amount = row.Entry.Amount,
+            Note = row.Entry.Note
+        };
+
+        var dialog = new AdvanceEntryWindow(vm)
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        if (dialog.ShowDialog() != true) return;
+        if (vm.Amount <= 0) { _dialogs.Error("Amount must be greater than zero."); return; }
+
+        using var db = await _dbf.CreateDbContextAsync();
+        var advance = await db.Advances.FindAsync(row.Entry.Id);
+        if (advance is null) return;
+        if (AdvanceSourceKeys.TryParseSalary(advance.SourceKey, out var salaryYear, out var salaryMonth))
+        {
+            advance.Date = new DateTime(salaryYear, salaryMonth, 1);
+            advance.EntryType = AdvanceEntryType.Deducted;
+        }
+        else
+        {
+            advance.Date = (vm.Date ?? DateTime.Today).Date;
+            advance.EntryType = vm.EntryType;
+        }
+        advance.Amount = vm.Amount;
+        advance.Note = string.IsNullOrWhiteSpace(vm.Note) ? null : vm.Note.Trim();
+        await db.SaveChangesAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadGroupFiltersAsync(AppDbContext db)
+    {
+        var selectedId = SelectedGroupFilter?.Id;
+        var groups = await db.EmployeeGroups.AsNoTracking()
+            .OrderBy(g => g.Name)
+            .Select(g => new GroupFilterOptionVm(g.Id, g.Name))
+            .ToListAsync();
+
+        var options = new List<GroupFilterOptionVm> { new(null, "All Groups") };
+        options.AddRange(groups);
+
+        _updatingGroupFilter = true;
+        try
+        {
+            GroupFilterOptions.ReplaceAll(options);
+            SelectedGroupFilter = options.FirstOrDefault(g => g.Id == selectedId) ?? options[0];
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
     }
 
     private static string GetInitials(string name)

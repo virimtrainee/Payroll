@@ -30,4 +30,5 @@ public class Employee
     public List<AttendanceRecord> AttendanceRecords { get; set; } = new();
     public List<Advance> Advances { get; set; } = new();
     public List<SalaryRevision> SalaryRevisions { get; set; } = new();
+    public List<EmployeeGroupMembership> GroupMemberships { get; set; } = new();
 }

@@ -29,5 +29,9 @@ public partial class MainViewModel : ObservableObject
         var win = _sp.GetRequiredService<EmployeesWindow>();
         win.Owner = Application.Current.MainWindow;
         win.ShowDialog();
+        DashboardVm.LoadCommand.Execute(null);
+        SalarySheetVm.LoadCommand.Execute(null);
+        AdvancesVm.LoadCommand.Execute(null);
+        ReportsVm.LoadCommand.Execute(null);
     }
 }

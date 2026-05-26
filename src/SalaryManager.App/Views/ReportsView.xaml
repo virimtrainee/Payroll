@@ -54,7 +54,7 @@
                     <TextBlock Text="DEDUCTIONS" Style="{StaticResource FieldLabel}"/>
                     <TextBlock Text="{Binding KpiDeductions}"
                                FontSize="22" FontWeight="Bold" Margin="0,4,0,0"/>
-                    <TextBlock Text="Absent + ESIC + PF" FontSize="11"
+                    <TextBlock Text="Absent + ESIC + PF + TDS + advances" FontSize="11"
                                Foreground="{StaticResource MutedTextBrush}" Margin="0,3,0,0"/>
                 </StackPanel>
             </Border>
@@ -103,6 +103,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="160"/>
                             <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="150"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="PERIOD" Style="{StaticResource FieldLabel}"
@@ -111,6 +112,9 @@
                                   SelectedItem="{Binding SelectedMonth}" DisplayMemberPath="Name"/>
                         <ComboBox Grid.Column="2" ItemsSource="{Binding Years}"
                                   SelectedItem="{Binding SelectedYear}" Margin="8,0,0,0"/>
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding GroupFilterOptions}"
+                                  SelectedItem="{Binding SelectedGroupFilter}"
+                                  DisplayMemberPath="Name" Margin="8,0,0,0"/>
                     </Grid>
 
                     <!-- Action footer -->
@@ -173,15 +177,25 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Employee selector -->
+                    <!-- Group and employee selector -->
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="EMPLOYEE" Style="{StaticResource FieldLabel}"
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="GROUP" Style="{StaticResource FieldLabel}"
                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding Employees}"
+                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding GroupFilterOptions}"
+                                  SelectedItem="{Binding SelectedGroupFilter}"
+                                  DisplayMemberPath="Name"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="EMPLOYEE" Style="{StaticResource FieldLabel}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Employees}"
                                   SelectedItem="{Binding SelectedEmployee}"
                                   DisplayMemberPath="Name"/>
                     </Grid>

@@ -28,11 +28,14 @@ public partial class SalaryRowVm : ObservableObject
     public string? AccountNumber { get; init; }
     public string? IfscCode { get; init; }
     public PaymentMode PaymentMode { get; init; }
+    public bool UsesTds => BaseSalary > 25000m;
+    public bool UsesEsicPf => !UsesTds;
 
     // Editable attendance fields — trigger recalculation on change
     [ObservableProperty] private int daysAbsent;
     [ObservableProperty] private decimal esicDeduction;
     [ObservableProperty] private decimal pfDeduction;
+    [ObservableProperty] private decimal tdsDeduction;
     [ObservableProperty] private decimal advanceDeductionEntry;
 
     // Computed display fields — updated by Recalculate()
@@ -43,12 +46,16 @@ public partial class SalaryRowVm : ObservableObject
     partial void OnDaysAbsentChanged(int value)            => Recalculate();
     partial void OnEsicDeductionChanged(decimal value)     => Recalculate();
     partial void OnPfDeductionChanged(decimal value)       => Recalculate();
+    partial void OnTdsDeductionChanged(decimal value)      => Recalculate();
     partial void OnAdvanceDeductionEntryChanged(decimal value) => Recalculate();
 
     public void Recalculate()
     {
         var b = SalaryCalculator.Compute(BaseSalary, Year, Month,
-            Math.Max(0, DaysAbsent), Math.Max(0, EsicDeduction), Math.Max(0, PfDeduction));
+            Math.Max(0, DaysAbsent),
+            Math.Max(0, EsicDeduction),
+            Math.Max(0, PfDeduction),
+            Math.Max(0, TdsDeduction));
         PerDay    = b.PerDayRate;
         Deduction = b.Deduction;
         NetSalary = b.NetSalary - Math.Max(0, AdvanceDeductionEntry);
@@ -72,6 +79,7 @@ public partial class SalarySheetViewModel : ObservableObject
     [ObservableProperty] private decimal totalGross;
     [ObservableProperty] private decimal totalDeduction;
     [ObservableProperty] private int employeeCount;
+    [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsGridReadOnly))]
@@ -84,6 +92,9 @@ public partial class SalarySheetViewModel : ObservableObject
     public string EditButtonText => IsEditMode ? "Done" : "Edit";
 
     public RangeObservableCollection<SalaryRowVm> Rows { get; } = new();
+    public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
+
+    private bool _updatingGroupFilter;
 
     public SalarySheetViewModel(IDbContextFactory<AppDbContext> dbf,
                                 DatabaseInitializer dbInit,
@@ -96,6 +107,10 @@ public partial class SalarySheetViewModel : ObservableObject
 
     partial void OnSelectedMonthChanged(MonthOption value) => _ = LoadAsync();
     partial void OnSelectedYearChanged(int value) => _ = LoadAsync();
+    partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
+    {
+        if (!_updatingGroupFilter) _ = LoadAsync();
+    }
 
     [RelayCommand]
     private void ToggleEditMode() => IsEditMode = !IsEditMode;
@@ -109,13 +124,18 @@ public partial class SalarySheetViewModel : ObservableObject
         await _dbInit.ReadyTask;
 
         using var db = await _dbf.CreateDbContextAsync();
+        await LoadGroupFiltersAsync(db);
 
-        var employees = await db.Employees.AsNoTracking()
-            .Where(e => e.IsActive)
-            .OrderBy(e => e.Name)
-            .ToListAsync();
+        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+        if (SelectedGroupFilter?.Id is int groupId)
+        {
+            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+        }
+
+        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
 
         var ids = employees.Select(e => e.Id).ToList();
+        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
 
         var attendance = await db.AttendanceRecords.AsNoTracking()
             .Where(a => ids.Contains(a.EmployeeId)
@@ -127,7 +147,11 @@ public partial class SalarySheetViewModel : ObservableObject
             .Where(a => ids.Contains(a.EmployeeId))
             .SumBalancesByEmployeeAsync();
 
-        var prevDeductions = Rows.ToDictionary(r => r.EmployeeId, r => r.AdvanceDeductionEntry);
+        var salaryAdvanceDeductions = await db.Advances.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId)
+                     && a.SourceKey == sourceKey
+                     && a.EntryType == AdvanceEntryType.Deducted)
+            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
 
         var newRows = new List<SalaryRowVm>(employees.Count);
         int serial = 0;
@@ -161,9 +185,10 @@ public partial class SalarySheetViewModel : ObservableObject
 
             // Set editable fields without triggering partial recalc individually
             row.DaysAbsent      = (rec?.DaysAbsent ?? 0) + proRata;
-            row.EsicDeduction   = rec?.EsicDeduction ?? 0m;
-            row.PfDeduction     = rec?.PfDeduction ?? 0m;
-            row.AdvanceDeductionEntry = prevDeductions.GetValueOrDefault(e.Id, 0m);
+            row.EsicDeduction   = row.UsesEsicPf ? rec?.EsicDeduction ?? 0m : 0m;
+            row.PfDeduction     = row.UsesEsicPf ? rec?.PfDeduction ?? 0m : 0m;
+            row.TdsDeduction    = row.UsesTds ? rec?.TdsDeduction ?? 0m : 0m;
+            row.AdvanceDeductionEntry = salaryAdvanceDeductions.GetValueOrDefault(e.Id, 0m);
             row.Recalculate();
 
             row.PropertyChanged += (_, args) =>
@@ -171,7 +196,7 @@ public partial class SalarySheetViewModel : ObservableObject
                 if (args.PropertyName == nameof(SalaryRowVm.NetSalary))
                 {
                     TotalNet       = Rows.Sum(r => r.NetSalary);
-                    TotalDeduction = Rows.Sum(r => r.Deduction + Math.Max(0, r.AdvanceDeductionEntry));
+                    TotalDeduction = Rows.Sum(TotalDeductionFor);
                 }
             };
 
@@ -182,7 +207,7 @@ public partial class SalarySheetViewModel : ObservableObject
 
         TotalNet       = Rows.Sum(r => r.NetSalary);
         TotalGross     = Rows.Sum(r => r.BaseSalary);
-        TotalDeduction = Rows.Sum(r => r.Deduction + Math.Max(0, r.AdvanceDeductionEntry));
+        TotalDeduction = Rows.Sum(TotalDeductionFor);
         EmployeeCount  = Rows.Count;
         }
         finally
@@ -212,8 +237,9 @@ public partial class SalarySheetViewModel : ObservableObject
                 if (existing.TryGetValue(r.EmployeeId, out var rec))
                 {
                     rec.DaysAbsent    = Math.Clamp(r.DaysAbsent, 0, daysInMonth);
-                    rec.EsicDeduction = Math.Max(0, r.EsicDeduction);
-                    rec.PfDeduction   = Math.Max(0, r.PfDeduction);
+                    rec.EsicDeduction = r.UsesEsicPf ? Math.Max(0, r.EsicDeduction) : 0m;
+                    rec.PfDeduction   = r.UsesEsicPf ? Math.Max(0, r.PfDeduction) : 0m;
+                    rec.TdsDeduction  = r.UsesTds ? Math.Max(0, r.TdsDeduction) : 0m;
                 }
                 else
                 {
@@ -223,8 +249,9 @@ public partial class SalarySheetViewModel : ObservableObject
                         Year          = SelectedYear,
                         Month         = SelectedMonth.Number,
                         DaysAbsent    = Math.Clamp(r.DaysAbsent, 0, daysInMonth),
-                        EsicDeduction = Math.Max(0, r.EsicDeduction),
-                        PfDeduction   = Math.Max(0, r.PfDeduction),
+                        EsicDeduction = r.UsesEsicPf ? Math.Max(0, r.EsicDeduction) : 0m,
+                        PfDeduction   = r.UsesEsicPf ? Math.Max(0, r.PfDeduction) : 0m,
+                        TdsDeduction  = r.UsesTds ? Math.Max(0, r.TdsDeduction) : 0m,
                     });
                 }
             }
@@ -238,11 +265,11 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task PostDeductionsAsync()
     {
-        var toPost = Rows.Where(r => r.AdvanceDeductionEntry > 0).ToList();
-        if (toPost.Count == 0) { _dialogs.Error("No deduction amounts entered."); return; }
+        var rows = Rows.ToList();
+        if (rows.Count == 0) { _dialogs.Error("No salary rows loaded."); return; }
 
-        var noteKey = $"SAL:{SelectedYear:0000}-{SelectedMonth.Number:00}";
-        var postIds = toPost.Select(r => r.EmployeeId).ToList();
+        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
+        var postIds = rows.Select(r => r.EmployeeId).ToList();
 
         try
         {
@@ -250,21 +277,37 @@ public partial class SalarySheetViewModel : ObservableObject
 
             var existing = await db.Advances
                 .Where(a => postIds.Contains(a.EmployeeId)
-                         && a.Note == noteKey
-                         && a.EntryType == AdvanceEntryType.Deducted)
-                .ToListAsync();
-            db.Advances.RemoveRange(existing);
+                         && a.SourceKey == sourceKey)
+                .ToDictionaryAsync(a => a.EmployeeId);
 
-            foreach (var row in toPost)
+            foreach (var row in rows)
             {
-                db.Advances.Add(new Advance
+                var amount = Math.Max(0, row.AdvanceDeductionEntry);
+                if (amount <= 0)
                 {
-                    EmployeeId = row.EmployeeId,
-                    Date       = new DateTime(SelectedYear, SelectedMonth.Number, 1),
-                    Amount     = row.AdvanceDeductionEntry,
-                    EntryType  = AdvanceEntryType.Deducted,
-                    Note       = noteKey
-                });
+                    if (existing.TryGetValue(row.EmployeeId, out var remove))
+                        db.Advances.Remove(remove);
+                    continue;
+                }
+
+                if (existing.TryGetValue(row.EmployeeId, out var advance))
+                {
+                    advance.Date = new DateTime(SelectedYear, SelectedMonth.Number, 1);
+                    advance.Amount = amount;
+                    advance.EntryType = AdvanceEntryType.Deducted;
+                }
+                else
+                {
+                    db.Advances.Add(new Advance
+                    {
+                        EmployeeId = row.EmployeeId,
+                        Date       = new DateTime(SelectedYear, SelectedMonth.Number, 1),
+                        Amount     = amount,
+                        EntryType  = AdvanceEntryType.Deducted,
+                        Note       = sourceKey,
+                        SourceKey  = sourceKey
+                    });
+                }
             }
 
             await db.SaveChangesAsync();
@@ -288,13 +331,15 @@ public partial class SalarySheetViewModel : ObservableObject
             var daysAbsent = row.DaysAbsent;
             var esic = row.EsicDeduction;
             var pf = row.PfDeduction;
+            var tds = row.TdsDeduction;
             var advBal = row.AdvanceBalance;
+            var advDeduction = row.AdvanceDeductionEntry;
             var baseSalary = emp.BaseSalary;
 
             var path = await Task.Run(() =>
             {
-                var b = SalaryCalculator.Compute(baseSalary, year, month, daysAbsent, esic, pf);
-                var data = new SalarySlipData(emp, year, month, b, advBal);
+                var b = SalaryCalculator.Compute(baseSalary, year, month, daysAbsent, esic, pf, tds);
+                var data = new SalarySlipData(emp, year, month, b, advBal, advDeduction);
                 return _pdf.GenerateSlip(data);
             });
             OpenFile(path);
@@ -311,8 +356,7 @@ public partial class SalarySheetViewModel : ObservableObject
             var path = _dialogs.AskSavePath("Excel Workbook (*.xlsx)|*.xlsx", defaultName);
             if (path is null) return;
 
-            var data = Rows.Select(r => new MonthlySummaryRow(r.Name, r.BaseSalary, r.DaysAbsent,
-                r.Deduction, r.EsicDeduction, r.PfDeduction, r.NetSalary)).ToList();
+            var data = BuildMonthlySummaryRows(Rows);
             var year = SelectedYear;
             var month = SelectedMonth.Number;
             await Task.Run(() => _excel.ExportMonthlySummary(year, month, data, path));
@@ -330,8 +374,7 @@ public partial class SalarySheetViewModel : ObservableObject
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", defaultName);
             if (path is null) return;
 
-            var data = Rows.Select(r => new MonthlySummaryRow(r.Name, r.BaseSalary, r.DaysAbsent,
-                r.Deduction, r.EsicDeduction, r.PfDeduction, r.NetSalary)).ToList();
+            var data = BuildMonthlySummaryRows(Rows);
             var year = SelectedYear;
             var month = SelectedMonth.Number;
             await Task.Run(() => _pdf.GenerateMonthlySummary(year, month, data, path));
@@ -352,8 +395,7 @@ public partial class SalarySheetViewModel : ObservableObject
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", defaultName);
             if (path is null) return;
 
-            var data = cashRows.Select(r => new MonthlySummaryRow(r.Name, r.BaseSalary, r.DaysAbsent,
-                r.Deduction, r.EsicDeduction, r.PfDeduction, r.NetSalary)).ToList();
+            var data = BuildMonthlySummaryRows(cashRows);
             var year = SelectedYear;
             var month = SelectedMonth.Number;
             await Task.Run(() => _pdf.GenerateMonthlySummary(year, month, data, path));
@@ -392,4 +434,43 @@ public partial class SalarySheetViewModel : ObservableObject
     {
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
     }
+
+    private async Task LoadGroupFiltersAsync(AppDbContext db)
+    {
+        var selectedId = SelectedGroupFilter?.Id;
+        var groups = await db.EmployeeGroups.AsNoTracking()
+            .OrderBy(g => g.Name)
+            .Select(g => new GroupFilterOptionVm(g.Id, g.Name))
+            .ToListAsync();
+
+        var options = new List<GroupFilterOptionVm> { new(null, "All Groups") };
+        options.AddRange(groups);
+
+        _updatingGroupFilter = true;
+        try
+        {
+            GroupFilterOptions.ReplaceAll(options);
+            SelectedGroupFilter = options.FirstOrDefault(g => g.Id == selectedId) ?? options[0];
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
+    }
+
+    private static decimal TotalDeductionFor(SalaryRowVm row)
+        => row.Deduction
+         + (row.UsesEsicPf ? Math.Max(0, row.EsicDeduction) + Math.Max(0, row.PfDeduction) : 0m)
+         + (row.UsesTds ? Math.Max(0, row.TdsDeduction) : 0m)
+         + Math.Max(0, row.AdvanceDeductionEntry);
+
+    private static List<MonthlySummaryRow> BuildMonthlySummaryRows(IEnumerable<SalaryRowVm> rows)
+        => rows.Select(r =>
+        {
+            var b = SalaryCalculator.Compute(r.BaseSalary, r.Year, r.Month, r.DaysAbsent,
+                r.EsicDeduction, r.PfDeduction, r.TdsDeduction);
+            return new MonthlySummaryRow(r.Name, r.BaseSalary, r.DaysAbsent, b.Deduction,
+                b.EsicDeduction, b.PfDeduction, b.TdsDeduction,
+                Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary);
+        }).ToList();
 }

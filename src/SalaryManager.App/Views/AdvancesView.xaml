@@ -57,6 +57,10 @@
                                     </Style>
                                 </TextBox.Style>
                             </TextBox>
+                            <ComboBox ItemsSource="{Binding GroupFilterOptions}"
+                                      SelectedItem="{Binding SelectedGroupFilter}"
+                                      DisplayMemberPath="Name"
+                                      Margin="0,0,0,6"/>
                             <!-- With-advances toggle -->
                             <CheckBox Content="Show only with advances"
                                       Foreground="{StaticResource MutedTextBrush}"
@@ -345,6 +349,18 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
+
+                            <DataGridTemplateColumn Header="Edit" Width="72" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Edit"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,3" Margin="5,2"
+                                                Command="{Binding DataContext.EditEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                     </Grid>

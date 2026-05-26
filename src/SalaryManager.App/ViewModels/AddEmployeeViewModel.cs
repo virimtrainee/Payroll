@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using SalaryManager.Data.Entities;
 
@@ -6,11 +7,17 @@ namespace SalaryManager.App.ViewModels;
 
 public partial class AddEmployeeViewModel : ObservableObject
 {
+    [ObservableProperty] private int? employeeId;
+    [ObservableProperty] private string windowTitle = "New Employee";
+    [ObservableProperty] private string saveButtonText = "Add Employee";
     [ObservableProperty] private string    name          = string.Empty;
     [ObservableProperty] private decimal   baseSalary;
     [ObservableProperty] private string    accountNumber = string.Empty;
     [ObservableProperty] private string    ifscCode      = string.Empty;
     [ObservableProperty] private DateTime? joiningDate;
+    [ObservableProperty] private bool      isActive = true;
+
+    public ObservableCollection<GroupMembershipOptionVm> Groups { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCash))]

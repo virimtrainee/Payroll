@@ -21,4 +21,7 @@ public class Advance
 
     [MaxLength(500)]
     public string? Note { get; set; }
+
+    [MaxLength(64)]
+    public string? SourceKey { get; set; }
 }

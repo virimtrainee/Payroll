@@ -63,4 +63,28 @@ public class SalaryCalculatorTests
         Assert.Equal(30, r.DaysAbsent);
         Assert.Equal(0m, r.NetSalary);
     }
+
+    [Fact]
+    public void SalaryAtThreshold_UsesEsicPfAndIgnoresTds()
+    {
+        var r = SalaryCalculator.Compute(25000m, 2025, 6, daysAbsent: 0,
+            esicDeduction: 100m, pfDeduction: 200m, tdsDeduction: 300m);
+
+        Assert.Equal(100m, r.EsicDeduction);
+        Assert.Equal(200m, r.PfDeduction);
+        Assert.Equal(0m, r.TdsDeduction);
+        Assert.Equal(24700m, r.NetSalary);
+    }
+
+    [Fact]
+    public void SalaryAboveThreshold_UsesTdsAndIgnoresEsicPf()
+    {
+        var r = SalaryCalculator.Compute(25000.01m, 2025, 6, daysAbsent: 0,
+            esicDeduction: 100m, pfDeduction: 200m, tdsDeduction: 300m);
+
+        Assert.Equal(0m, r.EsicDeduction);
+        Assert.Equal(0m, r.PfDeduction);
+        Assert.Equal(300m, r.TdsDeduction);
+        Assert.Equal(24700.01m, r.NetSalary);
+    }
 }

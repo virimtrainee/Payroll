@@ -64,7 +64,7 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
-    public async Task SalarySheetLoad_SelectedGroupsRequireEveryMembership()
+    public async Task SalarySheetLoad_SelectedGroupsIncludeAnyMembership()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -93,7 +93,7 @@ public class EmployeeSalarySheetFilterTests
         viewModel.GroupFilterOptions.Single(g => g.Name == "Night").IsSelected = true;
         await viewModel.LoadCommand.ExecuteAsync(null);
 
-        Assert.Equal(["Both"], viewModel.Rows.Select(r => r.Name));
+        Assert.Equal(["Both", "Factory Only", "Night Only"], viewModel.Rows.Select(r => r.Name));
     }
 
     [Fact]

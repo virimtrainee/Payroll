@@ -140,9 +140,10 @@ public partial class SalarySheetViewModel : ObservableObject
                 .Include(e => e.GroupMemberships)
                     .ThenInclude(m => m.EmployeeGroup)
                 .Where(e => e.IsActive);
-            foreach (var groupId in selectedGroupIds)
+            if (selectedGroupIds.Count > 0)
             {
-                employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+                employeeQuery = employeeQuery.Where(e =>
+                    e.GroupMemberships.Any(m => selectedGroupIds.Contains(m.EmployeeGroupId)));
             }
 
             var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();

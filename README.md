@@ -33,7 +33,7 @@ dotnet run --project src/SalaryManager.App
 dotnet test SalaryManager.slnx
 ```
 
-The first launch creates `salary.db` next to the executable and applies all EF migrations automatically. The DB file is per-user and is gitignored.
+The first launch creates `salary.db` in the same folder as the running app and applies all EF migrations automatically. Runtime files stay beside the app: `salary.db`, `settings.json`, SQLite sidecars, and the `Slips\` folder are not moved to `%LocalAppData%` or any other per-user data directory.
 
 ## Project layout
 
@@ -51,8 +51,9 @@ SalaryManager.slnx
 │       ├── Entities/              Employee, AttendanceRecord, Advance,
 │       │                          SalaryRevision, PaymentMode
 │       ├── Migrations/            EF migrations (run automatically)
-│       └── Services/              SalaryCalculator, AdvanceLedger,
-│                                  AdvanceQueryExtensions
+│       ├── Services/              SalaryCalculator, AdvanceLedger,
+│       │                          AdvanceQueryExtensions
+│       └── Validation/            Employee and payroll validation rules
 └── tests/SalaryManager.Tests/     xUnit tests
 ```
 
@@ -66,21 +67,26 @@ SalaryManager.slnx
 - **Backup / Restore** — `VACUUM INTO` produces an atomic, consistent SQLite snapshot regardless of journal mode.
 - **ICICI Excel export** — generates the bulk-payment template with `PAB_VENDOR` / `FT` / `NEFT` rows ready to upload.
 
-## Performance notes
+## Docs
 
-The codebase had a deep performance pass; the changes are listed in the initial commit message. Highlights:
+- [Architecture](docs/architecture.md)
+- [Import format](docs/import-format.md)
+- [ICICI export](docs/icici-export.md)
+- [Backup and restore](docs/backup-restore.md)
 
-- Database migration runs on a background thread after the window is shown; viewmodels gate their loads on `DatabaseInitializer.ReadyTask`.
-- Tab content is materialized lazily via implicit `DataTemplate`s — only the active tab's view is constructed.
-- Advance balances are aggregated in SQL via `SumBalancesByEmployeeAsync` / `SumOutstandingAsync` instead of pulling rows into memory.
-- Attendance and employee saves are O(1) round-trip patterns (single `ToDictionaryAsync` then mutate) instead of N+1 lookups.
-- `RangeObservableCollection<T>.ReplaceAll` raises a single Reset event instead of N Adds for bulk row loads.
-- The Advances rail uses `ICollectionView.Filter` so search keystrokes don't rebuild the underlying collection.
-- PDF and Excel generation runs inside `Task.Run` to keep the UI thread responsive.
+## Development
 
-## ICICI debit account
+```powershell
+dotnet format SalaryManager.slnx --verify-no-changes --verbosity minimal
+dotnet build SalaryManager.slnx --configuration Release
+dotnet test SalaryManager.slnx --configuration Release
+```
 
-The bulk-payment Excel hard-codes a debit account number in [`ExcelExportService.cs`](src/SalaryManager.App/Services/ExcelExportService.cs) (`DebitAccountNo`). Update that constant to match your bank account before exporting.
+For EF commands, use the data project directly. The design-time context uses a scratch database beside the running assemblies rather than `%LocalAppData%` or the user's live runtime database.
+
+```powershell
+dotnet ef migrations list --project src/SalaryManager.Data
+```
 
 ## License
 

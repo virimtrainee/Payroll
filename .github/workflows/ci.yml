@@ -26,6 +26,9 @@ jobs:
       - name: Restore
         run: dotnet restore SalaryManager.slnx
 
+      - name: Format check
+        run: dotnet format SalaryManager.slnx --verify-no-changes --verbosity minimal --no-restore
+
       - name: Build
         run: dotnet build SalaryManager.slnx --configuration Release --no-restore
 

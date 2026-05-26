@@ -10,10 +10,10 @@ namespace SalaryManager.App.Services;
 
 public record IciciPaymentRow(string Name, string? AccountNumber, string? IfscCode, decimal Amount, PaymentMode PaymentMode);
 
+public record IciciExportOptions(string DebitAccountNo, DateTime PaymentDate);
+
 public class ExcelExportService
 {
-    // Company ICICI debit account — update this to match your bank account number
-    private const string DebitAccountNo = "777705679980";
     public string ExportMonthlySummary(int year, int month, IReadOnlyList<MonthlySummaryRow> rows, string path)
     {
         var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
@@ -47,12 +47,12 @@ public class ExcelExportService
             ws.Cell(r, 9).Value = row.NetSalary;
 
             tBase += row.BaseSalary;
-            tDed  += row.Deduction;
+            tDed += row.Deduction;
             tEsic += row.EsicDeduction;
-            tPf   += row.PfDeduction;
-            tTds  += row.TdsDeduction;
+            tPf += row.PfDeduction;
+            tTds += row.TdsDeduction;
             tAdvance += row.AdvanceDeduction;
-            tNet  += row.NetSalary;
+            tNet += row.NetSalary;
             r++;
         }
 
@@ -79,7 +79,7 @@ public class ExcelExportService
         return path;
     }
 
-    public string ExportIciciPayment(IReadOnlyList<IciciPaymentRow> rows, string path)
+    public string ExportIciciPayment(IReadOnlyList<IciciPaymentRow> rows, IciciExportOptions options, string path)
     {
         using var wb = new XLWorkbook();
         var ws = wb.AddWorksheet("Sheet1");
@@ -98,18 +98,19 @@ public class ExcelExportService
             c.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
         }
 
-        var payDate = DateTime.Today.ToString("dd-MM-yyyy");
+        var payDate = options.PaymentDate.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
         int r = 2;
         foreach (var row in rows)
         {
             var mode = row.PaymentMode == PaymentMode.IciciBank ? "FT" : "NEFT";
             ws.Cell(r, 1).Value = "PAB_VENDOR";
             ws.Cell(r, 2).Value = mode;
-            ws.Cell(r, 3).Value = DebitAccountNo;
+            ws.Cell(r, 3).Value = options.DebitAccountNo;
             ws.Cell(r, 4).Value = row.Name;
             ws.Cell(r, 5).Value = row.AccountNumber ?? "";
             ws.Cell(r, 6).Value = row.IfscCode ?? "";
-            ws.Cell(r, 7).Value = row.Amount.ToString("F2", CultureInfo.InvariantCulture);
+            ws.Cell(r, 7).Value = row.Amount;
+            ws.Cell(r, 7).Style.NumberFormat.Format = "0.00";
             ws.Cell(r, 8).Value = payDate;
             ws.Cell(r, 9).Value = "";
             r++;

@@ -30,9 +30,9 @@ public class AdvanceQueryExtensionsTests
             new Employee { Id = 1, Name = "A", BaseSalary = 1000 },
             new Employee { Id = 2, Name = "B", BaseSalary = 2000 });
         db.Advances.AddRange(
-            new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given,    Date = new DateTime(2025, 1, 5) },
-            new Advance { EmployeeId = 1, Amount =  500m, EntryType = AdvanceEntryType.Deducted, Date = new DateTime(2025, 2, 1) },
-            new Advance { EmployeeId = 2, Amount = 1500m, EntryType = AdvanceEntryType.Given,    Date = new DateTime(2025, 1, 1) });
+            new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given, Date = new DateTime(2025, 1, 5) },
+            new Advance { EmployeeId = 1, Amount = 500m, EntryType = AdvanceEntryType.Deducted, Date = new DateTime(2025, 2, 1) },
+            new Advance { EmployeeId = 2, Amount = 1500m, EntryType = AdvanceEntryType.Given, Date = new DateTime(2025, 1, 1) });
         await db.SaveChangesAsync();
 
         var result = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
@@ -47,8 +47,8 @@ public class AdvanceQueryExtensionsTests
         using var db = NewInMemoryContext();
         db.Employees.Add(new Employee { Id = 1, Name = "A" });
         db.Advances.AddRange(
-            new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given,    Date = DateTime.Today },
-            new Advance { EmployeeId = 1, Amount =  500m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today });
+            new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today },
+            new Advance { EmployeeId = 1, Amount = 500m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today });
         await db.SaveChangesAsync();
 
         var total = await db.Advances.AsNoTracking().SumOutstandingAsync();

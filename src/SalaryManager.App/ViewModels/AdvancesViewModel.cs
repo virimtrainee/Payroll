@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Data;
 using System.Windows;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
@@ -19,11 +20,11 @@ namespace SalaryManager.App.ViewModels;
 
 public class EmployeeWithBalanceVm
 {
-    public int     Id          { get; init; }
-    public string  Name        { get; init; } = "";
-    public string  Initials    { get; init; } = "";
-    public decimal BaseSalary  { get; init; }
-    public decimal Balance     { get; init; }
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Initials { get; init; } = "";
+    public decimal BaseSalary { get; init; }
+    public decimal Balance { get; init; }
 }
 
 public partial class AdvanceEntryEditVm : ObservableObject
@@ -42,30 +43,32 @@ public partial class AdvancesViewModel : ObservableObject
     private readonly DatabaseInitializer _dbInit;
     private readonly DialogService _dialogs;
 
-    public ObservableCollection<Employee>              Employees    { get; } = new();
+    public ObservableCollection<Employee> Employees { get; } = new();
     public RangeObservableCollection<EmployeeWithBalanceVm> EmployeeRail { get; } = new();
-    public ICollectionView                             EmployeeRailView { get; }
-    public RangeObservableCollection<LedgerRow>        Ledger       { get; } = new();
+    public ICollectionView EmployeeRailView { get; }
+    public RangeObservableCollection<LedgerRow> Ledger { get; } = new();
     public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
 
     [ObservableProperty] private EmployeeWithBalanceVm? selectedRailItem;
-    [ObservableProperty] private Employee?               selectedEmployee;
-    [ObservableProperty] private decimal                 currentBalance;
-    [ObservableProperty] private string                  selectedEmployeeInitials = "";
-    [ObservableProperty] private decimal                 newAmount;
-    [ObservableProperty] private string?                 newNote;
-    [ObservableProperty] private string                  searchText = string.Empty;
-    [ObservableProperty] private bool                    showOnlyWithAdvances;
-    [ObservableProperty] private int                     filteredCount;
-    [ObservableProperty] private bool                    isLoading;
-    [ObservableProperty] private GroupFilterOptionVm?     selectedGroupFilter;
+    [ObservableProperty] private Employee? selectedEmployee;
+    [ObservableProperty] private decimal currentBalance;
+    [ObservableProperty] private string selectedEmployeeInitials = "";
+    [ObservableProperty] private decimal newAmount;
+    [ObservableProperty] private string? newNote;
+    [ObservableProperty] private string searchText = string.Empty;
+    [ObservableProperty] private bool showOnlyWithAdvances;
+    [ObservableProperty] private int filteredCount;
+    [ObservableProperty] private bool isLoading;
+    [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
     private bool _updatingGroupFilter;
+    private int _loadVersion;
+    private int _ledgerVersion;
 
-    partial void OnSearchTextChanged(string value)          => RefreshFilter();
-    partial void OnShowOnlyWithAdvancesChanged(bool value)  => RefreshFilter();
+    partial void OnSearchTextChanged(string value) => RefreshFilter();
+    partial void OnShowOnlyWithAdvancesChanged(bool value) => RefreshFilter();
     partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
     {
-        if (!_updatingGroupFilter) _ = LoadAsync();
+        if (!_updatingGroupFilter) LoadCommand.Execute(null);
     }
 
     private void RefreshFilter()
@@ -105,67 +108,76 @@ public partial class AdvancesViewModel : ObservableObject
     partial void OnSelectedEmployeeChanged(Employee? value)
     {
         SelectedEmployeeInitials = GetInitials(value?.Name ?? "");
-        _ = LoadLedgerAsync();
+        LoadLedgerCommand.Execute(null);
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
+        var version = Interlocked.Increment(ref _loadVersion);
         IsLoading = true;
         try
         {
-        await _dbInit.ReadyTask;
+            await _dbInit.ReadyTask;
 
-        var prevId = SelectedEmployee?.Id;
+            var prevId = SelectedEmployee?.Id;
 
-        using var db = await _dbf.CreateDbContextAsync();
-        await LoadGroupFiltersAsync(db);
+            using var db = await _dbf.CreateDbContextAsync();
+            await LoadGroupFiltersAsync(db);
 
-        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
-        if (SelectedGroupFilter?.Id is int groupId)
-            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+            var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+            if (SelectedGroupFilter?.Id is int groupId)
+                employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-        var list = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
+            var list = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
 
-        var ids = list.Select(e => e.Id).ToList();
-        var balances = await db.Advances.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId))
-            .SumBalancesByEmployeeAsync();
+            var ids = list.Select(e => e.Id).ToList();
+            var balances = await db.Advances.AsNoTracking()
+                .Where(a => ids.Contains(a.EmployeeId))
+                .SumBalancesByEmployeeAsync();
 
-        Employees.Clear();
-        var rail = new List<EmployeeWithBalanceVm>(list.Count);
-        foreach (var e in list)
-        {
-            Employees.Add(e);
-            rail.Add(new EmployeeWithBalanceVm
+            if (version != _loadVersion) return;
+            Employees.Clear();
+            var rail = new List<EmployeeWithBalanceVm>(list.Count);
+            foreach (var e in list)
             {
-                Id         = e.Id,
-                Name       = e.Name,
-                Initials   = GetInitials(e.Name),
-                BaseSalary = e.BaseSalary,
-                Balance    = balances.GetValueOrDefault(e.Id, 0m),
-            });
+                Employees.Add(e);
+                rail.Add(new EmployeeWithBalanceVm
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    Initials = GetInitials(e.Name),
+                    BaseSalary = e.BaseSalary,
+                    Balance = balances.GetValueOrDefault(e.Id, 0m),
+                });
+            }
+            EmployeeRail.ReplaceAll(rail);
+
+            RefreshFilter();
+
+            // Restore previous selection (or pick the first visible item)
+            var toSelect = prevId.HasValue
+                ? rail.FirstOrDefault(r => r.Id == prevId.Value && RailFilter(r))
+                : null;
+            toSelect ??= EmployeeRailView.Cast<EmployeeWithBalanceVm>().FirstOrDefault();
+            SelectedRailItem = toSelect;
         }
-        EmployeeRail.ReplaceAll(rail);
-
-        RefreshFilter();
-
-        // Restore previous selection (or pick the first visible item)
-        var toSelect = prevId.HasValue
-            ? rail.FirstOrDefault(r => r.Id == prevId.Value && RailFilter(r))
-            : null;
-        toSelect ??= EmployeeRailView.Cast<EmployeeWithBalanceVm>().FirstOrDefault();
-        SelectedRailItem = toSelect;
+        catch (Exception ex)
+        {
+            if (version == _loadVersion)
+                _dialogs.Error(ex.Message);
         }
         finally
         {
-            IsLoading = false;
+            if (version == _loadVersion)
+                IsLoading = false;
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadLedgerAsync()
     {
+        var version = Interlocked.Increment(ref _ledgerVersion);
         if (SelectedEmployee is null)
         {
             Ledger.ReplaceAll(System.Linq.Enumerable.Empty<LedgerRow>());
@@ -173,36 +185,45 @@ public partial class AdvancesViewModel : ObservableObject
             return;
         }
 
-        using var db = await _dbf.CreateDbContextAsync();
-        var entries = await db.Advances.AsNoTracking()
-            .Where(a => a.EmployeeId == SelectedEmployee.Id)
-            .OrderBy(a => a.Date).ThenBy(a => a.Id)
-            .ToListAsync();
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var entries = await db.Advances.AsNoTracking()
+                .Where(a => a.EmployeeId == SelectedEmployee.Id)
+                .OrderBy(a => a.Date).ThenBy(a => a.Id)
+                .ToListAsync();
 
-        var rows = AdvanceLedger.Build(entries);
-        Ledger.ReplaceAll(rows);
-        CurrentBalance = rows.LastOrDefault()?.RunningBalance ?? 0m;
+            var rows = AdvanceLedger.Build(entries);
+            if (version != _ledgerVersion) return;
+            Ledger.ReplaceAll(rows);
+            CurrentBalance = rows.LastOrDefault()?.RunningBalance ?? 0m;
+        }
+        catch (Exception ex)
+        {
+            if (version == _ledgerVersion)
+                _dialogs.Error(ex.Message);
+        }
     }
 
     [RelayCommand]
     private async Task AddEntryAsync()
     {
         if (SelectedEmployee is null) { _dialogs.Error("Pick an employee first."); return; }
-        if (NewAmount <= 0)           { _dialogs.Error("Amount must be greater than zero."); return; }
+        if (NewAmount <= 0) { _dialogs.Error("Amount must be greater than zero."); return; }
 
         using var db = await _dbf.CreateDbContextAsync();
         db.Advances.Add(new Advance
         {
             EmployeeId = SelectedEmployee.Id,
-            Date       = DateTime.Today,
-            Amount     = NewAmount,
-            EntryType  = AdvanceEntryType.Given,
-            Note       = string.IsNullOrWhiteSpace(NewNote) ? null : NewNote.Trim()
+            Date = DateTime.Today,
+            Amount = NewAmount,
+            EntryType = AdvanceEntryType.Given,
+            Note = string.IsNullOrWhiteSpace(NewNote) ? null : NewNote.Trim()
         });
         await db.SaveChangesAsync();
 
         NewAmount = 0;
-        NewNote   = null;
+        NewNote = null;
         await LoadAsync();
     }
 

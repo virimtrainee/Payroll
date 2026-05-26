@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using QuestPDF.Infrastructure;
@@ -30,7 +31,7 @@ public partial class App : Application
         EventManager.RegisterClassHandler(typeof(TextBox), UIElement.GotKeyboardFocusEvent,
             new KeyboardFocusChangedEventHandler(TextBox_GotKeyboardFocus));
 
-        var connStr = $"Data Source={AppPaths.DatabasePath}";
+        var connStr = new SqliteConnectionStringBuilder { DataSource = AppPaths.DatabasePath }.ToString();
 
         var sc = new ServiceCollection();
 
@@ -42,6 +43,7 @@ public partial class App : Application
         sc.AddSingleton<ExcelImportService>();
         sc.AddSingleton<DialogService>();
         sc.AddSingleton<BackupService>();
+        sc.AddSingleton<AppSettingsService>();
 
         sc.AddSingleton<MainViewModel>();
         sc.AddTransient<DashboardViewModel>();

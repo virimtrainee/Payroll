@@ -98,18 +98,18 @@ public class PdfSlipService
                 col.Item().PaddingTop(6).Background("#F8FAFC").Padding(12).Column(box =>
                 {
                     box.Spacing(6);
-                    DetailRow(box, "Base salary",       d.Breakdown.BaseSalary.ToString("N2"));
-                    DetailRow(box, "Days in month",     d.Breakdown.DaysInMonth.ToString());
-                    DetailRow(box, "Days absent",       d.Breakdown.DaysAbsent.ToString());
-                    DetailRow(box, "Days present",      d.Breakdown.DaysPresent.ToString());
-                    DetailRow(box, "Per-day rate",      d.Breakdown.PerDayRate.ToString("N2"));
+                    DetailRow(box, "Base salary", d.Breakdown.BaseSalary.ToString("N2"));
+                    DetailRow(box, "Days in month", d.Breakdown.DaysInMonth.ToString());
+                    DetailRow(box, "Days absent", d.Breakdown.DaysAbsent.ToString());
+                    DetailRow(box, "Days present", d.Breakdown.DaysPresent.ToString());
+                    DetailRow(box, "Per-day rate", d.Breakdown.PerDayRate.ToString("N2"));
                     DetailRow(box, "Absence deduction", $"- {d.Breakdown.Deduction:N2}");
                     if (d.Breakdown.EsicDeduction > 0)
                         DetailRow(box, "ESIC deduction", $"- {d.Breakdown.EsicDeduction:N2}");
                     if (d.Breakdown.PfDeduction > 0)
-                        DetailRow(box, "PF deduction",   $"- {d.Breakdown.PfDeduction:N2}");
+                        DetailRow(box, "PF deduction", $"- {d.Breakdown.PfDeduction:N2}");
                     if (d.Breakdown.TdsDeduction > 0)
-                        DetailRow(box, "TDS deduction",  $"- {d.Breakdown.TdsDeduction:N2}");
+                        DetailRow(box, "TDS deduction", $"- {d.Breakdown.TdsDeduction:N2}");
                     if (d.SalaryAdvanceDeduction > 0)
                         DetailRow(box, "Advance deduction", $"- {d.SalaryAdvanceDeduction:N2}");
                 });
@@ -208,12 +208,12 @@ public class PdfSlipService
                     t.Cell().Padding(6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
                     totalBase += r.BaseSalary;
-                    totalDed  += r.Deduction;
+                    totalDed += r.Deduction;
                     totalEsic += r.EsicDeduction;
-                    totalPf   += r.PfDeduction;
-                    totalTds  += r.TdsDeduction;
+                    totalPf += r.PfDeduction;
+                    totalTds += r.TdsDeduction;
                     totalAdvance += r.AdvanceDeduction;
-                    totalNet  += r.NetSalary;
+                    totalNet += r.NetSalary;
                 }
 
                 t.Cell().Background("#2563EB").Padding(6).Text("TOTAL").Bold().FontColor("white");

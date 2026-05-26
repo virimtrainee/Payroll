@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,6 +11,7 @@ using SalaryManager.App.Services;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
 using SalaryManager.Data.Services;
+using SalaryManager.Data.Validation;
 
 namespace SalaryManager.App.ViewModels;
 
@@ -24,13 +26,19 @@ public partial class EmployeesViewModel : ObservableObject
     public Helpers.RangeObservableCollection<EmployeeGroup> Groups { get; } = new();
     public Helpers.RangeObservableCollection<GroupEmployeeAssignmentVm> GroupAssignmentRows { get; } = new();
 
-    [ObservableProperty] private bool showInactive;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EmployeeListTitle))]
+    private bool showInactive;
+    [ObservableProperty] private string searchText = string.Empty;
     [ObservableProperty] private Employee? selected;
     [ObservableProperty] private EmployeeGroup? selectedGroup;
     [ObservableProperty] private string newGroupName = string.Empty;
     [ObservableProperty] private string selectedGroupName = string.Empty;
+    private int _loadVersion;
+    private int _groupAssignmentLoadVersion;
 
     public Window? OwnerWindow { get; set; }
+    public string EmployeeListTitle => ShowInactive ? "Inactive employees" : "Active employees";
 
     public EmployeesViewModel(IDbContextFactory<AppDbContext> dbf,
                               DatabaseInitializer dbInit,
@@ -41,32 +49,52 @@ public partial class EmployeesViewModel : ObservableObject
         _dbInit = dbInit;
         _dialogs = dialogs;
         _importer = importer;
-        _ = LoadAsync();
+        LoadCommand.Execute(null);
     }
 
-    partial void OnShowInactiveChanged(bool value) => _ = LoadAsync();
+    partial void OnShowInactiveChanged(bool value) => LoadCommand.Execute(null);
+    partial void OnSearchTextChanged(string value) => LoadCommand.Execute(null);
     partial void OnSelectedGroupChanged(EmployeeGroup? value)
     {
         SelectedGroupName = value?.Name ?? string.Empty;
-        _ = LoadGroupAssignmentsAsync();
+        LoadGroupAssignmentsCommand.Execute(null);
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
-        await _dbInit.ReadyTask;
+        var version = Interlocked.Increment(ref _loadVersion);
+        try
+        {
+            await _dbInit.ReadyTask;
 
-        using var db = await _dbf.CreateDbContextAsync();
-        IQueryable<Employee> query = db.Employees.AsNoTracking().OrderBy(e => e.Name);
-        if (!ShowInactive) query = query.Where(e => e.IsActive);
-        var list = await query.ToListAsync();
-        var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+            using var db = await _dbf.CreateDbContextAsync();
+            IQueryable<Employee> query = db.Employees.AsNoTracking()
+                .Where(e => e.IsActive == !ShowInactive)
+                .OrderBy(e => e.Name);
+            var list = await query.ToListAsync();
+            var search = SearchText.Trim();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                list = list
+                    .Where(e => e.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+            var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
 
-        Employees.ReplaceAll(list);
-        Groups.ReplaceAll(groups);
-        SelectedGroup = SelectedGroup is null
-            ? Groups.FirstOrDefault()
-            : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
-        await LoadGroupAssignmentsAsync();
+            if (version != _loadVersion) return;
+            Employees.ReplaceAll(list);
+            Groups.ReplaceAll(groups);
+            SelectedGroup = SelectedGroup is null
+                ? Groups.FirstOrDefault()
+                : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
+            await LoadGroupAssignmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            if (version == _loadVersion)
+                _dialogs.Error(ex.Message);
+        }
     }
 
     [RelayCommand]
@@ -75,9 +103,14 @@ public partial class EmployeesViewModel : ObservableObject
         var path = _dialogs.AskOpenPath("Excel Workbook (*.xlsx)|*.xlsx");
         if (path is null) return;
 
-        var (importedRows, error) = _importer.ReadEmployees(path);
-        if (error is not null) { _dialogs.Error(error); return; }
-        if (importedRows.Count == 0) { _dialogs.Info("No employee rows found in the file."); return; }
+        var import = _importer.ReadEmployees(path);
+        if (import.Error is not null) { _dialogs.Error(import.Error); return; }
+        if (import.Issues.Count > 0)
+        {
+            _dialogs.Error("Fix the following import errors before importing:\n\n" + FormatImportIssues(import.Issues));
+            return;
+        }
+        if (import.Rows.Count == 0) { _dialogs.Info("No employee rows found in the file."); return; }
 
         try
         {
@@ -89,24 +122,24 @@ public partial class EmployeesViewModel : ObservableObject
                                 .ToListAsync())
                            .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
 
-            int added = 0, skipped = 0;
-            foreach (var row in importedRows)
+            int added = 0, skippedExisting = 0;
+            foreach (var row in import.Rows)
             {
                 if (existing.Contains(row.Name))
                 {
-                    skipped++;
+                    skippedExisting++;
                     continue;
                 }
 
                 db.Employees.Add(new Employee
                 {
-                    Name          = row.Name,
-                    BaseSalary    = row.BaseSalary,
+                    Name = row.Name,
+                    BaseSalary = row.BaseSalary,
                     AccountNumber = row.AccountNumber,
-                    IfscCode      = row.IfscCode,
-                    PaymentMode   = row.PaymentMode,
-                    IsActive      = true,
-                    CreatedAt     = System.DateTime.UtcNow
+                    IfscCode = row.IfscCode,
+                    PaymentMode = row.PaymentMode,
+                    IsActive = true,
+                    CreatedAt = System.DateTime.UtcNow
                 });
 
                 existing.Add(row.Name); // prevent duplicates within the same file
@@ -117,7 +150,7 @@ public partial class EmployeesViewModel : ObservableObject
             await LoadAsync();
 
             var msg = $"Imported {added} employee{(added == 1 ? "" : "s")}.";
-            if (skipped > 0) msg += $" {skipped} skipped (name already exists).";
+            if (skippedExisting > 0) msg += $" {skippedExisting} skipped (name already exists).";
             _dialogs.Info(msg);
         }
         catch (System.Exception ex) { _dialogs.Error(ex.Message); }
@@ -137,25 +170,22 @@ public partial class EmployeesViewModel : ObservableObject
 
         if (dialog.ShowDialog() != true) return;
 
-        if (string.IsNullOrWhiteSpace(vm.Name))
-        {
-            _dialogs.Error("Employee name is required.");
-            return;
-        }
-
         try
         {
             using var db = await _dbf.CreateDbContextAsync();
+            var validation = await ValidateEmployeeAsync(db, vm, null);
+            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+
             var employee = new Employee
             {
-                Name          = vm.Name.Trim(),
-                BaseSalary    = vm.BaseSalary,
-                AccountNumber = string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim(),
-                IfscCode      = string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant(),
-                PaymentMode   = vm.PaymentMode,
-                JoiningDate   = vm.JoiningDate,
-                IsActive      = vm.IsActive,
-                CreatedAt     = DateTime.UtcNow
+                Name = vm.Name.Trim(),
+                BaseSalary = vm.BaseSalary,
+                AccountNumber = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim(),
+                IfscCode = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant(),
+                PaymentMode = vm.PaymentMode,
+                JoiningDate = vm.JoiningDate,
+                IsActive = vm.IsActive,
+                CreatedAt = DateTime.UtcNow
             };
             db.Employees.Add(employee);
             await db.SaveChangesAsync();
@@ -198,18 +228,16 @@ public partial class EmployeesViewModel : ObservableObject
         };
 
         if (dialog.ShowDialog() != true) return;
-        if (string.IsNullOrWhiteSpace(vm.Name))
-        {
-            _dialogs.Error("Employee name is required.");
-            return;
-        }
+
+        var validation = await ValidateEmployeeAsync(db, vm, tracked.Id);
+        if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
 
         var oldSalary = tracked.BaseSalary;
         tracked.Name = vm.Name.Trim();
         tracked.BaseSalary = vm.BaseSalary;
         tracked.IsActive = vm.IsActive;
-        tracked.AccountNumber = string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim();
-        tracked.IfscCode = string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant();
+        tracked.AccountNumber = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim();
+        tracked.IfscCode = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant();
         tracked.PaymentMode = vm.PaymentMode;
         tracked.JoiningDate = vm.JoiningDate;
 
@@ -240,6 +268,28 @@ public partial class EmployeesViewModel : ObservableObject
         var tracked = await db.Employees
             .Where(e => ids.Contains(e.Id))
             .ToDictionaryAsync(e => e.Id);
+        var allEmployees = await db.Employees.AsNoTracking()
+            .Select(e => new { e.Id, e.Name })
+            .ToListAsync();
+        var issues = new List<ValidationIssue>();
+
+        foreach (var e in Employees)
+        {
+            if (!tracked.TryGetValue(e.Id, out var t)) continue;
+
+            var duplicateNames = allEmployees
+                .Where(existing => existing.Id != e.Id)
+                .Select(existing => existing.Name)
+                .Concat(Employees.Where(existing => existing.Id != e.Id).Select(existing => existing.Name));
+            var validation = EmployeeValidator.Validate(ToEmployeeValidationInput(e), duplicateNames);
+            issues.AddRange(validation.Issues.Select(i => i with { Field = $"{e.Name} - {i.Field}" }));
+        }
+
+        if (issues.Count > 0)
+        {
+            _dialogs.Error(new ValidationResult(issues).ToMessage());
+            return;
+        }
 
         foreach (var e in Employees)
         {
@@ -247,22 +297,22 @@ public partial class EmployeesViewModel : ObservableObject
 
             var oldSalary = t.BaseSalary;
 
-            t.Name          = e.Name;
-            t.BaseSalary    = e.BaseSalary;
-            t.IsActive      = e.IsActive;
-            t.AccountNumber = e.AccountNumber;
-            t.IfscCode      = e.IfscCode;
-            t.PaymentMode   = e.PaymentMode;
-            t.JoiningDate   = e.JoiningDate;
+            t.Name = e.Name.Trim();
+            t.BaseSalary = e.BaseSalary;
+            t.IsActive = e.IsActive;
+            t.AccountNumber = e.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(e.AccountNumber) ? null : e.AccountNumber.Trim();
+            t.IfscCode = e.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(e.IfscCode) ? null : e.IfscCode.Trim().ToUpperInvariant();
+            t.PaymentMode = e.PaymentMode;
+            t.JoiningDate = e.JoiningDate;
 
             if (oldSalary != e.BaseSalary)
             {
                 db.SalaryRevisions.Add(new SalaryManager.Data.Entities.SalaryRevision
                 {
                     EmployeeId = e.Id,
-                    OldSalary  = oldSalary,
-                    NewSalary  = e.BaseSalary,
-                    ChangedAt  = DateTime.UtcNow,
+                    OldSalary = oldSalary,
+                    NewSalary = e.BaseSalary,
+                    ChangedAt = DateTime.UtcNow,
                 });
             }
         }
@@ -293,9 +343,9 @@ public partial class EmployeesViewModel : ObservableObject
         if (tracked is null) return;
         tracked.PaymentMode = tracked.PaymentMode switch
         {
-            PaymentMode.Cash      => PaymentMode.IciciBank,
+            PaymentMode.Cash => PaymentMode.IciciBank,
             PaymentMode.IciciBank => PaymentMode.OtherBank,
-            _                     => PaymentMode.Cash
+            _ => PaymentMode.Cash
         };
         await db.SaveChangesAsync();
         await LoadAsync();
@@ -392,30 +442,45 @@ public partial class EmployeesViewModel : ObservableObject
         catch (Exception ex) { _dialogs.Error(ex.Message); }
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadGroupAssignmentsAsync()
     {
-        if (SelectedGroup is null)
+        var version = Interlocked.Increment(ref _groupAssignmentLoadVersion);
+        var selectedGroup = SelectedGroup;
+        if (selectedGroup is null)
         {
             GroupAssignmentRows.ReplaceAll(Array.Empty<GroupEmployeeAssignmentVm>());
             return;
         }
 
-        using var db = await _dbf.CreateDbContextAsync();
-        var memberIds = await db.EmployeeGroupMemberships.AsNoTracking()
-            .Where(m => m.EmployeeGroupId == SelectedGroup.Id)
-            .Select(m => m.EmployeeId)
-            .ToHashSetAsync();
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var memberIds = await db.EmployeeGroupMemberships.AsNoTracking()
+                .Where(m => m.EmployeeGroupId == selectedGroup.Id)
+                .Select(m => m.EmployeeId)
+                .ToHashSetAsync();
 
-        var rows = Employees
-            .OrderBy(e => e.Name)
-            .Select(e => new GroupEmployeeAssignmentVm
+            var rows = Employees
+                .OrderBy(e => e.Name)
+                .Select(e => new GroupEmployeeAssignmentVm
+                {
+                    EmployeeId = e.Id,
+                    EmployeeName = e.Name,
+                    IsMember = memberIds.Contains(e.Id)
+                })
+                .ToList();
+
+            if (version == _groupAssignmentLoadVersion)
+                GroupAssignmentRows.ReplaceAll(rows);
+        }
+        catch (Exception ex)
+        {
+            if (version == _groupAssignmentLoadVersion)
             {
-                EmployeeId = e.Id,
-                EmployeeName = e.Name,
-                IsMember = memberIds.Contains(e.Id)
-            })
-            .ToList();
-        GroupAssignmentRows.ReplaceAll(rows);
+                _dialogs.Error(ex.Message);
+            }
+        }
     }
 
     private static async Task PopulateGroupOptionsAsync(AppDbContext db, AddEmployeeViewModel vm, HashSet<int>? selectedIds = null)
@@ -452,4 +517,35 @@ public partial class EmployeesViewModel : ObservableObject
             });
         }
     }
+
+    private static async Task<ValidationResult> ValidateEmployeeAsync(AppDbContext db, AddEmployeeViewModel vm, int? employeeId)
+    {
+        var existingNames = await db.Employees.AsNoTracking()
+            .Where(e => employeeId == null || e.Id != employeeId.Value)
+            .Select(e => e.Name)
+            .ToListAsync();
+
+        return EmployeeValidator.Validate(ToEmployeeValidationInput(vm), existingNames);
+    }
+
+    private static EmployeeValidationInput ToEmployeeValidationInput(AddEmployeeViewModel vm)
+        => new(
+            vm.Name,
+            vm.BaseSalary,
+            vm.PaymentMode,
+            vm.AccountNumber,
+            vm.IfscCode,
+            vm.JoiningDate);
+
+    private static EmployeeValidationInput ToEmployeeValidationInput(Employee employee)
+        => new(
+            employee.Name,
+            employee.BaseSalary,
+            employee.PaymentMode,
+            employee.AccountNumber,
+            employee.IfscCode,
+            employee.JoiningDate);
+
+    private static string FormatImportIssues(IReadOnlyList<ValidationIssue> issues)
+        => ValidationResult.FromErrors(issues).ToDisplayString();
 }

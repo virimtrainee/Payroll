@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using SalaryManager.Data.Entities;
@@ -22,7 +23,11 @@ public class AppDbContext : DbContext
     {
         if (!options.IsConfigured)
         {
-            options.UseSqlite("Data Source=salary.db");
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = Path.Combine(AppContext.BaseDirectory, "salary.design.db")
+            }.ToString();
+            options.UseSqlite(connectionString);
         }
     }
 

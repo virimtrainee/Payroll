@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,6 +11,8 @@ using SalaryManager.App.Helpers;
 using SalaryManager.App.Services;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
+using SalaryManager.Data.Services;
+using SalaryManager.Data.Validation;
 
 namespace SalaryManager.App.ViewModels;
 
@@ -41,6 +44,7 @@ public partial class AttendanceViewModel : ObservableObject
     [ObservableProperty] private int daysInMonth;
     [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
     private bool _updatingGroupFilter;
+    private int _loadVersion;
 
     public RangeObservableCollection<AttendanceRow> Rows { get; } = new();
     public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
@@ -54,54 +58,67 @@ public partial class AttendanceViewModel : ObservableObject
         _dialogs = dialogs;
     }
 
-    partial void OnSelectedMonthChanged(MonthOption value) => _ = LoadAsync();
-    partial void OnSelectedYearChanged(int value) => _ = LoadAsync();
+    partial void OnSelectedMonthChanged(MonthOption value) => LoadCommand.Execute(null);
+    partial void OnSelectedYearChanged(int value) => LoadCommand.Execute(null);
     partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
     {
-        if (!_updatingGroupFilter) _ = LoadAsync();
+        if (!_updatingGroupFilter) LoadCommand.Execute(null);
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
-        await _dbInit.ReadyTask;
-
-        DaysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth.Number);
-        using var db = await _dbf.CreateDbContextAsync();
-        await LoadGroupFiltersAsync(db);
-
-        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
-        if (SelectedGroupFilter?.Id is int groupId)
-            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
-
-        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
-
-        var existing = await db.AttendanceRecords.AsNoTracking()
-            .Where(a => a.Year == SelectedYear && a.Month == SelectedMonth.Number)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a);
-
-        var newRows = new List<AttendanceRow>(employees.Count);
-        foreach (var e in employees)
+        var version = Interlocked.Increment(ref _loadVersion);
+        try
         {
-            var rec = existing.GetValueOrDefault(e.Id);
-            newRows.Add(new AttendanceRow
+            await _dbInit.ReadyTask;
+
+            DaysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth.Number);
+            using var db = await _dbf.CreateDbContextAsync();
+            await LoadGroupFiltersAsync(db);
+
+            var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+            if (SelectedGroupFilter?.Id is int groupId)
+                employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+            var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
+
+            var existing = await db.AttendanceRecords.AsNoTracking()
+                .Where(a => a.Year == SelectedYear && a.Month == SelectedMonth.Number)
+                .ToDictionaryAsync(a => a.EmployeeId, a => a);
+
+            var newRows = new List<AttendanceRow>(employees.Count);
+            foreach (var e in employees)
             {
-                EmployeeId = e.Id,
-                Name = e.Name,
-                BaseSalary = e.BaseSalary,
-                DaysAbsent = rec?.DaysAbsent ?? 0,
-                EsicDeduction = e.BaseSalary <= 25000m ? rec?.EsicDeduction ?? 0m : 0m,
-                PfDeduction = e.BaseSalary <= 25000m ? rec?.PfDeduction ?? 0m : 0m,
-                TdsDeduction = e.BaseSalary > 25000m ? rec?.TdsDeduction ?? 0m : 0m,
-            });
+                var rec = existing.GetValueOrDefault(e.Id);
+                newRows.Add(new AttendanceRow
+                {
+                    EmployeeId = e.Id,
+                    Name = e.Name,
+                    BaseSalary = e.BaseSalary,
+                    DaysAbsent = rec?.DaysAbsent ?? 0,
+                    EsicDeduction = e.BaseSalary <= 25000m ? rec?.EsicDeduction ?? 0m : 0m,
+                    PfDeduction = e.BaseSalary <= 25000m ? rec?.PfDeduction ?? 0m : 0m,
+                    TdsDeduction = e.BaseSalary > 25000m ? rec?.TdsDeduction ?? 0m : 0m,
+                });
+            }
+
+            if (version != _loadVersion) return;
+            Rows.ReplaceAll(newRows);
         }
-        Rows.ReplaceAll(newRows);
+        catch (Exception ex)
+        {
+            if (version == _loadVersion)
+                _dialogs.Error(ex.Message);
+        }
     }
 
     [RelayCommand]
     private async Task SaveAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
+        var validation = ValidateRows(Rows, SelectedYear, SelectedMonth.Number);
+        if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
 
         var empIds = Rows.Select(r => r.EmployeeId).ToList();
         var existing = await db.AttendanceRecords
@@ -114,10 +131,10 @@ public partial class AttendanceViewModel : ObservableObject
         {
             if (existing.TryGetValue(r.EmployeeId, out var rec))
             {
-                rec.DaysAbsent = Math.Clamp(r.DaysAbsent, 0, DaysInMonth);
-                rec.EsicDeduction = r.UsesEsicPf ? Math.Max(0, r.EsicDeduction) : 0m;
-                rec.PfDeduction = r.UsesEsicPf ? Math.Max(0, r.PfDeduction) : 0m;
-                rec.TdsDeduction = r.UsesTds ? Math.Max(0, r.TdsDeduction) : 0m;
+                rec.DaysAbsent = r.DaysAbsent;
+                rec.EsicDeduction = r.UsesEsicPf ? r.EsicDeduction : 0m;
+                rec.PfDeduction = r.UsesEsicPf ? r.PfDeduction : 0m;
+                rec.TdsDeduction = r.UsesTds ? r.TdsDeduction : 0m;
             }
             else
             {
@@ -126,10 +143,10 @@ public partial class AttendanceViewModel : ObservableObject
                     EmployeeId = r.EmployeeId,
                     Year = SelectedYear,
                     Month = SelectedMonth.Number,
-                    DaysAbsent = Math.Clamp(r.DaysAbsent, 0, DaysInMonth),
-                    EsicDeduction = r.UsesEsicPf ? Math.Max(0, r.EsicDeduction) : 0m,
-                    PfDeduction = r.UsesEsicPf ? Math.Max(0, r.PfDeduction) : 0m,
-                    TdsDeduction = r.UsesTds ? Math.Max(0, r.TdsDeduction) : 0m,
+                    DaysAbsent = r.DaysAbsent,
+                    EsicDeduction = r.UsesEsicPf ? r.EsicDeduction : 0m,
+                    PfDeduction = r.UsesEsicPf ? r.PfDeduction : 0m,
+                    TdsDeduction = r.UsesTds ? r.TdsDeduction : 0m,
                 });
             }
         }
@@ -159,5 +176,23 @@ public partial class AttendanceViewModel : ObservableObject
         {
             _updatingGroupFilter = false;
         }
+    }
+
+    private static ValidationResult ValidateRows(IEnumerable<AttendanceRow> rows, int year, int month)
+    {
+        var issues = rows
+            .SelectMany(row => PayrollValidator.Validate(new PayrollValidationInput(
+                row.Name,
+                row.BaseSalary,
+                year,
+                month,
+                row.DaysAbsent,
+                row.EsicDeduction,
+                row.PfDeduction,
+                row.TdsDeduction,
+                0m,
+                0m)).Issues)
+            .ToList();
+        return new ValidationResult(issues);
     }
 }

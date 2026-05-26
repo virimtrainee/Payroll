@@ -23,16 +23,16 @@ public partial class DashboardViewModel : ObservableObject
     private readonly BackupService _backup;
     private readonly DialogService _dialogs;
 
-    [ObservableProperty] private int    activeEmployees;
+    [ObservableProperty] private int activeEmployees;
     [ObservableProperty] private decimal grossPayroll;
     [ObservableProperty] private decimal outstandingAdvances;
-    [ObservableProperty] private int    attendanceSavedThisMonth;
-    [ObservableProperty] private int    totalEmployees;
+    [ObservableProperty] private int attendanceSavedThisMonth;
+    [ObservableProperty] private int totalEmployees;
     [ObservableProperty] private string currentPeriod = DateTime.Now.ToString("MMMM yyyy");
-    [ObservableProperty] private bool   isLoading;
+    [ObservableProperty] private bool isLoading;
 
-    public ObservableCollection<RecentAdvanceVm> RecentAdvances  { get; } = new();
-    public ObservableCollection<RevisionVm>      RecentRevisions { get; } = new();
+    public ObservableCollection<RecentAdvanceVm> RecentAdvances { get; } = new();
+    public ObservableCollection<RevisionVm> RecentRevisions { get; } = new();
 
     public DashboardViewModel(IDbContextFactory<AppDbContext> dbf,
                               DatabaseInitializer dbInit,
@@ -51,12 +51,12 @@ public partial class DashboardViewModel : ObservableObject
             await _dbInit.ReadyTask;
 
             CurrentPeriod = DateTime.Now.ToString("MMMM yyyy");
-            using var db  = await _dbf.CreateDbContextAsync();
-            var now       = DateTime.Now;
+            using var db = await _dbf.CreateDbContextAsync();
+            var now = DateTime.Now;
 
-            TotalEmployees      = await db.Employees.CountAsync();
-            ActiveEmployees     = await db.Employees.CountAsync(e => e.IsActive);
-            GrossPayroll        = await db.Employees.Where(e => e.IsActive).SumAsync(e => e.BaseSalary);
+            TotalEmployees = await db.Employees.CountAsync();
+            ActiveEmployees = await db.Employees.CountAsync(e => e.IsActive);
+            GrossPayroll = await db.Employees.Where(e => e.IsActive).SumAsync(e => e.BaseSalary);
             OutstandingAdvances = await db.Advances.AsNoTracking().SumOutstandingAsync();
 
             AttendanceSavedThisMonth = await db.AttendanceRecords.CountAsync(

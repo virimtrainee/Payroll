@@ -7,6 +7,14 @@ public record GroupFilterOptionVm(int? Id, string Name)
     public bool IsAllGroups => Id is null;
 }
 
+public partial class SelectableGroupFilterOptionVm : ObservableObject
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+
+    [ObservableProperty] private bool isSelected;
+}
+
 public partial class GroupMembershipOptionVm : ObservableObject
 {
     public int Id { get; init; }

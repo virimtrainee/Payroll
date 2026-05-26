@@ -14,6 +14,21 @@ public partial class AddEmployeeWindow : Window
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
+        if (DataContext is AddEmployeeViewModel vm)
+        {
+            var validation = vm.Validate();
+            if (!validation.IsValid)
+            {
+                MessageBox.Show(
+                    this,
+                    validation.ToDisplayString(),
+                    "Invalid employee",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+        }
+
         DialogResult = true;
     }
 

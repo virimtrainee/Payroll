@@ -33,9 +33,29 @@
                 <ComboBox Width="76" ItemsSource="{Binding Years}"
                           SelectedItem="{Binding SelectedYear}" Margin="8,0,0,0"/>
 
-                <ComboBox Width="150" ItemsSource="{Binding GroupFilterOptions}"
-                          SelectedItem="{Binding SelectedGroupFilter}"
-                          DisplayMemberPath="Name" Margin="8,0,0,0"/>
+                <TextBlock Text="GROUPS" Style="{StaticResource FieldLabel}"
+                           VerticalAlignment="Center" Margin="14,0,8,0"/>
+                <ScrollViewer Width="240"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled"
+                              VerticalAlignment="Center">
+                    <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected}"
+                                          Foreground="{StaticResource MutedTextBrush}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,10,0"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
 
                 <Separator Style="{StaticResource VSep}"/>
 

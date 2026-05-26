@@ -9,18 +9,18 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly System.IServiceProvider _sp;
 
-    public DashboardViewModel   DashboardVm   { get; }
+    public DashboardViewModel DashboardVm { get; }
     public SalarySheetViewModel SalarySheetVm { get; }
-    public AdvancesViewModel    AdvancesVm    { get; }
-    public ReportsViewModel     ReportsVm     { get; }
+    public AdvancesViewModel AdvancesVm { get; }
+    public ReportsViewModel ReportsVm { get; }
 
     public MainViewModel(System.IServiceProvider sp)
     {
         _sp = sp;
-        DashboardVm   = sp.GetRequiredService<DashboardViewModel>();
+        DashboardVm = sp.GetRequiredService<DashboardViewModel>();
         SalarySheetVm = sp.GetRequiredService<SalarySheetViewModel>();
-        AdvancesVm    = sp.GetRequiredService<AdvancesViewModel>();
-        ReportsVm     = sp.GetRequiredService<ReportsViewModel>();
+        AdvancesVm = sp.GetRequiredService<AdvancesViewModel>();
+        ReportsVm = sp.GetRequiredService<ReportsViewModel>();
     }
 
     [RelayCommand]

@@ -26,13 +26,17 @@
 
                 <!-- Left cluster: title + count badge + filter toggle -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="All employees" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding EmployeeListTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <Border CornerRadius="99" Background="#F1F5F9" Padding="9,3"
                             Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Employees.Count}"
                                    FontSize="11" FontWeight="SemiBold"
                                    Foreground="{StaticResource MutedTextBrush}"/>
                     </Border>
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="Search employees..."
+                             Width="220"
+                             Margin="20,0,0,0"/>
                     <CheckBox Content="Show inactive"
                               Foreground="{StaticResource MutedTextBrush}"
                               VerticalAlignment="Center"

@@ -22,7 +22,11 @@ public static class AppPaths
         }
     }
 
-    public static string DatabasePath => Path.Combine(ApplicationDirectory, "salary.db");
+    public static string DataDirectory => ApplicationDirectory;
 
-    public static string SlipsDirectory => Path.Combine(ApplicationDirectory, "Slips");
+    public static string DatabasePath => Path.Combine(DataDirectory, "salary.db");
+
+    public static string SettingsPath => Path.Combine(DataDirectory, "settings.json");
+
+    public static string SlipsDirectory => Path.Combine(DataDirectory, "Slips");
 }

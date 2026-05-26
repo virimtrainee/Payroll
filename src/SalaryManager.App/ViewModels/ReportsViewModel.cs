@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,6 +16,7 @@ using SalaryManager.App.Services;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
 using SalaryManager.Data.Services;
+using SalaryManager.Data.Validation;
 
 namespace SalaryManager.App.ViewModels;
 
@@ -37,12 +39,15 @@ public partial class ReportsViewModel : ObservableObject
     [ObservableProperty] private Employee? selectedEmployee;
     [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
 
-    [ObservableProperty] private string kpiTotalPayable   = "₹0.00";
-    [ObservableProperty] private string kpiGross          = "₹0.00";
-    [ObservableProperty] private string kpiDeductions     = "₹0.00";
-    [ObservableProperty] private int    kpiActiveEmployees;
-    [ObservableProperty] private bool   isLoading;
+    [ObservableProperty] private string kpiTotalPayable = "₹0.00";
+    [ObservableProperty] private string kpiGross = "₹0.00";
+    [ObservableProperty] private string kpiDeductions = "₹0.00";
+    [ObservableProperty] private int kpiActiveEmployees;
+    [ObservableProperty] private bool isLoading;
     private bool _updatingGroupFilter;
+    private int _loadVersion;
+    private int _employeeLoadVersion;
+    private int _kpiLoadVersion;
 
     public ReportsViewModel(IDbContextFactory<AppDbContext> dbf,
                             DatabaseInitializer dbInit,
@@ -53,9 +58,10 @@ public partial class ReportsViewModel : ObservableObject
         _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _dialogs = dialogs;
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
+        var version = Interlocked.Increment(ref _loadVersion);
         IsLoading = true;
         try
         {
@@ -65,41 +71,60 @@ public partial class ReportsViewModel : ObservableObject
             await LoadEmployeesAsync();
             await LoadKpisAsync();
         }
+        catch (Exception ex)
+        {
+            if (version == _loadVersion)
+                _dialogs.Error(ex.Message);
+        }
         finally
         {
-            IsLoading = false;
+            if (version == _loadVersion)
+                IsLoading = false;
         }
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadEmployeesAsync()
     {
-        using var db = await _dbf.CreateDbContextAsync();
-        var query = db.Employees.AsNoTracking();
-        if (SelectedGroupFilter?.Id is int groupId)
-            query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+        var version = Interlocked.Increment(ref _employeeLoadVersion);
+        try
+        {
+            using var db = await _dbf.CreateDbContextAsync();
+            var query = db.Employees.AsNoTracking();
+            if (SelectedGroupFilter?.Id is int groupId)
+                query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-        var list = await query.OrderBy(e => e.Name).ToListAsync();
-        Employees.ReplaceAll(list);
-        SelectedEmployee = Employees.FirstOrDefault();
+            var list = await query.OrderBy(e => e.Name).ToListAsync();
+            if (version != _employeeLoadVersion) return;
+            Employees.ReplaceAll(list);
+            SelectedEmployee = Employees.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            if (version == _employeeLoadVersion)
+                _dialogs.Error(ex.Message);
+        }
     }
 
-    partial void OnSelectedMonthChanged(MonthOption value) => _ = LoadKpisAsync();
-    partial void OnSelectedYearChanged(int value)          => _ = LoadKpisAsync();
+    partial void OnSelectedMonthChanged(MonthOption value) => LoadKpisCommand.Execute(null);
+    partial void OnSelectedYearChanged(int value) => LoadKpisCommand.Execute(null);
     partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
     {
         if (_updatingGroupFilter) return;
-        _ = LoadEmployeesAsync();
-        _ = LoadKpisAsync();
+        LoadEmployeesCommand.Execute(null);
+        LoadKpisCommand.Execute(null);
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadKpisAsync()
     {
+        var version = Interlocked.Increment(ref _kpiLoadVersion);
         try
         {
             var rows = await BuildSummaryRowsAsync();
             var gross = rows.Sum(r => r.BaseSalary);
-            var net   = rows.Sum(r => r.NetSalary);
-            var ded   = gross - net;
+            var net = rows.Sum(r => r.NetSalary);
+            var ded = gross - net;
 
             using var db = await _dbf.CreateDbContextAsync();
             var activeQuery = db.Employees.Where(e => e.IsActive);
@@ -107,12 +132,17 @@ public partial class ReportsViewModel : ObservableObject
                 activeQuery = activeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
             var active = await activeQuery.CountAsync();
 
-            KpiTotalPayable   = $"₹{net:N0}";
-            KpiGross          = $"₹{gross:N0}";
-            KpiDeductions     = $"₹{ded:N0}";
+            if (version != _kpiLoadVersion) return;
+            KpiTotalPayable = $"₹{net:N0}";
+            KpiGross = $"₹{gross:N0}";
+            KpiDeductions = $"₹{ded:N0}";
             KpiActiveEmployees = active;
         }
-        catch { /* swallow on empty DB */ }
+        catch (Exception ex)
+        {
+            if (version == _kpiLoadVersion)
+                _dialogs.Error(ex.Message);
+        }
     }
 
     [RelayCommand]
@@ -223,7 +253,12 @@ public partial class ReportsViewModel : ObservableObject
                      && a.EntryType == AdvanceEntryType.Deducted)
             .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
 
+        var balances = await db.Advances.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId))
+            .SumBalancesByEmployeeAsync();
+
         var list = new List<MonthlySummaryRow>(employees.Count);
+        var issues = new List<ValidationIssue>();
         foreach (var e in employees)
         {
             var rec = attendance.GetValueOrDefault(e.Id);
@@ -232,11 +267,29 @@ public partial class ReportsViewModel : ObservableObject
             var pf = rec?.PfDeduction ?? 0m;
             var tds = rec?.TdsDeduction ?? 0m;
             var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
+            var validation = PayrollValidator.Validate(new PayrollValidationInput(
+                e.Name,
+                e.BaseSalary,
+                SelectedYear,
+                SelectedMonth.Number,
+                absent,
+                esic,
+                pf,
+                tds,
+                advanceDeduction,
+                balances.GetValueOrDefault(e.Id, 0m),
+                advanceDeduction));
+            issues.AddRange(validation.Issues);
+
             var b = SalaryCalculator.Compute(e.BaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
             list.Add(new MonthlySummaryRow(e.Name, e.BaseSalary, absent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction, advanceDeduction,
                 b.NetSalary - advanceDeduction));
         }
+
+        if (issues.Count > 0)
+            throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
+
         return list;
     }
 

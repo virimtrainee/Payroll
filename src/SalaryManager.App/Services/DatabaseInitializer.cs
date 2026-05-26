@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SalaryManager.Data;
@@ -18,6 +19,7 @@ public class DatabaseInitializer
         {
             try
             {
+                PrepareRuntimeData();
                 using var db = factory.CreateDbContext();
                 db.Database.Migrate();
                 _tcs.TrySetResult();
@@ -27,5 +29,11 @@ public class DatabaseInitializer
                 _tcs.TrySetException(ex);
             }
         });
+    }
+
+    public static void PrepareRuntimeData()
+    {
+        Directory.CreateDirectory(AppPaths.DataDirectory);
+        Directory.CreateDirectory(AppPaths.SlipsDirectory);
     }
 }

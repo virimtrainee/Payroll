@@ -1,27 +1,26 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SalaryManager.Data.Migrations
+namespace SalaryManager.Data.Migrations;
+
+/// <inheritdoc />
+public partial class AddEmployeeIsActiveNameIndex : Migration
 {
     /// <inheritdoc />
-    public partial class AddEmployeeIsActiveNameIndex : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.CreateIndex(
-                name: "IX_Employees_IsActive_Name",
-                table: "Employees",
-                columns: new[] { "IsActive", "Name" });
-        }
+        migrationBuilder.CreateIndex(
+            name: "IX_Employees_IsActive_Name",
+            table: "Employees",
+            columns: new[] { "IsActive", "Name" });
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropIndex(
-                name: "IX_Employees_IsActive_Name",
-                table: "Employees");
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropIndex(
+            name: "IX_Employees_IsActive_Name",
+            table: "Employees");
     }
 }

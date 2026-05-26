@@ -56,7 +56,7 @@ public class PdfSlipService
     private static string DefaultSlipPath(SalarySlipData d)
     {
         var safeName = string.Join("_", d.Employee.Name.Split(Path.GetInvalidFileNameChars()));
-        return Path.Combine(AppContext.BaseDirectory, "Slips",
+        return Path.Combine(AppPaths.SlipsDirectory,
             $"{safeName}-{d.Year:0000}-{d.Month:00}.pdf");
     }
 

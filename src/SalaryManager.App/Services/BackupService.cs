@@ -6,8 +6,7 @@ namespace SalaryManager.App.Services;
 
 public class BackupService
 {
-    private readonly string _dbPath =
-        Path.Combine(AppContext.BaseDirectory, "salary.db");
+    private readonly string _dbPath = AppPaths.DatabasePath;
 
     public void Backup(string outputPath)
     {

@@ -30,8 +30,7 @@ public partial class App : Application
         EventManager.RegisterClassHandler(typeof(TextBox), UIElement.GotKeyboardFocusEvent,
             new KeyboardFocusChangedEventHandler(TextBox_GotKeyboardFocus));
 
-        var dbPath = Path.Combine(AppContext.BaseDirectory, "salary.db");
-        var connStr = $"Data Source={dbPath}";
+        var connStr = $"Data Source={AppPaths.DatabasePath}";
 
         var sc = new ServiceCollection();
 

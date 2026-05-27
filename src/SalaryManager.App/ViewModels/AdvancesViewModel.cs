@@ -168,7 +168,7 @@ public partial class AdvancesViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _loadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -204,15 +204,15 @@ public partial class AdvancesViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _ledgerVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
     }
 
     [RelayCommand]
     private async Task AddEntryAsync()
     {
-        if (SelectedEmployee is null) { _dialogs.Error("Pick an employee first."); return; }
-        if (NewAmount <= 0) { _dialogs.Error("Amount must be greater than zero."); return; }
+        if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee first."); return; }
+        if (NewAmount <= 0) { await _dialogs.ErrorAsync("Amount must be greater than zero."); return; }
 
         using var db = await _dbf.CreateDbContextAsync();
         db.Advances.Add(new Advance
@@ -245,13 +245,8 @@ public partial class AdvancesViewModel : ObservableObject
             Note = row.Entry.Note
         };
 
-        var dialog = new AdvanceEntryWindow(vm)
-        {
-            Owner = Application.Current.MainWindow
-        };
-
-        if (dialog.ShowDialog() != true) return;
-        if (vm.Amount <= 0) { _dialogs.Error("Amount must be greater than zero."); return; }
+        if (!await _dialogs.ShowAdvanceEntryDialogAsync(vm, Application.Current.MainWindow)) return;
+        if (vm.Amount <= 0) { await _dialogs.ErrorAsync("Amount must be greater than zero."); return; }
 
         using var db = await _dbf.CreateDbContextAsync();
         var advance = await db.Advances.FindAsync(row.Entry.Id);

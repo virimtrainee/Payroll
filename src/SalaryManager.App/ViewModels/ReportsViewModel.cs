@@ -81,7 +81,7 @@ public partial class ReportsViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _loadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -109,7 +109,7 @@ public partial class ReportsViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _employeeLoadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
     }
 
@@ -169,7 +169,7 @@ public partial class ReportsViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _kpiLoadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
     }
 
@@ -187,7 +187,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateMonthlySummary(year, month, rows, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -204,7 +204,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _excel.ExportMonthlySummary(year, month, rows, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -224,7 +224,7 @@ public partial class ReportsViewModel : ObservableObject
             });
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -233,21 +233,21 @@ public partial class ReportsViewModel : ObservableObject
         try
         {
             var rows = await BuildIciciRowsAsync();
-            if (rows.Count == 0) { _dialogs.Info("No bank-payment employees in this period."); return; }
+            if (rows.Count == 0) { await _dialogs.InfoAsync("No bank-payment employees in this period."); return; }
 
             var name = $"ICICI-Salary-{SelectedYear:0000}-{SelectedMonth.Number:00}.xlsx";
             var path = _dialogs.AskSavePath("Excel Workbook (*.xlsx)|*.xlsx", name);
             if (path is null) return;
 
             var settings = _settings.Load();
-            var options = _dialogs.AskIciciExportOptions(settings.IciciDebitAccountNo);
+            var options = await _dialogs.AskIciciExportOptionsAsync(settings.IciciDebitAccountNo);
             if (options is null) return;
             _settings.Save(settings with { IciciDebitAccountNo = options.DebitAccountNo });
 
             await Task.Run(() => _excel.ExportIciciPayment(rows, options, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -255,7 +255,7 @@ public partial class ReportsViewModel : ObservableObject
     {
         try
         {
-            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
             var (rows, bal) = await BuildLedgerAsync(SelectedEmployee.Id);
             var name = $"AdvanceLedger-{Sanitize(SelectedEmployee.Name)}.pdf";
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", name);
@@ -264,7 +264,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateAdvanceLedger(emp, rows, bal, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -272,7 +272,7 @@ public partial class ReportsViewModel : ObservableObject
     {
         try
         {
-            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
             var (rows, bal) = await BuildLedgerAsync(SelectedEmployee.Id);
             var name = $"AdvanceLedger-{Sanitize(SelectedEmployee.Name)}.xlsx";
             var path = _dialogs.AskSavePath("Excel Workbook (*.xlsx)|*.xlsx", name);
@@ -281,7 +281,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _excel.ExportAdvanceLedger(emp, rows, bal, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -289,7 +289,7 @@ public partial class ReportsViewModel : ObservableObject
     {
         try
         {
-            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
             var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
             var name = $"SalarySlip-{Sanitize(SelectedEmployee.Name)}-{SelectedYear:0000}-{SelectedMonth.Number:00}.pdf";
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", name);
@@ -297,7 +297,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateSlip(data, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -305,12 +305,12 @@ public partial class ReportsViewModel : ObservableObject
     {
         try
         {
-            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
             var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
             var path = await Task.Run(() => _pdf.GenerateSlip(data));
             PrintFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -325,7 +325,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateSalaryRevisionReport(rows, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -340,7 +340,7 @@ public partial class ReportsViewModel : ObservableObject
             await Task.Run(() => _excel.ExportSalaryRevisions(rows, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     private async Task<List<MonthlySummaryRow>> BuildSummaryRowsAsync()

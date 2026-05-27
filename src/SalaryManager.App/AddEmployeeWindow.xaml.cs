@@ -1,9 +1,11 @@
 using System.Windows;
+using System.Windows.Controls;
+using MaterialDesignThemes.Wpf;
 using SalaryManager.App.ViewModels;
 
 namespace SalaryManager.App;
 
-public partial class AddEmployeeWindow : Window
+public partial class AddEmployeeWindow : UserControl
 {
     public AddEmployeeWindow(AddEmployeeViewModel vm)
     {
@@ -19,21 +21,17 @@ public partial class AddEmployeeWindow : Window
             var validation = vm.Validate();
             if (!validation.IsValid)
             {
-                MessageBox.Show(
-                    this,
-                    validation.ToDisplayString(),
-                    "Invalid employee",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                ValidationErrorText.Text = validation.ToDisplayString();
+                ValidationErrorText.Visibility = Visibility.Visible;
                 return;
             }
         }
 
-        DialogResult = true;
+        DialogHost.CloseDialogCommand.Execute(true, this);
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
+        DialogHost.CloseDialogCommand.Execute(false, this);
     }
 }

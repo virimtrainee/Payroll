@@ -159,7 +159,7 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void BackupDatabase()
+    private async Task BackupDatabase()
     {
         try
         {
@@ -167,15 +167,15 @@ public partial class DashboardViewModel : ObservableObject
             var path = _dialogs.AskSavePath("SQLite Database (*.db)|*.db", defaultName);
             if (path is null) return;
             _backup.Backup(path);
-            _dialogs.Info($"Backup saved to:\n{path}");
+            await _dialogs.InfoAsync($"Backup saved to:\n{path}");
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
-    private void RestoreDatabase()
+    private async Task RestoreDatabase()
     {
-        if (!_dialogs.Confirm(
+        if (!await _dialogs.ConfirmAsync(
             "Restoring will replace the current database with the selected backup.\n" +
             "The app will close — restart it after.\n\nContinue?"))
             return;
@@ -184,10 +184,10 @@ public partial class DashboardViewModel : ObservableObject
             var path = _dialogs.AskOpenPath("SQLite Database (*.db)|*.db");
             if (path is null) return;
             _backup.Restore(path);
-            _dialogs.Info("Database restored. Please restart the application.");
+            await _dialogs.InfoAsync("Database restored. Please restart the application.");
             Application.Current.Shutdown();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     private static async Task<decimal> CalculatePayablePayrollAsync(

@@ -166,7 +166,7 @@ public partial class EmployeesViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _loadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
     }
 
@@ -177,13 +177,13 @@ public partial class EmployeesViewModel : ObservableObject
         if (path is null) return;
 
         var import = _importer.ReadEmployees(path);
-        if (import.Error is not null) { _dialogs.Error(import.Error); return; }
+        if (import.Error is not null) { await _dialogs.ErrorAsync(import.Error); return; }
         if (import.Issues.Count > 0)
         {
-            _dialogs.Error("Fix the following import errors before importing:\n\n" + FormatImportIssues(import.Issues));
+            await _dialogs.ErrorAsync("Fix the following import errors before importing:\n\n" + FormatImportIssues(import.Issues));
             return;
         }
-        if (import.Rows.Count == 0) { _dialogs.Info("No employee rows found in the file."); return; }
+        if (import.Rows.Count == 0) { await _dialogs.InfoAsync("No employee rows found in the file."); return; }
 
         try
         {
@@ -224,9 +224,9 @@ public partial class EmployeesViewModel : ObservableObject
 
             var msg = $"Imported {added} employee{(added == 1 ? "" : "s")}.";
             if (skippedExisting > 0) msg += $" {skippedExisting} skipped (name already exists).";
-            _dialogs.Info(msg);
+            await _dialogs.InfoAsync(msg);
         }
-        catch (System.Exception ex) { _dialogs.Error(ex.Message); }
+        catch (System.Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -236,18 +236,13 @@ public partial class EmployeesViewModel : ObservableObject
         using (var loadDb = await _dbf.CreateDbContextAsync())
             await PopulateGroupOptionsAsync(loadDb, vm);
 
-        var dialog = new AddEmployeeWindow(vm)
-        {
-            Owner = OwnerWindow ?? Application.Current.MainWindow
-        };
-
-        if (dialog.ShowDialog() != true) return;
+        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current.MainWindow)) return;
 
         try
         {
             using var db = await _dbf.CreateDbContextAsync();
             var validation = await ValidateEmployeeAsync(db, vm, null);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
             var employee = new Employee
             {
@@ -266,7 +261,7 @@ public partial class EmployeesViewModel : ObservableObject
             await db.SaveChangesAsync();
             await LoadAsync();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -295,15 +290,10 @@ public partial class EmployeesViewModel : ObservableObject
         };
         await PopulateGroupOptionsAsync(db, vm, tracked.GroupMemberships.Select(m => m.EmployeeGroupId).ToHashSet());
 
-        var dialog = new AddEmployeeWindow(vm)
-        {
-            Owner = OwnerWindow ?? Application.Current.MainWindow
-        };
-
-        if (dialog.ShowDialog() != true) return;
+        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current.MainWindow)) return;
 
         var validation = await ValidateEmployeeAsync(db, vm, tracked.Id);
-        if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+        if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
         var oldSalary = tracked.BaseSalary;
         tracked.Name = vm.Name.Trim();
@@ -360,7 +350,7 @@ public partial class EmployeesViewModel : ObservableObject
 
         if (issues.Count > 0)
         {
-            _dialogs.Error(new ValidationResult(issues).ToMessage());
+            await _dialogs.ErrorAsync(new ValidationResult(issues).ToMessage());
             return;
         }
 
@@ -391,7 +381,7 @@ public partial class EmployeesViewModel : ObservableObject
         }
 
         await db.SaveChangesAsync();
-        _dialogs.Info("Saved.");
+        await _dialogs.InfoAsync("Saved.");
         await LoadAsync();
     }
 
@@ -429,7 +419,7 @@ public partial class EmployeesViewModel : ObservableObject
                 $"Salary revisions: {impact.SalaryRevisions}\n" +
                 $"Group memberships: {impact.GroupMemberships}";
 
-            if (!_dialogs.ConfirmDestructive(message, "Permanently delete employee")) return;
+            if (!await _dialogs.ConfirmDestructiveAsync(message, "Permanently delete employee")) return;
 
             using var db = await _dbf.CreateDbContextAsync();
             var tracked = await db.Employees.FindAsync(emp.Id);
@@ -442,7 +432,7 @@ public partial class EmployeesViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            _dialogs.Error(ex.Message);
+            await _dialogs.ErrorAsync(ex.Message);
         }
     }
 
@@ -467,7 +457,7 @@ public partial class EmployeesViewModel : ObservableObject
     private async Task CreateGroupAsync()
     {
         var name = NewGroupName.Trim();
-        if (string.IsNullOrWhiteSpace(name)) { _dialogs.Error("Group name is required."); return; }
+        if (string.IsNullOrWhiteSpace(name)) { await _dialogs.ErrorAsync("Group name is required."); return; }
 
         try
         {
@@ -478,7 +468,7 @@ public partial class EmployeesViewModel : ObservableObject
             await LoadAsync();
             SelectedGroup = Groups.FirstOrDefault(g => GroupNameNormalizer.Normalize(g.Name) == GroupNameNormalizer.Normalize(name));
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -486,7 +476,7 @@ public partial class EmployeesViewModel : ObservableObject
     {
         if (SelectedGroup is null) return;
         var name = SelectedGroupName.Trim();
-        if (string.IsNullOrWhiteSpace(name)) { _dialogs.Error("Group name is required."); return; }
+        if (string.IsNullOrWhiteSpace(name)) { await _dialogs.ErrorAsync("Group name is required."); return; }
 
         try
         {
@@ -497,14 +487,14 @@ public partial class EmployeesViewModel : ObservableObject
             await db.SaveChangesAsync();
             await LoadAsync();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
     private async Task DeleteGroupAsync()
     {
         if (SelectedGroup is null) return;
-        if (!_dialogs.Confirm($"Delete group '{SelectedGroup.Name}'? Employees will not be deleted.")) return;
+        if (!await _dialogs.ConfirmAsync($"Delete group '{SelectedGroup.Name}'? Employees will not be deleted.")) return;
 
         try
         {
@@ -515,7 +505,7 @@ public partial class EmployeesViewModel : ObservableObject
             await db.SaveChangesAsync();
             await LoadAsync();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -548,10 +538,10 @@ public partial class EmployeesViewModel : ObservableObject
             }
 
             await db.SaveChangesAsync();
-            _dialogs.Info("Group assignments saved.");
+            await _dialogs.InfoAsync("Group assignments saved.");
             await LoadAsync();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -590,7 +580,7 @@ public partial class EmployeesViewModel : ObservableObject
         {
             if (version == _groupAssignmentLoadVersion)
             {
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
             }
         }
     }

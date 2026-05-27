@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using SalaryManager.Data;
@@ -18,7 +19,7 @@ public class AsyncViewModelLoadTests
     {
         using var factory = new SequencedDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
-        var dialogs = new CapturingDialogService();
+        var dialogs = NewDialogService();
         var viewModel = new AttendanceViewModel(factory, initializer, dialogs);
 
         factory.EnqueueAsync(async ct =>
@@ -35,7 +36,7 @@ public class AsyncViewModelLoadTests
         await latestLoad;
         await staleLoad;
 
-        Assert.Empty(dialogs.Errors);
+        _ = dialogs.DidNotReceive().ErrorAsync(Arg.Any<string>(), Arg.Any<string>());
         Assert.Empty(viewModel.Rows);
     }
 
@@ -44,7 +45,7 @@ public class AsyncViewModelLoadTests
     {
         using var factory = new SequencedDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
-        var dialogs = new CapturingDialogService();
+        var dialogs = NewDialogService();
         var viewModel = new SalarySheetViewModel(
             factory,
             initializer,
@@ -58,8 +59,15 @@ public class AsyncViewModelLoadTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsLoading);
-        Assert.Equal(["database unavailable"], dialogs.Errors);
+        _ = dialogs.Received(1).ErrorAsync("database unavailable", "Error");
         Assert.Empty(viewModel.Rows);
+    }
+
+    private static DialogService NewDialogService()
+    {
+        var dialogs = Substitute.For<DialogService>();
+        dialogs.ErrorAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.CompletedTask);
+        return dialogs;
     }
 
     private static async Task<DatabaseInitializer> ReadyInitializerAsync(IDbContextFactory<AppDbContext> factory)
@@ -68,14 +76,6 @@ public class AsyncViewModelLoadTests
         initializer.StartMigration(factory);
         await initializer.ReadyTask.WaitAsync(TimeSpan.FromSeconds(10));
         return initializer;
-    }
-
-    private sealed class CapturingDialogService : DialogService
-    {
-        public List<string> Errors { get; } = [];
-
-        public override void Error(string message, string title = "Error")
-            => Errors.Add(message);
     }
 
     private sealed class SequencedDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

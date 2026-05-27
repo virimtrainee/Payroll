@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using SalaryManager.Data;
@@ -100,18 +101,20 @@ public class EmployeeSalarySheetFilterTests
             });
         });
 
-        var dialogs = new CapturingDialogService();
+        var dialogs = NewDialogService();
         var viewModel = new EmployeesViewModel(factory, initializer, dialogs, new ExcelImportService());
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var employee = Assert.Single(viewModel.Employees);
         await viewModel.DeleteEmployeeCommand.ExecuteAsync(employee);
 
-        var prompt = Assert.Single(dialogs.DestructivePrompts);
-        Assert.Contains("Attendance records: 1", prompt);
-        Assert.Contains("Advance entries: 1", prompt);
-        Assert.Contains("Salary revisions: 1", prompt);
-        Assert.Contains("Group memberships: 1", prompt);
+        _ = dialogs.Received(1).ConfirmDestructiveAsync(
+            Arg.Is<string>(prompt =>
+                prompt.Contains("Attendance records: 1") &&
+                prompt.Contains("Advance entries: 1") &&
+                prompt.Contains("Salary revisions: 1") &&
+                prompt.Contains("Group memberships: 1")),
+            "Permanently delete employee");
 
         using var verifyDb = factory.CreateDbContext();
         Assert.Empty(await verifyDb.Employees.AsNoTracking().ToListAsync());
@@ -128,7 +131,7 @@ public class EmployeeSalarySheetFilterTests
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
 
-        var viewModel = new AdvancesViewModel(factory, initializer, new CapturingDialogService());
+        var viewModel = new AdvancesViewModel(factory, initializer, NewDialogService());
 
         Assert.True(viewModel.ShowOnlyWithAdvances);
     }
@@ -343,7 +346,7 @@ public class EmployeeSalarySheetFilterTests
     private static EmployeesViewModel NewEmployeesViewModel(
         IDbContextFactory<AppDbContext> factory,
         DatabaseInitializer initializer)
-        => new(factory, initializer, new CapturingDialogService(), new ExcelImportService());
+        => new(factory, initializer, NewDialogService(), new ExcelImportService());
 
     private static SalarySheetViewModel NewSalarySheetViewModel(
         IDbContextFactory<AppDbContext> factory,
@@ -354,7 +357,7 @@ public class EmployeeSalarySheetFilterTests
             initializer,
             new PdfSlipService(),
             new ExcelExportService(),
-            new CapturingDialogService(),
+            NewDialogService(),
             new AppSettingsService())
         {
             SelectedYear = 2026,
@@ -362,6 +365,16 @@ public class EmployeeSalarySheetFilterTests
         };
 
         return viewModel;
+    }
+
+    private static DialogService NewDialogService()
+    {
+        var dialogs = Substitute.For<DialogService>();
+        dialogs.ErrorAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.CompletedTask);
+        dialogs.InfoAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.CompletedTask);
+        dialogs.ConfirmAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
+        dialogs.ConfirmDestructiveAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
+        return dialogs;
     }
 
     private static async Task SeedAsync(SqliteDbContextFactory factory, Action<AppDbContext> seed)
@@ -377,26 +390,6 @@ public class EmployeeSalarySheetFilterTests
         initializer.StartMigration(factory);
         await initializer.ReadyTask.WaitAsync(TimeSpan.FromSeconds(10));
         return initializer;
-    }
-
-    private sealed class CapturingDialogService : DialogService
-    {
-        public List<string> Errors { get; } = [];
-        public List<string> Infos { get; } = [];
-        public List<string> DestructivePrompts { get; } = [];
-        public bool DestructiveConfirmResult { get; set; } = true;
-
-        public override void Error(string message, string title = "Error")
-            => Errors.Add(message);
-
-        public override void Info(string message, string title = "Information")
-            => Infos.Add(message);
-
-        public override bool ConfirmDestructive(string message, string title = "Confirm Delete")
-        {
-            DestructivePrompts.Add(message);
-            return DestructiveConfirmResult;
-        }
     }
 
     private sealed class SqliteDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

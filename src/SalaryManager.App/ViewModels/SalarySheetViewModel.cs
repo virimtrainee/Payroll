@@ -352,7 +352,7 @@ public partial class SalarySheetViewModel : ObservableObject
         catch (Exception ex)
         {
             if (version == _loadVersion)
-                _dialogs.Error(ex.Message);
+                await _dialogs.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -368,7 +368,7 @@ public partial class SalarySheetViewModel : ObservableObject
         {
             using var db = await _dbf.CreateDbContextAsync();
             var validation = ValidateRows(Rows, includeAdvance: false);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
             var empIds = Rows.Select(r => r.EmployeeId).ToList();
             var existing = await db.AttendanceRecords
@@ -406,18 +406,18 @@ public partial class SalarySheetViewModel : ObservableObject
             }
 
             await db.SaveChangesAsync();
-            _dialogs.Info("Attendance saved.");
+            await _dialogs.InfoAsync("Attendance saved.");
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
     private async Task PostDeductionsAsync()
     {
         var rows = Rows.ToList();
-        if (rows.Count == 0) { _dialogs.Error("No salary rows loaded."); return; }
+        if (rows.Count == 0) { await _dialogs.ErrorAsync("No salary rows loaded."); return; }
         var validation = ValidateRows(rows, includeAdvance: true);
-        if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+        if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
         var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
         var postIds = rows.Select(r => r.EmployeeId).ToList();
@@ -464,7 +464,7 @@ public partial class SalarySheetViewModel : ObservableObject
             await db.SaveChangesAsync();
             await LoadAsync();
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -477,7 +477,7 @@ public partial class SalarySheetViewModel : ObservableObject
             if (path is null) return;
 
             var validation = ValidateRows(Rows, includeAdvance: true);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
             var data = BuildMonthlySummaryRows(Rows);
             var year = SelectedYear;
@@ -485,7 +485,7 @@ public partial class SalarySheetViewModel : ObservableObject
             await Task.Run(() => _excel.ExportMonthlySummary(year, month, data, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -498,7 +498,7 @@ public partial class SalarySheetViewModel : ObservableObject
             if (path is null) return;
 
             var validation = ValidateRows(Rows, includeAdvance: true);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
             var data = BuildMonthlySummaryRows(Rows);
             var year = SelectedYear;
@@ -506,7 +506,7 @@ public partial class SalarySheetViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateMonthlySummary(year, month, data, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -515,9 +515,9 @@ public partial class SalarySheetViewModel : ObservableObject
         try
         {
             var cashRows = Rows.Where(r => r.PaymentMode == PaymentMode.Cash).ToList();
-            if (cashRows.Count == 0) { _dialogs.Info("No cash-payment employees in this period."); return; }
+            if (cashRows.Count == 0) { await _dialogs.InfoAsync("No cash-payment employees in this period."); return; }
             var validation = ValidateRows(cashRows, includeAdvance: true);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
 
             var defaultName = $"Cash-Salary-{SelectedYear:0000}-{SelectedMonth.Number:00}.pdf";
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", defaultName);
@@ -529,7 +529,7 @@ public partial class SalarySheetViewModel : ObservableObject
             await Task.Run(() => _pdf.GenerateMonthlySummary(year, month, data, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     [RelayCommand]
@@ -542,19 +542,19 @@ public partial class SalarySheetViewModel : ObservableObject
             if (path is null) return;
 
             var payableRows = Rows.Where(r => r.PaymentMode != PaymentMode.Cash).ToList();
-            if (payableRows.Count == 0) { _dialogs.Info("No bank-payment employees in this period."); return; }
+            if (payableRows.Count == 0) { await _dialogs.InfoAsync("No bank-payment employees in this period."); return; }
 
             var validation = ValidateRows(payableRows, includeAdvance: true);
             var exportIssues = ValidateIciciRows(payableRows);
             if (!validation.IsValid || exportIssues.Count > 0)
             {
                 var issues = validation.Issues.Concat(exportIssues).ToList();
-                _dialogs.Error(new ValidationResult(issues).ToMessage());
+                await _dialogs.ErrorAsync(new ValidationResult(issues).ToMessage());
                 return;
             }
 
             var settings = _settings.Load();
-            var options = _dialogs.AskIciciExportOptions(settings.IciciDebitAccountNo);
+            var options = await _dialogs.AskIciciExportOptionsAsync(settings.IciciDebitAccountNo);
             if (options is null) return;
             _settings.Save(settings with { IciciDebitAccountNo = options.DebitAccountNo });
 
@@ -565,7 +565,7 @@ public partial class SalarySheetViewModel : ObservableObject
             await Task.Run(() => _excel.ExportIciciPayment(data, options, path));
             OpenFile(path);
         }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
 
     private static void OpenFile(string path)

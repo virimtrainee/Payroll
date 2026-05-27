@@ -1,6 +1,8 @@
 <UserControl x:Class="SalaryManager.App.Views.AttendanceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:SalaryManager.App.Behaviors"
+             xmlns:i="http://schemas.microsoft.com/xaml/behaviors">
     <Grid Margin="20,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -55,8 +57,11 @@
             <DataGrid x:Name="AttendanceGrid"
                       ItemsSource="{Binding Rows}"
                       SelectionUnit="Cell"
-                      SelectionMode="Single"
-                      CurrentCellChanged="AttendanceGrid_CurrentCellChanged">
+                      SelectionMode="Single">
+                <i:Interaction.Behaviors>
+                    <b:BeginEditOnCurrentCellChangedBehavior/>
+                </i:Interaction.Behaviors>
+
                 <DataGrid.Columns>
 
                     <DataGridTextColumn Header="Employee"

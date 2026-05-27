@@ -1,11 +1,7 @@
-<Window x:Class="SalaryManager.App.AdvanceEntryWindow"
+<UserControl x:Class="SalaryManager.App.AdvanceEntryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Edit Advance Entry"
-        Width="420" SizeToContent="Height"
-        ResizeMode="NoResize"
-        ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner"
+        Width="420"
         Background="{StaticResource BackgroundBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
@@ -62,4 +58,4 @@
                     Content="Save" Click="Save_Click" IsDefault="True"/>
         </Grid>
     </Grid>
-</Window>
+</UserControl>

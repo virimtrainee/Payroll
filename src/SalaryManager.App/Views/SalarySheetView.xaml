@@ -9,52 +9,55 @@
         <Style x:Key="InlineLabel" TargetType="TextBlock" BasedOn="{StaticResource FieldLabel}">
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
-        <Style x:Key="RightCellText" TargetType="TextBlock">
-            <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Style x:Key="LeftCellText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="TextAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style x:Key="GroupChipCheckBox" TargetType="CheckBox">
+        <Style x:Key="CenterCellText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="RightCellText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="GroupChipCheckBox" TargetType="CheckBox" BasedOn="{StaticResource MaterialDesignCheckBox}">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Border x:Name="bd"
-                                CornerRadius="8"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                BorderThickness="1"
-                                Background="White"
-                                Padding="12,6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#F8FAFC"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#EFF6FF"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#BFDBFE"/>
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Padding" Value="6,0"/>
         </Style>
         <Style x:Key="AllChipButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
-        <Style x:Key="ResizableSalaryColumnHeader" TargetType="DataGridColumnHeader">
+        <Style x:Key="ResizableSalaryColumnHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
             <Setter Property="Background" Value="#F1F5F9"/>
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Height" Value="42"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="7,0"/>
+            <Setter Property="Height" Value="38"/>
             <Setter Property="Cursor" Value="SizeWE"/>
+        </Style>
+        <Style x:Key="SalaryHeaderLeft" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="SalaryHeaderCenter" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SalaryHeaderRight" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+        </Style>
+        <Style x:Key="SalaryReadOnlyCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style x:Key="SalaryEditableCell" TargetType="DataGridCell" BasedOn="{StaticResource EditableCell}">
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -87,11 +90,11 @@
 
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="240"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="270"/>
+                            <ColumnDefinition Width="210"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="180"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -102,7 +105,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="112"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox ItemsSource="{Binding Months}"
                                           Style="{StaticResource PayrollModernComboBox}"
@@ -135,14 +138,15 @@
                         <StackPanel Grid.Column="6"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Bottom">
-                            <Button Margin="0,0,10,0"
+                            <Button Margin="0,0,6,0"
+                                    Padding="10,7"
                                     Command="{Binding ToggleEditModeCommand}">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                        <Setter Property="Content" Value="Edit Sheet"/>
+                                        <Setter Property="Content" Value="Edit"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsEditMode}" Value="True">
-                                                <Setter Property="Content" Value="Lock Sheet"/>
+                                                <Setter Property="Content" Value="Lock"/>
                                                 <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
                                                 <Setter Property="Foreground" Value="White"/>
                                             </DataTrigger>
@@ -153,14 +157,18 @@
                             <Button Style="{StaticResource SecondaryButton}"
                                     Content="Save"
                                     IsEnabled="{Binding IsEditMode}"
-                                    Margin="0,0,10,0"
+                                    Padding="10,7"
+                                    Margin="0,0,6,0"
                                     Command="{Binding SaveAttendanceCommand}"/>
                             <Button Style="{StaticResource SecondaryButton}"
-                                    Content="Reload"
-                                    Margin="0,0,10,0"
+                                    Content="Load"
+                                    Padding="10,7"
+                                    Margin="0,0,6,0"
                                     Command="{Binding LoadCommand}"/>
                             <Button Style="{StaticResource PrimaryButton}"
-                                    Content="Add Employee"
+                                    Content="Emp"
+                                    Visibility="Collapsed"
+                                    Padding="10,7"
                                     Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                         </StackPanel>
                     </Grid>
@@ -214,17 +222,20 @@
                             <TextBlock Text="Export"
                                        Style="{StaticResource FieldLabel}"
                                        VerticalAlignment="Center"
-                                       Margin="0,0,12,0"/>
+                                       Margin="0,0,8,0"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="Add"
+                                    Margin="0,0,6,0" Padding="10,7"
+                                    Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             <Button Style="{StaticResource SecondaryButton}" Content="Cash PDF"
-                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportCashPdfCommand}"/>
+                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportCashPdfCommand}"/>
                             <Button Style="{StaticResource SecondaryButton}" Content="All PDF"
-                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportSummaryPdfCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="ICICI Excel"
-                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportIciciExcelCommand}"/>
+                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportSummaryPdfCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="ICICI"
+                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportIciciExcelCommand}"/>
                             <Button Style="{StaticResource SecondaryButton}" Content="Excel"
-                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportToExcelCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="Post Advances"
-                                    Padding="12,7"
+                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportToExcelCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Post Adv"
+                                    Padding="10,7"
                                     Command="{Binding PostDeductionsCommand}"/>
                         </StackPanel>
                     </Grid>
@@ -254,7 +265,11 @@
                               ItemsSource="{Binding RowsView}"
                               IsReadOnly="{Binding IsGridReadOnly}"
                               RowHeight="44"
+                              RowBackground="White"
+                              AlternatingRowBackground="#F3F4F6"
+                              AlternationCount="2"
                               CanUserResizeColumns="True"
+                              CellStyle="{StaticResource SalaryReadOnlyCell}"
                               ColumnHeaderStyle="{StaticResource ResizableSalaryColumnHeader}"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               SelectionUnit="Cell"
@@ -303,20 +318,22 @@
                         </DataGrid.GroupStyle>
 
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="S.No."
+                            <DataGridTextColumn Header="#"
                                                 helpers:DataGridColumnKey.Key="serial"
                                                 Binding="{Binding SerialNumber}"
                                                 IsReadOnly="True"
-                                                Width="62">
+                                                HeaderStyle="{StaticResource SalaryHeaderCenter}"
+                                                Width="44"
+                                                MinWidth="44">
                                 <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource CenterCellText}">
                                         <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
 
-                            <DataGridTemplateColumn Header="Employee" helpers:DataGridColumnKey.Key="employee" Width="*" MinWidth="190" IsReadOnly="True">
+                            <DataGridTemplateColumn Header="Employee" helpers:DataGridColumnKey.Key="employee" Width="*" MinWidth="250" IsReadOnly="True"
+                                                    HeaderStyle="{StaticResource SalaryHeaderLeft}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Grid>
@@ -326,9 +343,10 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}"
                                                        FontWeight="SemiBold"
+                                                       Style="{StaticResource LeftCellText}"
                                                        VerticalAlignment="Center"/>
                                             <CheckBox Grid.Column="1"
-                                                      Content="Override"
+                                                      Content="OD"
                                                       IsChecked="{Binding IsNetSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                       IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                       Foreground="{StaticResource MutedTextBrush}"
@@ -344,12 +362,16 @@
                                                 helpers:DataGridColumnKey.Key="group"
                                                 Binding="{Binding GroupDisplayName}"
                                                 IsReadOnly="True"
-                                                Width="120"/>
+                                                HeaderStyle="{StaticResource SalaryHeaderLeft}"
+                                                ElementStyle="{StaticResource LeftCellText}"
+                                                Width="90"
+                                                MinWidth="82"/>
 
-                            <DataGridTemplateColumn Header="Payment" helpers:DataGridColumnKey.Key="payment" Width="100" IsReadOnly="True">
+                            <DataGridTemplateColumn Header="Pay" helpers:DataGridColumnKey.Key="payment" Width="82" MinWidth="82" IsReadOnly="True"
+                                                    HeaderStyle="{StaticResource SalaryHeaderCenter}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border CornerRadius="6" Padding="12,4" HorizontalAlignment="Left" BorderThickness="1">
+                                        <Border CornerRadius="6" Padding="12,4" HorizontalAlignment="Center" BorderThickness="1">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="Background" Value="#D1FAE5"/>
@@ -386,20 +408,23 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Base Salary (₹)"
+                            <DataGridTextColumn Header="Base (₹)"
                                                 helpers:DataGridColumnKey.Key="baseSalary"
-                                                Binding="{Binding BaseSalary, StringFormat=N2}"
+                                                Binding="{Binding BaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                 IsReadOnly="True"
-                                                Width="126"
+                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                Width="110"
+                                                MinWidth="104"
                                                 ElementStyle="{StaticResource RightCellText}"/>
 
-                            <DataGridTemplateColumn Header="Absent" helpers:DataGridColumnKey.Key="absent" Width="78"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="Absent" helpers:DataGridColumnKey.Key="absent" Width="70"
+                                                    MinWidth="64"
+                                                    HeaderStyle="{StaticResource SalaryHeaderCenter}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding DaysAbsent}"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
+                                                   Style="{StaticResource CenterCellText}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                                 <DataGridTemplateColumn.CellEditingTemplate>
@@ -413,13 +438,14 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="ESIC (₹)" helpers:DataGridColumnKey.Key="esic" Width="96"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="ESIC" helpers:DataGridColumnKey.Key="esic" Width="78"
+                                                    MinWidth="70"
+                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding EsicDeduction, StringFormat=N2}"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding EsicDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                                 <DataGridTemplateColumn.CellEditingTemplate>
@@ -434,13 +460,14 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="PF (₹)" helpers:DataGridColumnKey.Key="pf" Width="92"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="PF" helpers:DataGridColumnKey.Key="pf" Width="74"
+                                                    MinWidth="66"
+                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding PfDeduction, StringFormat=N2}"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding PfDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                                 <DataGridTemplateColumn.CellEditingTemplate>
@@ -455,13 +482,14 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="TDS (₹)" helpers:DataGridColumnKey.Key="tds" Width="96"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="TDS" helpers:DataGridColumnKey.Key="tds" Width="78"
+                                                    MinWidth="70"
+                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding TdsDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                                 <DataGridTemplateColumn.CellEditingTemplate>
@@ -476,20 +504,23 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Deductions (₹)"
+                            <DataGridTextColumn Header="Deduct"
                                                 helpers:DataGridColumnKey.Key="deductions"
-                                                Binding="{Binding TotalDeductions, StringFormat=N2}"
+                                                Binding="{Binding TotalDeductions, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                 IsReadOnly="True"
-                                                Width="126"
+                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                Width="96"
+                                                MinWidth="86"
                                                 ElementStyle="{StaticResource RightCellText}"/>
 
-                            <DataGridTemplateColumn Header="Adv. Ded. (₹)" helpers:DataGridColumnKey.Key="advanceDeduction" Width="116"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="Adv Ded" helpers:DataGridColumnKey.Key="advanceDeduction" Width="92"
+                                                    MinWidth="86"
+                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding AdvanceDeductionEntry, StringFormat=N2}"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AdvanceDeductionEntry, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                                 <DataGridTemplateColumn.CellEditingTemplate>
@@ -503,11 +534,13 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTextColumn Header="Adv. Balance (₹)"
+                            <DataGridTextColumn Header="Adv Bal"
                                                 helpers:DataGridColumnKey.Key="advanceBalance"
-                                                Binding="{Binding AdvanceBalance, StringFormat=N2}"
+                                                Binding="{Binding AdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                 IsReadOnly="True"
-                                                Width="132">
+                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                Width="98"
+                                                MinWidth="86">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource RightCellText}">
                                         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -521,13 +554,14 @@
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
 
-                            <DataGridTemplateColumn Header="Net Salary (₹)" helpers:DataGridColumnKey.Key="netSalary" Width="128"
-                                                    CellStyle="{StaticResource EditableCell}">
+                            <DataGridTemplateColumn Header="Net" helpers:DataGridColumnKey.Key="netSalary" Width="106"
+                                                    MinWidth="100"
+                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
+                                                    CellStyle="{StaticResource SalaryEditableCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding NetSalary, StringFormat=N2}"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"
+                                        <TextBlock Text="{Binding NetSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource PrimaryBrush}"/>
                                     </DataTemplate>
@@ -544,18 +578,6 @@
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Slip" helpers:DataGridColumnKey.Key="slip" Width="82" IsReadOnly="True">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Content="PDF"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Padding="12,4"
-                                                Margin="5,2"
-                                                Command="{Binding DataContext.GenerateSlipCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -574,32 +596,47 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="280"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="260"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Margin="18,10">
+                    <StackPanel Margin="14,10">
                         <TextBlock Text="Gross Pay" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalGross, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalGross, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="18,10">
-                        <TextBlock Text="Deductions" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAbsenceDeduction, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                    <StackPanel Grid.Column="1" Margin="14,10">
+                        <TextBlock Text="Absent Ded." Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalAbsenceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="18,10">
+                    <StackPanel Grid.Column="2" Margin="14,10">
+                        <TextBlock Text="ESIC" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalEsic, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="14,10">
+                        <TextBlock Text="PF" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalPf, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Margin="14,10">
+                        <TextBlock Text="TDS" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalTds, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="5" Margin="14,10">
                         <TextBlock Text="Adv. Deducted" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAdvanceDeduction, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalAdvanceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Margin="18,10">
+                    <StackPanel Grid.Column="6" Margin="14,10">
                         <TextBlock Text="Advance Balance" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAdvanceBalance, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalAdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <Border Grid.Column="4"
+                    <Border Grid.Column="7"
                             Background="{StaticResource PrimaryBrush}"
                             CornerRadius="0,8,8,0"
                             Padding="22,10">
                         <StackPanel>
                             <TextBlock Text="Net Payable" Foreground="#DBEAFE" FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding TotalNet, StringFormat={}₹{0:N2}}"
+                            <TextBlock Text="{Binding TotalNet, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}"
                                        Foreground="White"
                                        FontSize="24"
                                        FontWeight="Bold"

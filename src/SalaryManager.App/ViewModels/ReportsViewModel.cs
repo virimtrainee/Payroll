@@ -53,6 +53,7 @@ public partial class ReportsViewModel : ObservableObject
     private int _loadVersion;
     private int _employeeLoadVersion;
     private int _kpiLoadVersion;
+    private static readonly string CashGroupNormalizedName = GroupNameNormalizer.Normalize("Cash");
 
     public ReportsViewModel(IDbContextFactory<AppDbContext> dbf,
                             DatabaseInitializer dbInit,
@@ -156,10 +157,10 @@ public partial class ReportsViewModel : ObservableObject
                 .FirstOrDefaultAsync();
 
             if (version != _kpiLoadVersion) return;
-            KpiTotalPayable = $"₹{net:N0}";
-            KpiGross = $"₹{gross:N0}";
-            KpiDeductions = $"₹{ded:N0}";
-            KpiTotalAdvances = $"₹{advances:N0}";
+            KpiTotalPayable = FormatCurrency(net);
+            KpiGross = FormatCurrency(gross);
+            KpiDeductions = FormatCurrency(ded);
+            KpiTotalAdvances = FormatCurrency(advances);
             KpiActiveEmployees = active;
             RevisionEntryCount = revisionCount;
             RevisionEmployeeCount = revisionEmployees;
@@ -279,6 +280,35 @@ public partial class ReportsViewModel : ObservableObject
             var emp = SelectedEmployee;
             await Task.Run(() => _excel.ExportAdvanceLedger(emp, rows, bal, path));
             OpenFile(path);
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task SalarySlipPdfAsync()
+    {
+        try
+        {
+            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
+            var name = $"SalarySlip-{Sanitize(SelectedEmployee.Name)}-{SelectedYear:0000}-{SelectedMonth.Number:00}.pdf";
+            var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", name);
+            if (path is null) return;
+            await Task.Run(() => _pdf.GenerateSlip(data, path));
+            OpenFile(path);
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task SalarySlipPrintAsync()
+    {
+        try
+        {
+            if (SelectedEmployee is null) { _dialogs.Error("Pick an employee."); return; }
+            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
+            var path = await Task.Run(() => _pdf.GenerateSlip(data));
+            PrintFile(path);
         }
         catch (Exception ex) { _dialogs.Error(ex.Message); }
     }
@@ -463,6 +493,64 @@ public partial class ReportsViewModel : ObservableObject
         return (rows, rows.LastOrDefault()?.RunningBalance ?? 0m);
     }
 
+    private async Task<SalarySlipData> BuildSalarySlipDataAsync(int employeeId)
+    {
+        using var db = await _dbf.CreateDbContextAsync();
+        var employee = await db.Employees.AsNoTracking()
+            .Include(e => e.GroupMemberships)
+                .ThenInclude(m => m.EmployeeGroup)
+            .SingleOrDefaultAsync(e => e.Id == employeeId);
+        if (employee is null)
+            throw new InvalidOperationException("Selected employee was not found.");
+
+        var attendance = await db.AttendanceRecords.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.EmployeeId == employeeId
+                                   && a.Year == SelectedYear
+                                   && a.Month == SelectedMonth.Number);
+        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
+        var advanceDeduction = await db.Advances.AsNoTracking()
+            .Where(a => a.EmployeeId == employeeId
+                     && a.SourceKey == sourceKey
+                     && a.EntryType == AdvanceEntryType.Deducted)
+            .SumAsync(a => (decimal?)a.Amount) ?? 0m;
+        var advanceBalance = await db.Advances.AsNoTracking()
+            .Where(a => a.EmployeeId == employeeId)
+            .SumOutstandingAsync();
+
+        var daysAbsent = attendance?.DaysAbsent ?? 0;
+        var esic = UsesEsicPf(employee) ? attendance?.EsicDeduction ?? 0m : 0m;
+        var pf = UsesEsicPf(employee) ? attendance?.PfDeduction ?? 0m : 0m;
+        var tds = UsesTds(employee) ? attendance?.TdsDeduction ?? 0m : 0m;
+
+        var validation = PayrollValidator.Validate(new PayrollValidationInput(
+            employee.Name,
+            employee.BaseSalary,
+            SelectedYear,
+            SelectedMonth.Number,
+            daysAbsent,
+            esic,
+            pf,
+            tds,
+            advanceDeduction,
+            advanceBalance,
+            advanceDeduction));
+        var issues = validation.Issues.ToList();
+        if (attendance?.NetSalaryOverride < 0)
+            issues.Add(new ValidationIssue(employee.Name, "Net salary override cannot be negative.", "net_override_negative"));
+        if (issues.Count > 0)
+            throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
+
+        var breakdown = SalaryCalculator.Compute(employee.BaseSalary, SelectedYear, SelectedMonth.Number, daysAbsent, esic, pf, tds);
+        return new SalarySlipData(
+            employee,
+            SelectedYear,
+            SelectedMonth.Number,
+            breakdown,
+            advanceBalance,
+            advanceDeduction,
+            attendance?.NetSalaryOverride);
+    }
+
     private async Task<List<SalaryRevisionReportRow>> BuildRevisionRowsAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
@@ -484,10 +572,31 @@ public partial class ReportsViewModel : ObservableObject
 
     private static string Sanitize(string s) => string.Join("_", s.Split(Path.GetInvalidFileNameChars()));
 
+    private static string FormatCurrency(decimal value) =>
+        $"₹{value.ToString("N0", CultureInfo.GetCultureInfo("en-IN"))}";
+
     private static void OpenFile(string path)
     {
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
     }
+
+    private static void PrintFile(string path)
+    {
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, Verb = "print" }); }
+        catch { OpenFile(path); }
+    }
+
+    private static bool UsesEsicPf(Employee employee)
+        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary <= 25000m;
+
+    private static bool UsesTds(Employee employee)
+        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary > 25000m;
+
+    private static bool HasCashDeductionsDisabled(Employee employee)
+        => employee.PaymentMode == PaymentMode.Cash
+        || employee.GroupMemberships.Any(m =>
+            m.EmployeeGroup is not null
+            && GroupNameNormalizer.Normalize(m.EmployeeGroup.Name) == CashGroupNormalizedName);
 
     private async Task LoadGroupFiltersAsync(AppDbContext db)
     {

@@ -52,7 +52,9 @@ public partial class EmployeesViewModel : ObservableObject
     [ObservableProperty] private string searchText = string.Empty;
     [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
     [ObservableProperty] private Employee? selected;
-    [ObservableProperty] private EmployeeGroup? selectedGroup;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedGroup))]
+    private EmployeeGroup? selectedGroup;
     [ObservableProperty] private string newGroupName = string.Empty;
     [ObservableProperty] private string selectedGroupName = string.Empty;
     private int _loadVersion;
@@ -62,6 +64,7 @@ public partial class EmployeesViewModel : ObservableObject
     public event EventHandler<EmployeeDeletedEventArgs>? EmployeePermanentlyDeleted;
 
     public Window? OwnerWindow { get; set; }
+    public bool HasSelectedGroup => SelectedGroup is not null;
     public string EmployeeListTitle => SelectedStatusFilter switch
     {
         EmployeeStatusFilter.Inactive => "Inactive employees",

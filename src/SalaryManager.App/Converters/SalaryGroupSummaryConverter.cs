@@ -17,7 +17,7 @@ public sealed class SalaryGroupSummaryConverter : IValueConverter
         var label = rows.Count == 1 ? "employee" : "employees";
         var baseTotal = rows.Sum(r => r.BaseSalary);
 
-        return $"{rows.Count} {label}  Base \u20B9{baseTotal:N0}";
+        return $"{rows.Count} {label}  Base \u20B9{baseTotal.ToString("N0", CultureInfo.GetCultureInfo("en-IN"))}";
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

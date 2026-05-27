@@ -76,8 +76,7 @@
                                                        Visibility="{Binding DataContext.SidebarTextVisibility, RelativeSource={RelativeSource TemplatedParent}}"
                                                        VerticalAlignment="Center"/>
                                             <Button Grid.Column="2"
-                                                    Content="{Binding DataContext.SidebarToggleGlyph, RelativeSource={RelativeSource TemplatedParent}}"
-                                                    Command="{Binding DataContext.ToggleSidebarCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                                    Command="{Binding DataContext.ToggleSidebarCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                     Width="28"
                                                     Height="28"
                                                     Margin="8,0,0,0"
@@ -88,7 +87,25 @@
                                                     BorderThickness="1"
                                                     FontSize="18"
                                                     FontWeight="Bold"
-                                                    Cursor="Hand"/>
+                                                    HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"
+                                                    Cursor="Hand">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                CornerRadius="4">
+                                                            <TextBlock Text="&lt;"
+                                                                       Foreground="{TemplateBinding Foreground}"
+                                                                       FontSize="{TemplateBinding FontSize}"
+                                                                       FontWeight="{TemplateBinding FontWeight}"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
                                         </Grid>
                                     </Border>
 

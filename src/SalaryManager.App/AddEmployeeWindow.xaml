@@ -9,38 +9,12 @@
         Background="{StaticResource BackgroundBrush}">
 
     <Window.Resources>
-        <!-- Payment mode radio button styled as a compact segment -->
-        <Style x:Key="SegmentRadio" TargetType="RadioButton">
-            <Setter Property="Padding" Value="16,0"/>
-            <Setter Property="Height" Value="34"/>
+        <Style x:Key="SegmentRadio" TargetType="RadioButton" BasedOn="{StaticResource MaterialDesignRadioButton}">
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="bd"
-                                Background="#F1F5F9"
-                                CornerRadius="8"
-                                Padding="{TemplateBinding Padding}">
-                            <TextBlock x:Name="txt"
-                                       Text="{TemplateBinding Content}"
-                                       Foreground="#64748B"
-                                       FontSize="13" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{StaticResource PrimaryBrush}"/>
-                                <Setter TargetName="txt" Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.88"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
     </Window.Resources>
 
@@ -55,8 +29,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="20"/>
             <RowDefinition Height="Auto"/>

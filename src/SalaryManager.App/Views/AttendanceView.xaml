@@ -73,7 +73,7 @@
                     </DataGridTextColumn>
 
                     <DataGridTextColumn Header="Base Salary"
-                                        Binding="{Binding BaseSalary, StringFormat=N2}"
+                                        Binding="{Binding BaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                         IsReadOnly="True"
                                         Width="130">
                         <DataGridTextColumn.ElementStyle>
@@ -108,7 +108,7 @@
                     <DataGridTemplateColumn Header="ESIC Deduction" Width="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding EsicDeduction, StringFormat=N2}"
+                                <TextBlock Text="{Binding EsicDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                            HorizontalAlignment="Right"
                                            VerticalAlignment="Center"
                                            Padding="0,0,12,0"/>
@@ -130,7 +130,7 @@
                     <DataGridTemplateColumn Header="PF Deduction" Width="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding PfDeduction, StringFormat=N2}"
+                                <TextBlock Text="{Binding PfDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                            HorizontalAlignment="Right"
                                            VerticalAlignment="Center"
                                            Padding="0,0,12,0"/>
@@ -152,7 +152,7 @@
                     <DataGridTemplateColumn Header="TDS Deduction" Width="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
+                                <TextBlock Text="{Binding TdsDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                            HorizontalAlignment="Right"
                                            VerticalAlignment="Center"
                                            Padding="0,0,12,0"/>

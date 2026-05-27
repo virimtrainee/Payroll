@@ -7,14 +7,14 @@
             <Setter Property="Margin" Value="0"/>
         </Style>
         <Style x:Key="DashboardNumber" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="28"/>
+            <Setter Property="FontSize" Value="22"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="0,8,0,0"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         </Style>
         <Style x:Key="SmallStatusBadge" TargetType="Border">
             <Setter Property="CornerRadius" Value="99"/>
-            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="Padding" Value="7,3"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -25,7 +25,7 @@
                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <Grid Margin="32,28,32,28">
+            <Grid Margin="24,24,24,24">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -38,23 +38,23 @@
                            Style="{StaticResource PageTitle}"
                            Margin="0,0,0,22"/>
 
-                <UniformGrid Grid.Row="1" Rows="1" Columns="4" Margin="0,0,0,24">
-                    <Border Style="{StaticResource Card}" Margin="0,0,16,0">
+                <UniformGrid Grid.Row="1" Rows="1" Columns="4" Margin="0,0,0,20">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#DBEAFE">
-                                <TextBlock Text="₹" Foreground="{StaticResource PrimaryBrush}" FontSize="28"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#DBEAFE">
+                                <TextBlock Text="₹" Foreground="{StaticResource PrimaryBrush}" FontSize="20"
                                            FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="TOTAL PAYABLE" Style="{StaticResource DashboardCardTitle}"/>
-                                <TextBlock Text="{Binding GrossPayroll, StringFormat={}₹{0:N0}}"
+                                <TextBlock Text="PAYABLE" Style="{StaticResource DashboardCardTitle}"/>
+                                <TextBlock Text="{Binding PayablePayroll, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}"
                                            Style="{StaticResource DashboardNumber}"
                                            Foreground="{StaticResource PrimaryBrush}"/>
-                                <TextBlock Text="{Binding GrossPayroll, StringFormat={}Gross ₹{0:N0} • Deductions ₹0}"
+                                <TextBlock Text="Net payroll"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            FontSize="12"
                                            Margin="0,6,0,0"/>
@@ -62,22 +62,22 @@
                         </Grid>
                     </Border>
 
-                    <Border Style="{StaticResource Card}" Margin="0,0,16,0">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#FFEDD5">
-                                <TextBlock Text="₹" Foreground="#EA580C" FontSize="28"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#FFEDD5">
+                                <TextBlock Text="₹" Foreground="#EA580C" FontSize="20"
                                            FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="OUTSTANDING ADVANCES" Style="{StaticResource DashboardCardTitle}"/>
-                                <TextBlock Text="{Binding OutstandingAdvances, StringFormat={}₹{0:N0}}"
+                                <TextBlock Text="ADVANCES" Style="{StaticResource DashboardCardTitle}"/>
+                                <TextBlock Text="{Binding OutstandingAdvances, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}"
                                            Style="{StaticResource DashboardNumber}"
                                            Foreground="#EA580C"/>
-                                <TextBlock Text="{Binding EmployeesWithPendingAdvances, StringFormat={}{0} employees with pending advances}"
+                                <TextBlock Text="{Binding EmployeesWithPendingAdvances, StringFormat={}{0} pending}"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            FontSize="12"
                                            Margin="0,6,0,0"/>
@@ -85,18 +85,18 @@
                         </Grid>
                     </Border>
 
-                    <Border Style="{StaticResource Card}" Margin="0,0,16,0">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#DCFCE7">
-                                <TextBlock Text="✓" Foreground="#16A34A" FontSize="24"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#DCFCE7">
+                                <TextBlock Text="✓" Foreground="#16A34A" FontSize="20"
                                            FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="ATTENDANCE ENTERED" Style="{StaticResource DashboardCardTitle}"/>
+                                <TextBlock Text="ATTENDANCE" Style="{StaticResource DashboardCardTitle}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                     <TextBlock Text="{Binding AttendanceSavedThisMonth}"
                                                FontSize="28"
@@ -112,7 +112,7 @@
                                                Foreground="{StaticResource MutedTextBrush}"
                                                VerticalAlignment="Bottom"/>
                                 </StackPanel>
-                                <TextBlock Text="Employees • This Month"
+                                <TextBlock Text="This month"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            FontSize="12"
                                            Margin="0,6,0,0"/>
@@ -120,22 +120,22 @@
                         </Grid>
                     </Border>
 
-                    <Border Style="{StaticResource Card}">
+                    <Border Style="{StaticResource Card}" Padding="16">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#F3E8FF">
-                                <TextBlock Text="↗" Foreground="#7C3AED" FontSize="24"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#F3E8FF">
+                                <TextBlock Text="↗" Foreground="#7C3AED" FontSize="20"
                                            FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="SALARY CHANGES" Style="{StaticResource DashboardCardTitle}"/>
+                                <TextBlock Text="CHANGES" Style="{StaticResource DashboardCardTitle}"/>
                                 <TextBlock Text="{Binding SalaryChangesCount}"
                                            Style="{StaticResource DashboardNumber}"
                                            Foreground="#7C3AED"/>
-                                <TextBlock Text="Changes pending review"
+                                <TextBlock Text="{Binding SalaryReviewStatusText}"
                                            Foreground="{StaticResource MutedTextBrush}"
                                            FontSize="12"
                                            Margin="0,6,0,0"/>
@@ -146,148 +146,29 @@
 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.05*"/>
-                        <ColumnDefinition Width="20"/>
-                        <ColumnDefinition Width="1.05*"/>
-                        <ColumnDefinition Width="20"/>
-                        <ColumnDefinition Width="1.2*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="1*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding CurrentPeriod, StringFormat={}Payroll Checklist - {0}}"
-                                       FontSize="17"
-                                       FontWeight="Bold"
-                                       Margin="0,0,0,16"/>
-
-                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8">
-                                <StackPanel>
-                                    <Grid Height="58" Margin="0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="28"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="28" Height="28" CornerRadius="6" Background="#EFF6FF" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="✓" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Attendance Entry" FontWeight="SemiBold"/>
-                                            <TextBlock FontSize="12" Foreground="{StaticResource MutedTextBrush}">
-                                                <Run Text="{Binding AttendanceSavedThisMonth}"/><Run Text=" of "/><Run Text="{Binding ActiveEmployees}"/><Run Text=" employees"/>
-                                            </TextBlock>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Style="{StaticResource SmallStatusBadge}" Background="#DCFCE7">
-                                            <TextBlock Text="Completed" Foreground="#166534" FontSize="11" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="3" Text="›" Foreground="{StaticResource MutedTextBrush}" FontSize="24" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Separator Background="{StaticResource BorderBrush}"/>
-
-                                    <Grid Height="58">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="28"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="28" Height="28" CornerRadius="6" Background="#EFF6FF" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="↗" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Salary Review" FontWeight="SemiBold"/>
-                                            <TextBlock Text="Review salary changes" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Style="{StaticResource SmallStatusBadge}" Background="#DCFCE7">
-                                            <TextBlock Text="Completed" Foreground="#166534" FontSize="11" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="3" Text="›" Foreground="{StaticResource MutedTextBrush}" FontSize="24" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Separator Background="{StaticResource BorderBrush}"/>
-
-                                    <Grid Height="58">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="28"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="28" Height="28" CornerRadius="6" Background="#FFF7ED" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="₹" Foreground="#EA580C" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Advances &amp; Deductions" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding OutstandingAdvances, StringFormat={}{0:N0} outstanding}" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Style="{StaticResource SmallStatusBadge}" Background="#FFEDD5">
-                                            <TextBlock Text="Pending" Foreground="#EA580C" FontSize="11" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="3" Text="›" Foreground="{StaticResource MutedTextBrush}" FontSize="24" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Separator Background="{StaticResource BorderBrush}"/>
-
-                                    <Grid Height="58">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="28"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="28" Height="28" CornerRadius="6" Background="#F1F5F9" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="□" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Salary Sheet Finalization" FontWeight="SemiBold"/>
-                                            <TextBlock Text="Generate payroll" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Style="{StaticResource SmallStatusBadge}" Background="#F1F5F9">
-                                            <TextBlock Text="Not Started" Foreground="{StaticResource MutedTextBrush}" FontSize="11" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="3" Text="›" Foreground="{StaticResource MutedTextBrush}" FontSize="24" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    <Separator Background="{StaticResource BorderBrush}"/>
-
-                                    <Grid Height="58">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="28"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="28" Height="28" CornerRadius="6" Background="#F1F5F9" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Text="□" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Payslip Generation" FontWeight="SemiBold"/>
-                                            <TextBlock Text="Create &amp; distribute payslips" FontSize="12" Foreground="{StaticResource MutedTextBrush}"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Style="{StaticResource SmallStatusBadge}" Background="#F1F5F9">
-                                            <TextBlock Text="Not Started" Foreground="{StaticResource MutedTextBrush}" FontSize="11" FontWeight="SemiBold"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="3" Text="›" Foreground="{StaticResource MutedTextBrush}" FontSize="24" VerticalAlignment="Center"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
-                        <DockPanel>
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="0">
+                        <DockPanel LastChildFill="False">
                             <Grid DockPanel.Dock="Top" Margin="20,18,20,12">
-                                <TextBlock Text="Recent Advance Entries" FontSize="17" FontWeight="Bold"/>
-                                <Button Content="View All"
+                                <TextBlock Text="Advance Entries" FontSize="15" FontWeight="Bold"/>
+                                <Button Content="All"
                                         HorizontalAlignment="Right"
                                         Style="{StaticResource GhostButton}"
                                         Command="{Binding DataContext.ShowAdvancesCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             </Grid>
-                            <DataGrid ItemsSource="{Binding RecentAdvances}"
+                            <DataGrid DockPanel.Dock="Top"
+                                      ItemsSource="{Binding RecentAdvances}"
+                                      AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       BorderThickness="0"
                                       RowHeight="42">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Employee" Binding="{Binding EmployeeName}" Width="*"/>
-                                    <DataGridTemplateColumn Header="Type" Width="82">
+                                    <DataGridTextColumn Header="Emp" Binding="{Binding EmployeeName}" Width="*"/>
+                                    <DataGridTemplateColumn Header="Type" Width="76">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Border CornerRadius="6" Background="#FFEDD5" BorderBrush="#FED7AA" BorderThickness="1" Padding="8,3" HorizontalAlignment="Left">
@@ -296,7 +177,7 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat={}₹{0:N0}}" Width="95">
+                                    <DataGridTextColumn Header="Amount" Binding="{Binding Amount, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}" Width="96">
                                         <DataGridTextColumn.ElementStyle>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="FontWeight" Value="Bold"/>
@@ -304,13 +185,13 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Date" Binding="{Binding Date, StringFormat=dd MMM yyyy}" Width="110"/>
+                                    <DataGridTextColumn Header="Dt" Binding="{Binding Date, StringFormat=dd/MM}" Width="64"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                             <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="20,16">
                                 <Grid>
                                     <TextBlock Text="Total Advances" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding OutstandingAdvances, StringFormat={}₹{0:N0}}"
+                                    <TextBlock Text="{Binding OutstandingAdvances, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}"
                                                HorizontalAlignment="Right"
                                                FontSize="18"
                                                FontWeight="Bold"
@@ -320,23 +201,25 @@
                         </DockPanel>
                     </Border>
 
-                    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="0">
-                        <DockPanel>
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+                        <DockPanel LastChildFill="False">
                             <Grid DockPanel.Dock="Top" Margin="20,18,20,12">
-                                <TextBlock Text="Recent Salary Changes" FontSize="17" FontWeight="Bold"/>
-                                <Button Content="View All"
+                                <TextBlock Text="Salary Changes" FontSize="15" FontWeight="Bold"/>
+                                <Button Content="All"
                                         HorizontalAlignment="Right"
                                         Style="{StaticResource GhostButton}"
                                         Command="{Binding DataContext.ShowEmployeesCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             </Grid>
-                            <DataGrid ItemsSource="{Binding RecentRevisions}"
+                            <DataGrid DockPanel.Dock="Top"
+                                      ItemsSource="{Binding RecentRevisions}"
+                                      AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       BorderThickness="0"
                                       RowHeight="42">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Employee" Binding="{Binding EmployeeName}" Width="*"/>
-                                    <DataGridTextColumn Header="Old (₹)" Binding="{Binding OldSalary, StringFormat=N0}" Width="92"/>
-                                    <DataGridTextColumn Header="New (₹)" Binding="{Binding NewSalary, StringFormat=N0}" Width="92">
+                                    <DataGridTextColumn Header="Emp" Binding="{Binding EmployeeName}" Width="*"/>
+                                    <DataGridTextColumn Header="Old" Binding="{Binding OldSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain0}" Width="76"/>
+                                    <DataGridTextColumn Header="New" Binding="{Binding NewSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain0}" Width="76">
                                         <DataGridTextColumn.ElementStyle>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="FontWeight" Value="Bold"/>
@@ -345,13 +228,13 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Date" Binding="{Binding ChangedAt, StringFormat=dd MMM yyyy}" Width="110"/>
+                                    <DataGridTextColumn Header="Dt" Binding="{Binding ChangedAt, StringFormat=dd/MM}" Width="64"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                             <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="20,16">
                                 <Grid>
                                     <TextBlock Text="Total Increases" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding TotalRevisionIncrease, StringFormat={}₹{0:N0}}"
+                                    <TextBlock Text="{Binding TotalRevisionIncrease, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}"
                                                HorizontalAlignment="Right"
                                                FontSize="18"
                                                FontWeight="Bold"
@@ -380,11 +263,11 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="You’re all set! Attendance is complete and payroll is ready."
+                            <TextBlock Text="{Binding PayrollBannerTitle}"
                                        FontSize="15"
                                        FontWeight="SemiBold"
                                        Foreground="#0B2A5B"/>
-                            <TextBlock Text="Review salary changes and generate payroll when ready."
+                            <TextBlock Text="{Binding PayrollBannerSubtitle}"
                                        FontSize="13"
                                        Foreground="{StaticResource MutedTextBrush}"
                                        Margin="0,4,0,0"/>

@@ -468,40 +468,6 @@ public partial class SalarySheetViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task GenerateSlipAsync(SalaryRowVm? row)
-    {
-        if (row is null) return;
-        try
-        {
-            using var db = await _dbf.CreateDbContextAsync();
-            var emp = await db.Employees.FindAsync(row.EmployeeId);
-            if (emp is null) return;
-            var validation = ValidateRows([row], includeAdvance: true);
-            if (!validation.IsValid) { _dialogs.Error(validation.ToMessage()); return; }
-
-            var year = SelectedYear;
-            var month = SelectedMonth.Number;
-            var daysAbsent = row.DaysAbsent;
-            var esic = EffectiveEsicDeduction(row);
-            var pf = EffectivePfDeduction(row);
-            var tds = EffectiveTdsDeduction(row);
-            var advBal = row.AdvanceBalance;
-            var advDeduction = row.AdvanceDeductionEntry;
-            decimal? netSalaryOverride = row.IsNetSalaryOverrideEnabled ? row.NetSalary : null;
-            var baseSalary = emp.BaseSalary;
-
-            var path = await Task.Run(() =>
-            {
-                var b = SalaryCalculator.Compute(baseSalary, year, month, daysAbsent, esic, pf, tds);
-                var data = new SalarySlipData(emp, year, month, b, advBal, advDeduction, netSalaryOverride);
-                return _pdf.GenerateSlip(data);
-            });
-            OpenFile(path);
-        }
-        catch (Exception ex) { _dialogs.Error(ex.Message); }
-    }
-
-    [RelayCommand]
     private async Task ExportToExcelAsync()
     {
         try

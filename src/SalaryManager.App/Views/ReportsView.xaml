@@ -3,15 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
         <Style x:Key="ReportCardTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontSize" Value="17"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         </Style>
         <Style x:Key="ReportMetricLabel" TargetType="TextBlock" BasedOn="{StaticResource FieldLabel}">
-            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style x:Key="ReportMetricValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         </Style>
@@ -22,8 +23,9 @@
                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <Grid Margin="32,24,32,28">
+            <Grid Margin="28,18,28,22">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -33,94 +35,159 @@
                 <TextBlock Grid.Row="0"
                            Text="Reports"
                            Style="{StaticResource PageTitle}"
-                           Margin="0,0,0,20"/>
+                           Margin="0,0,0,14"/>
 
-                <UniformGrid Grid.Row="1" Rows="1" Columns="4" Margin="0,0,0,24">
-                    <Border Style="{StaticResource Card}" Margin="0,0,18,0">
+                <UniformGrid Grid.Row="1" Rows="1" Columns="4" Margin="0,0,0,16">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#DBEAFE">
-                                <TextBlock Text="₹" Foreground="{StaticResource PrimaryBrush}" FontSize="28" FontWeight="Bold"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#DBEAFE">
+                                <TextBlock Text="₹" Foreground="{StaticResource PrimaryBrush}" FontSize="20" FontWeight="Bold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="TOTAL PAYABLE" Style="{StaticResource FieldLabel}"/>
-                                <TextBlock Text="{Binding KpiTotalPayable}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,8,0,0"/>
-                                <TextBlock Text="Net amount to be paid" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="PAYABLE" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="{Binding KpiTotalPayable}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="Net payroll" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}" Margin="0,0,18,0">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#DCFCE7">
-                                <TextBlock Text="▥" Foreground="#16A34A" FontSize="24" FontWeight="Bold"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#DCFCE7">
+                                <TextBlock Text="▥" Foreground="#16A34A" FontSize="18" FontWeight="Bold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="GROSS" Style="{StaticResource FieldLabel}"/>
-                                <TextBlock Text="{Binding KpiGross}" FontSize="26" FontWeight="Bold" Margin="0,8,0,0"/>
-                                <TextBlock Text="Total gross payroll" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="{Binding KpiGross}" FontSize="20" FontWeight="Bold" Margin="0,6,0,0"/>
+                                <TextBlock Text="Gross payroll" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}" Margin="0,0,18,0">
+                    <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#FFEDD5">
-                                <TextBlock Text="%" Foreground="#EA580C" FontSize="24" FontWeight="Bold"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#FFEDD5">
+                                <TextBlock Text="%" Foreground="#EA580C" FontSize="18" FontWeight="Bold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
                                 <TextBlock Text="DEDUCTIONS" Style="{StaticResource FieldLabel}"/>
-                                <TextBlock Text="{Binding KpiDeductions}" FontSize="26" FontWeight="Bold" Margin="0,8,0,0"/>
-                                <TextBlock Text="Total deductions" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="{Binding KpiDeductions}" FontSize="20" FontWeight="Bold" Margin="0,6,0,0"/>
+                                <TextBlock Text="Total deductions" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}">
+                    <Border Style="{StaticResource Card}" Padding="16">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Width="48" Height="48" CornerRadius="8" Background="#F3E8FF">
-                                <TextBlock Text="U" Foreground="#7C3AED" FontSize="20" FontWeight="Bold"
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#F3E8FF">
+                                <TextBlock Text="U" Foreground="#7C3AED" FontSize="18" FontWeight="Bold"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="ACTIVE EMPLOYEES" Style="{StaticResource FieldLabel}"/>
-                                <TextBlock Text="{Binding KpiActiveEmployees}" FontSize="26" FontWeight="Bold" Foreground="#7C3AED" Margin="0,8,0,0"/>
-                                <TextBlock Text="Employees on payroll" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="EMPLOYEES" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="{Binding KpiActiveEmployees}" FontSize="20" FontWeight="Bold" Foreground="#7C3AED" Margin="0,6,0,0"/>
+                                <TextBlock Text="On payroll" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
                 </UniformGrid>
 
-                <Grid Grid.Row="2">
+                <Border Grid.Row="2" Style="{StaticResource Card}" Padding="16" Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="58"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="42" Height="42" CornerRadius="8" Background="#DBEAFE">
+                            <TextBlock Text="₹" Foreground="{StaticResource PrimaryBrush}" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <Grid Grid.Column="1" Margin="14,0,18,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Salary Slip" Style="{StaticResource ReportCardTitle}"/>
+                                <TextBlock Text="Select an employee and generate the salary slip for the selected period."
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Margin="0,6,0,0"/>
+                            </StackPanel>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox ItemsSource="{Binding Months}"
+                                          SelectedItem="{Binding SelectedMonth}"
+                                          DisplayMemberPath="Name"/>
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding Years}"
+                                          SelectedItem="{Binding SelectedYear}"
+                                          Margin="10,0,0,0"/>
+                                <ComboBox Grid.Column="2"
+                                          ItemsSource="{Binding GroupFilterOptions}"
+                                          SelectedItem="{Binding SelectedGroupFilter}"
+                                          DisplayMemberPath="Name"
+                                          Margin="10,0,0,0"/>
+                                <ComboBox Grid.Column="3"
+                                          ItemsSource="{Binding Employees}"
+                                          SelectedItem="{Binding SelectedEmployee}"
+                                          DisplayMemberPath="Name"
+                                          Margin="10,0,0,0"/>
+                            </Grid>
+                        </Grid>
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Bottom">
+                            <Button Style="{StaticResource SecondaryButton}"
+                                    Content="PDF"
+                                    Padding="12,7"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding SalarySlipPdfCommand}"/>
+                            <Button Style="{StaticResource PrimaryButton}"
+                                    Content="Print"
+                                    Padding="14,7"
+                                    Command="{Binding SalarySlipPrintCommand}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="3">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="14"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="14"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}">
+                    <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Padding="16">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,18">
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
                                 <Border Width="42" Height="42" CornerRadius="8" Background="#DBEAFE" Margin="0,0,16,0">
                                     <TextBlock Text="▦" Foreground="{StaticResource PrimaryBrush}" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -130,30 +197,31 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="160"/>
-                                    <ColumnDefinition Width="112"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="100"/>
                                     <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="0"/>
+                                    <ColumnDefinition Width="0"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox ItemsSource="{Binding Months}" SelectedItem="{Binding SelectedMonth}" DisplayMemberPath="Name"/>
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding Years}" SelectedItem="{Binding SelectedYear}" Margin="10,0,0,0"/>
                                 <ComboBox Grid.Column="2" ItemsSource="{Binding GroupFilterOptions}" SelectedItem="{Binding SelectedGroupFilter}" DisplayMemberPath="Name" Margin="10,0,0,0"/>
                             </Grid>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,4,0,18">
+                            <Grid DockPanel.Dock="Top" Margin="0,2,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="NET PAYABLE" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="NET" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiTotalPayable}" Style="{StaticResource ReportMetricValue}" Foreground="{StaticResource PrimaryBrush}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="ACTIVE EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiActiveEmployees}" Style="{StaticResource ReportMetricValue}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
@@ -162,21 +230,21 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Export as:" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Margin="0,0,10,0" Command="{Binding SummaryPdfCommand}"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Margin="0,0,10,0" Command="{Binding SummaryExcelCommand}"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="CSV" Margin="0,0,10,0" Command="{Binding SummaryCsvCommand}"/>
-                                    <Button Style="{StaticResource PrimaryButton}" Content="View Report" Command="{Binding SummaryPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Padding="10,7" Margin="0,0,6,0" Command="{Binding SummaryPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Padding="10,7" Margin="0,0,6,0" Command="{Binding SummaryExcelCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="CSV" Padding="10,7" Margin="0,0,6,0" Command="{Binding SummaryCsvCommand}"/>
+                                    <Button Style="{StaticResource PrimaryButton}" Content="View" Padding="10,7" Command="{Binding SummaryPdfCommand}"/>
                                 </StackPanel>
                             </Border>
                         </DockPanel>
                     </Border>
 
-                    <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource Card}">
+                    <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource Card}" Padding="16">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,24">
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,14">
                                 <Border Width="42" Height="42" CornerRadius="8" Background="#DCFCE7" Margin="0,0,16,0">
                                     <TextBlock Text="▣" Foreground="#16A34A" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -186,27 +254,27 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,2,0,22">
+                            <Grid DockPanel.Dock="Top" Margin="0,2,0,14">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="TOTAL PAYABLE" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="PAYABLE" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiTotalPayable}" Style="{StaticResource ReportMetricValue}" Foreground="{StaticResource PrimaryBrush}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="ACTIVE EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiActiveEmployees}" Style="{StaticResource ReportMetricValue}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="FILE FORMAT" Style="{StaticResource ReportMetricLabel}"/>
-                                    <TextBlock Text="ICICI Excel" Style="{StaticResource ReportMetricValue}" FontSize="16"/>
+                                    <TextBlock Text="FORMAT" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="ICICI" Style="{StaticResource ReportMetricValue}" FontSize="16"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
                                 <Grid>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Export as:" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
@@ -214,7 +282,7 @@
                                     </StackPanel>
                                     <Button Style="{StaticResource PrimaryButton}"
                                             Background="#16A34A"
-                                            Content="Generate ICICI Excel"
+                                            Content="Generate Excel"
                                             HorizontalAlignment="Right"
                                             Command="{Binding IciciExcelCommand}"/>
                                 </Grid>
@@ -222,9 +290,9 @@
                         </DockPanel>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}">
+                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Card}" Padding="16">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,18">
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
                                 <Border Width="42" Height="42" CornerRadius="8" Background="#FFEDD5" Margin="0,0,16,0">
                                     <TextBlock Text="₹" Foreground="#EA580C" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -234,7 +302,7 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,0,0,16">
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="180"/>
                                     <ColumnDefinition Width="*"/>
@@ -243,40 +311,40 @@
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployee}" DisplayMemberPath="Name" Margin="12,0,0,0"/>
                             </Grid>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,4,0,18">
+                            <Grid DockPanel.Dock="Top" Margin="0,2,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="SELECTED GROUP" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="GROUP" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding SelectedGroupFilter.Name, TargetNullValue='All Groups'}" Style="{StaticResource ReportMetricValue}" FontSize="16"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="TOTAL EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiActiveEmployees}" Style="{StaticResource ReportMetricValue}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="TOTAL ADVANCES" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="ADVANCES" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding KpiTotalAdvances}" Style="{StaticResource ReportMetricValue}" Foreground="#EA580C"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Export as:" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Margin="0,0,10,0" Command="{Binding LedgerPdfCommand}"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Margin="0,0,10,0" Command="{Binding LedgerExcelCommand}"/>
-                                    <Button Style="{StaticResource PrimaryButton}" Content="View Report" Command="{Binding LedgerPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Padding="10,7" Margin="0,0,6,0" Command="{Binding LedgerPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Padding="10,7" Margin="0,0,6,0" Command="{Binding LedgerExcelCommand}"/>
+                                    <Button Style="{StaticResource PrimaryButton}" Content="View" Padding="10,7" Command="{Binding LedgerPdfCommand}"/>
                                 </StackPanel>
                             </Border>
                         </DockPanel>
                     </Border>
 
-                    <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}">
+                    <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}" Padding="16">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,24">
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,14">
                                 <Border Width="42" Height="42" CornerRadius="8" Background="#F3E8FF" Margin="0,0,16,0">
                                     <TextBlock Text="↗" Foreground="#7C3AED" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -286,40 +354,40 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Grid DockPanel.Dock="Top" Margin="0,2,0,22">
+                            <Grid DockPanel.Dock="Top" Margin="0,2,0,14">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="TOTAL REVISION ENTRIES" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="REVISIONS" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding RevisionEntryCount}" Style="{StaticResource ReportMetricValue}" Foreground="#7C3AED"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="EMPLOYEES AFFECTED" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="EMPLOYEES" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding RevisionEmployeeCount}" Style="{StaticResource ReportMetricValue}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="LAST UPDATED" Style="{StaticResource ReportMetricLabel}"/>
+                                    <TextBlock Text="UPDATED" Style="{StaticResource ReportMetricLabel}"/>
                                     <TextBlock Text="{Binding LastRevisionDate}" Style="{StaticResource ReportMetricValue}" FontSize="16"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Export as:" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Margin="0,0,10,0" Command="{Binding RevisionPdfCommand}"/>
-                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Margin="0,0,10,0" Command="{Binding RevisionExcelCommand}"/>
-                                    <Button Style="{StaticResource PrimaryButton}" Content="View Report" Command="{Binding RevisionPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="PDF" Padding="10,7" Margin="0,0,6,0" Command="{Binding RevisionPdfCommand}"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Excel" Padding="10,7" Margin="0,0,6,0" Command="{Binding RevisionExcelCommand}"/>
+                                    <Button Style="{StaticResource PrimaryButton}" Content="View" Padding="10,7" Command="{Binding RevisionPdfCommand}"/>
                                 </StackPanel>
                             </Border>
                         </DockPanel>
                     </Border>
                 </Grid>
 
-                <Border Grid.Row="3"
-                        Margin="0,24,0,0"
+                <Border Grid.Row="4"
+                        Margin="0,14,0,0"
                         CornerRadius="8"
                         Background="#EEF6FF"
                         Padding="18">

@@ -97,7 +97,8 @@ public partial class SalarySheetView : UserControl
                 if (string.IsNullOrWhiteSpace(key)) continue;
                 if (!widths.TryGetValue(key, out var width)) continue;
                 if (!double.IsFinite(width) || width < 40) continue;
-                column.Width = new DataGridLength(width);
+                var minimumWidth = Math.Max(column.MinWidth, 40);
+                column.Width = new DataGridLength(Math.Max(width, minimumWidth));
             }
         }
         finally
@@ -153,7 +154,7 @@ public partial class SalarySheetView : UserControl
         if (e.Key != Key.Enter) return;
         if (sender is not DataGrid dg || dg.IsReadOnly) return;
 
-        var editableHeaders = new[] { "Absent", "ESIC (₹)", "PF (₹)", "TDS (₹)", "Adv. Ded. (₹)", "Net Salary (₹)" };
+        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv Ded", "Net" };
         var editableCols = dg.Columns
             .Where(c => editableHeaders.Contains(c.Header?.ToString()))
             .OrderBy(c => c.DisplayIndex)
@@ -221,11 +222,11 @@ public partial class SalarySheetView : UserControl
         return column.Header?.ToString() switch
         {
             "Absent" => true,
-            "ESIC (₹)" => row.UsesEsicPf,
-            "PF (₹)" => row.UsesEsicPf,
-            "TDS (₹)" => row.UsesTds,
-            "Adv. Ded. (₹)" => true,
-            "Net Salary (₹)" => row.IsNetSalaryOverrideEnabled,
+            "ESIC" => row.UsesEsicPf,
+            "PF" => row.UsesEsicPf,
+            "TDS" => row.UsesTds,
+            "Adv Ded" => true,
+            "Net" => row.IsNetSalaryOverrideEnabled,
             _ => false
         };
     }

@@ -97,6 +97,109 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public async Task SalarySheetLoad_SelectedGroupsAreGroupedSortedAndDeduplicated()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.EmployeeGroups.AddRange(
+                new EmployeeGroup { Id = 1, Name = "s_factory" },
+                new EmployeeGroup { Id = 2, Name = "s_night" });
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "Both", BaseSalary = 20000m, IsActive = true },
+                new Employee { Id = 2, Name = "Factory Only", BaseSalary = 20000m, IsActive = true },
+                new Employee { Id = 3, Name = "Night Only", BaseSalary = 20000m, IsActive = true },
+                new Employee { Id = 4, Name = "Ungrouped", BaseSalary = 20000m, IsActive = true });
+            db.EmployeeGroupMemberships.AddRange(
+                new EmployeeGroupMembership { EmployeeId = 1, EmployeeGroupId = 1 },
+                new EmployeeGroupMembership { EmployeeId = 1, EmployeeGroupId = 2 },
+                new EmployeeGroupMembership { EmployeeId = 2, EmployeeGroupId = 1 },
+                new EmployeeGroupMembership { EmployeeId = 3, EmployeeGroupId = 2 });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.GroupFilterOptions.Single(g => g.Name == "s_night").IsSelected = true;
+        viewModel.GroupFilterOptions.Single(g => g.Name == "s_factory").IsSelected = true;
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(["Both", "Factory Only", "Night Only"], viewModel.Rows.Select(r => r.Name));
+        Assert.Equal(["s_factory", "s_factory", "s_night"], viewModel.Rows.Select(r => r.GroupDisplayName));
+        Assert.Single(viewModel.RowsView.GroupDescriptions);
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_NetSalaryOverridePersistsReloadsAndUpdatesTotals()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        row.IsNetSalaryOverrideEnabled = true;
+        row.NetSalaryOverride = 7777m;
+
+        Assert.Equal(7777m, row.NetSalary);
+        Assert.Equal(7777m, viewModel.TotalNet);
+        Assert.Equal(2223m, viewModel.TotalDeduction);
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+            Assert.Equal(7777m, saved.NetSalaryOverride);
+        }
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var reloaded = Assert.Single(viewModel.Rows);
+        Assert.True(reloaded.IsNetSalaryOverrideEnabled);
+        Assert.Equal(7777m, reloaded.NetSalaryOverride);
+        Assert.Equal(7777m, reloaded.NetSalary);
+        Assert.Equal(7777m, viewModel.TotalNet);
+    }
+
+    [Fact]
+    public async Task SalarySheetTotals_UpdateAfterDeductionsAdvanceAndOverrideChanges()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        row.DaysAbsent = 1;
+        row.TdsDeduction = 100m;
+        row.AdvanceDeductionEntry = 50m;
+
+        Assert.Equal(1, viewModel.TotalDaysAbsent);
+        Assert.Equal(100m, viewModel.TotalTds);
+        Assert.Equal(50m, viewModel.TotalAdvanceDeduction);
+        Assert.Equal(967.74m, viewModel.TotalAbsenceDeduction);
+        Assert.Equal(28882.26m, viewModel.TotalNet);
+
+        row.IsNetSalaryOverrideEnabled = true;
+        row.NetSalaryOverride = 25000m;
+
+        Assert.Equal(25000m, viewModel.TotalNet);
+        Assert.Equal(5000m, viewModel.TotalDeduction);
+    }
+
+    [Fact]
     public async Task SalarySheetLoad_CashPaymentOrCashGroupDisablesAndClearsStatutoryDeductions()
     {
         using var factory = new SqliteDbContextFactory();

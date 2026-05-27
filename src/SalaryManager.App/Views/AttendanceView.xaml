@@ -10,11 +10,6 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Attendance" Style="{StaticResource PageTitle}"/>
-            <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,0">
-                <Run Text="Enter attendance data per employee. "/>
-                <Run Text="{Binding DaysInMonth, StringFormat={}{0} days in this month., Mode=OneWay}"/>
-                <Run Text="  Tab: next cell · Enter: next row · F2: edit cell"/>
-            </TextBlock>
         </StackPanel>
 
         <!-- Controls bar -->

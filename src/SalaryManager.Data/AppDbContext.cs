@@ -46,6 +46,7 @@ public class AppDbContext : DbContext
             e.Property(a => a.TdsDeduction)
                 .HasColumnType("DECIMAL(18,2)")
                 .HasDefaultValue(0m);
+            e.Property(a => a.NetSalaryOverride).HasColumnType("DECIMAL(18,2)");
 
             e.HasOne(a => a.Employee)
              .WithMany(p => p.AttendanceRecords)

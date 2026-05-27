@@ -13,11 +13,6 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="Advances" Style="{StaticResource PageTitle}"/>
-            <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,0">
-                <Run Text="Pick an employee, enter amount &amp; optional narration."/>
-                <Run Text="Enter" FontWeight="SemiBold"/>
-                <Run Text="to post — balance updates live."/>
-            </TextBlock>
         </StackPanel>
 
         <!-- Two-column layout -->
@@ -270,8 +265,6 @@
                             </StackPanel.Style>
                             <TextBlock Style="{StaticResource EmptyStateTitle}"
                                        Text="No ledger entries"/>
-                            <TextBlock Style="{StaticResource EmptyStateSubtitle}"
-                                       Text="Use the form above to record an advance. Postings from the Salary Sheet show up here too."/>
                         </StackPanel>
 
                     <DataGrid ItemsSource="{Binding Ledger}" IsReadOnly="True">

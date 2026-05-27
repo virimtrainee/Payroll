@@ -11,8 +11,6 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Employees" Style="{StaticResource PageTitle}"/>
-            <TextBlock Text="Add and manage your workforce. Inactive employees stay in records but disappear from payroll screens."
-                       Style="{StaticResource PageSubtitle}" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- Toolbar -->
@@ -81,8 +79,6 @@
                     </StackPanel.Style>
                     <TextBlock Style="{StaticResource EmptyStateTitle}"
                                Text="No employees yet"/>
-                    <TextBlock Style="{StaticResource EmptyStateSubtitle}"
-                               Text="Click '+ Add Employee' to register your first one, or import a list from Excel."/>
                 </StackPanel>
 
             <DataGrid ItemsSource="{Binding Employees}"

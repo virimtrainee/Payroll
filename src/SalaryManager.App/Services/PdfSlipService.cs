@@ -16,7 +16,8 @@ public record SalarySlipData(
     int Month,
     SalaryBreakdown Breakdown,
     decimal AdvanceBalance,
-    decimal SalaryAdvanceDeduction);
+    decimal SalaryAdvanceDeduction,
+    decimal? NetSalaryOverride = null);
 
 public record MonthlySummaryRow(
     string EmployeeName,
@@ -34,23 +35,30 @@ public class PdfSlipService
     public string GenerateSlip(SalarySlipData data, string? outputPath = null)
     {
         outputPath ??= DefaultSlipPath(data);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        EnsureDirectory(outputPath);
         BuildSlipDocument(data).GeneratePdf(outputPath);
         return outputPath;
     }
 
     public string GenerateMonthlySummary(int year, int month, IReadOnlyList<MonthlySummaryRow> rows, string outputPath)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        EnsureDirectory(outputPath);
         BuildSummaryDocument(year, month, rows).GeneratePdf(outputPath);
         return outputPath;
     }
 
     public string GenerateAdvanceLedger(Employee emp, IReadOnlyList<LedgerRow> rows, decimal balance, string outputPath)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        EnsureDirectory(outputPath);
         BuildLedgerDocument(emp, rows, balance).GeneratePdf(outputPath);
         return outputPath;
+    }
+
+    private static void EnsureDirectory(string outputPath)
+    {
+        var directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
     }
 
     private static string DefaultSlipPath(SalarySlipData d)
@@ -112,14 +120,16 @@ public class PdfSlipService
                         DetailRow(box, "TDS deduction", $"- {d.Breakdown.TdsDeduction:N2}");
                     if (d.SalaryAdvanceDeduction > 0)
                         DetailRow(box, "Advance deduction", $"- {d.SalaryAdvanceDeduction:N2}");
+                    if (d.NetSalaryOverride.HasValue)
+                        DetailRow(box, "Net salary override", d.NetSalaryOverride.Value.ToString("N2"));
                 });
 
                 col.Item().PaddingTop(8).Background("#2563EB").Padding(12).Row(r =>
                 {
-                    var payable = d.Breakdown.NetSalary - Math.Max(0, d.SalaryAdvanceDeduction);
-                    r.RelativeItem().Text("PAYABLE NET").FontSize(11).Bold().FontColor("white");
+                    var payable = d.NetSalaryOverride ?? d.Breakdown.NetSalary - Math.Max(0, d.SalaryAdvanceDeduction);
+                    r.RelativeItem().Text("PAYABLE NET").FontSize(11).Bold().FontColor(Colors.White);
                     r.ConstantItem(140).AlignRight().Text($"₹ {payable:N2}")
-                        .FontSize(16).Bold().FontColor("white");
+                        .FontSize(16).Bold().FontColor(Colors.White);
                 });
 
                 col.Item().PaddingTop(8).Text(t =>
@@ -216,15 +226,15 @@ public class PdfSlipService
                     totalNet += r.NetSalary;
                 }
 
-                t.Cell().Background("#2563EB").Padding(6).Text("TOTAL").Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text("").FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor("white");
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor("white");
+                t.Cell().Background("#2563EB").Padding(6).Text("TOTAL").Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text("").FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor(Colors.White);
             });
 
             p.Footer().AlignRight().Text(x =>

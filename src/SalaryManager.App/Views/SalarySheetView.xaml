@@ -15,11 +15,6 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Salary Sheet" Style="{StaticResource PageTitle}"/>
-            <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,0">
-                <Run Text="Press"/>
-                <Run Text="Edit" FontWeight="SemiBold"/>
-                <Run Text="to unlock the sheet. Absent · ESIC · PF · TDS · Adv. Deduction update Net Salary live. Enter moves between columns, Ctrl+S saves."/>
-            </TextBlock>
         </StackPanel>
 
         <!-- Single-row filter bar -->
@@ -63,7 +58,7 @@
                 <Button Margin="0,0,8,0" Command="{Binding ToggleEditModeCommand}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-                            <Setter Property="Content" Value="Editing — click to lock"/>
+                            <Setter Property="Content" Value="Lock sheet"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsEditMode}" Value="False">
                                     <Setter Property="Content" Value="Edit sheet"/>
@@ -101,8 +96,13 @@
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <!-- Empty state -->
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                <StackPanel Grid.Row="0"
+                            VerticalAlignment="Center" HorizontalAlignment="Center"
                             Margin="20,40">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
@@ -121,6 +121,7 @@
                 </StackPanel>
 
             <DataGrid x:Name="SalaryGrid"
+                      Grid.Row="0"
                       ItemsSource="{Binding Rows}"
                       IsReadOnly="{Binding IsGridReadOnly}"
                       SelectionUnit="Cell"
@@ -136,6 +137,41 @@
                         </Style.Triggers>
                     </Style>
                 </DataGrid.Style>
+                <DataGrid.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.ContainerStyle>
+                            <Style TargetType="{x:Type GroupItem}">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="{x:Type GroupItem}">
+                                            <StackPanel>
+                                                <Border Background="#F8FAFC"
+                                                        BorderBrush="{StaticResource BorderBrush}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Padding="12,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextBrush}"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Converter={StaticResource SalaryGroupSummaryConverter}}"
+                                                                   FontSize="12"
+                                                                   Foreground="{StaticResource MutedTextBrush}"/>
+                                                    </Grid>
+                                                </Border>
+                                                <ItemsPresenter/>
+                                            </StackPanel>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </GroupStyle.ContainerStyle>
+                    </GroupStyle>
+                </DataGrid.GroupStyle>
                 <DataGrid.Columns>
 
                     <DataGridTextColumn Header="S.No."
@@ -150,17 +186,28 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <!-- Read-only identification -->
-                    <DataGridTextColumn Header="Employee"
-                                        Binding="{Binding Name}"
-                                        IsReadOnly="True" Width="*" MinWidth="120">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="FontWeight" Value="Medium"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                    <DataGridTemplateColumn Header="Employee" Width="*" MinWidth="170" IsReadOnly="True">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="Medium"
+                                               VerticalAlignment="Center"/>
+                                    <CheckBox Grid.Column="1"
+                                              Content="Override"
+                                              IsChecked="{Binding IsNetSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Foreground="{StaticResource MutedTextBrush}"
+                                              VerticalAlignment="Center"
+                                              Margin="10,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTextColumn Header="Base"
                                         Binding="{Binding BaseSalary, StringFormat=N2}"
@@ -318,18 +365,28 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
 
-                    <DataGridTextColumn Header="Net Salary"
-                                        Binding="{Binding NetSalary, StringFormat=N2}"
-                                        IsReadOnly="True" Width="100">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Right"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                    <DataGridTemplateColumn Header="Net Salary" Width="104"
+                                            CellStyle="{StaticResource EditableCell}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding NetSalary, StringFormat=N2}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource PrimaryBrush}"
+                                           Padding="0,0,10,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding NetSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding IsNetSalaryOverrideEnabled}"
+                                         TextAlignment="Right"
+                                         VerticalContentAlignment="Center"
+                                         BorderThickness="0" Padding="8,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTemplateColumn Header="Slip" Width="82" IsReadOnly="True">
                         <DataGridTemplateColumn.CellTemplate>
@@ -345,6 +402,57 @@
 
                 </DataGrid.Columns>
             </DataGrid>
+
+                <Border Grid.Row="1"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Background="#F8FAFC"
+                        Padding="12,8">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="TOTALS" Style="{StaticResource FieldLabel}"
+                                       VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="Base "/><Run Text="{Binding TotalGross, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="Absent "/><Run Text="{Binding TotalDaysAbsent}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="ESIC "/><Run Text="{Binding TotalEsic, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="PF "/><Run Text="{Binding TotalPf, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="TDS "/><Run Text="{Binding TotalTds, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="Adv. Ded "/><Run Text="{Binding TotalAdvanceDeduction, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="Deduction "/><Run Text="{Binding TotalAbsenceDeduction, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,18,0">
+                                <Run Text="Adv. Bal "/><Run Text="{Binding TotalAdvanceBalance, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                            <TextBlock>
+                                <Run Text="Net "/><Run Text="{Binding TotalNet, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
             </Grid>
         </Border>
 

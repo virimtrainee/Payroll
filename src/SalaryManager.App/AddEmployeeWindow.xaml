@@ -66,8 +66,6 @@
         <StackPanel Grid.Row="0">
             <TextBlock Text="{Binding WindowTitle}" FontSize="20" FontWeight="Bold"
                        Foreground="{StaticResource TextBrush}"/>
-            <TextBlock Text="Fill in the details below. Bank fields appear for non-cash payment."
-                       FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- Name + Base Salary row -->

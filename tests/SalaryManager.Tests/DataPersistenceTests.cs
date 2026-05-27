@@ -87,4 +87,24 @@ public class DataPersistenceTests
 
         Assert.Equal(750m, saved.TdsDeduction);
     }
+
+    [Fact]
+    public async Task AttendanceRecord_PersistsNetSalaryOverride()
+    {
+        using var db = NewSqliteContext();
+        db.Employees.Add(new Employee { Id = 1, Name = "A" });
+        db.AttendanceRecords.Add(new AttendanceRecord
+        {
+            EmployeeId = 1,
+            Year = 2026,
+            Month = 5,
+            DaysAbsent = 0,
+            NetSalaryOverride = 8750m
+        });
+        await db.SaveChangesAsync();
+
+        var saved = await db.AttendanceRecords.AsNoTracking().SingleAsync();
+
+        Assert.Equal(8750m, saved.NetSalaryOverride);
+    }
 }

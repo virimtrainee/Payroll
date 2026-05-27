@@ -57,7 +57,7 @@ public partial class SalarySheetView : UserControl
         if (e.Key != Key.Enter) return;
         if (sender is not DataGrid dg || dg.IsReadOnly) return;
 
-        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv. Ded" };
+        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv. Ded", "Net Salary" };
         var editableCols = dg.Columns
             .Where(c => editableHeaders.Contains(c.Header?.ToString()))
             .OrderBy(c => c.DisplayIndex)
@@ -129,6 +129,7 @@ public partial class SalarySheetView : UserControl
             "PF" => row.UsesEsicPf,
             "TDS" => row.UsesTds,
             "Adv. Ded" => true,
+            "Net Salary" => row.IsNetSalaryOverrideEnabled,
             _ => false
         };
     }

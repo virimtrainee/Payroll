@@ -12,4 +12,5 @@ public class AttendanceRecord
     public decimal EsicDeduction { get; set; }
     public decimal PfDeduction { get; set; }
     public decimal TdsDeduction { get; set; }
+    public decimal? NetSalaryOverride { get; set; }
 }

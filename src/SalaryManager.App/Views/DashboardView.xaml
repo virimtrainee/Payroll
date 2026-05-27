@@ -18,8 +18,6 @@
                     Content="Refresh" Command="{Binding LoadCommand}"/>
             <StackPanel>
                 <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}"/>
-                <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,0"
-                           Text="{Binding CurrentPeriod, StringFormat='{}{0} — payroll and employee overview'}"/>
             </StackPanel>
         </DockPanel>
 
@@ -55,8 +53,6 @@
                     <TextBlock Text="GROSS PAYROLL" Style="{StaticResource FieldLabel}"/>
                     <TextBlock Text="{Binding GrossPayroll, StringFormat='₹{0:N0}'}"
                                FontSize="34" FontWeight="Bold" Foreground="#16A34A" Margin="0,6,0,0"/>
-                    <TextBlock Text="sum of active base salaries" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -71,8 +67,6 @@
                     <TextBlock Text="OUTSTANDING ADVANCES" Style="{StaticResource FieldLabel}"/>
                     <TextBlock Text="{Binding OutstandingAdvances, StringFormat='₹{0:N0}'}"
                                FontSize="34" FontWeight="Bold" Foreground="#EA580C" Margin="0,6,0,0"/>
-                    <TextBlock Text="across all employees" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -94,8 +88,6 @@
                                    Foreground="{StaticResource MutedTextBrush}"
                                    VerticalAlignment="Bottom" Margin="0,0,0,4"/>
                     </StackPanel>
-                    <TextBlock Text="records this month" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>
         </UniformGrid>

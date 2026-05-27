@@ -15,8 +15,6 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,14">
             <TextBlock Text="Reports" Style="{StaticResource PageTitle}"/>
-            <TextBlock Text="Generate payroll summaries and per-employee advance ledgers."
-                       Style="{StaticResource PageSubtitle}" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- KPI strip: 4 cards -->
@@ -34,8 +32,6 @@
                     <TextBlock Text="{Binding KpiTotalPayable}"
                                FontSize="22" FontWeight="Bold" Margin="0,4,0,0"
                                Foreground="{StaticResource PrimaryBrush}"/>
-                    <TextBlock Text="This period" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,3,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -44,8 +40,6 @@
                     <TextBlock Text="GROSS" Style="{StaticResource FieldLabel}"/>
                     <TextBlock Text="{Binding KpiGross}"
                                FontSize="22" FontWeight="Bold" Margin="0,4,0,0"/>
-                    <TextBlock Text="Sum of base salaries" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,3,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -54,8 +48,6 @@
                     <TextBlock Text="DEDUCTIONS" Style="{StaticResource FieldLabel}"/>
                     <TextBlock Text="{Binding KpiDeductions}"
                                FontSize="22" FontWeight="Bold" Margin="0,4,0,0"/>
-                    <TextBlock Text="Absent + ESIC + PF + TDS + advances" FontSize="11"
-                               Foreground="{StaticResource MutedTextBrush}" Margin="0,3,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -92,8 +84,6 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Monthly payroll summary" FontSize="15" FontWeight="SemiBold"/>
-                            <TextBlock Text="One row per employee — base, deductions, advances, net pay."
-                                       FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -172,8 +162,6 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Advance ledger" FontSize="15" FontWeight="SemiBold"/>
-                            <TextBlock Text="Full give/deduct history with running balance per employee."
-                                       FontSize="12" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </StackPanel>
 

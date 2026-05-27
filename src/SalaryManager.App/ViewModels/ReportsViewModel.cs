@@ -280,11 +280,14 @@ public partial class ReportsViewModel : ObservableObject
                 balances.GetValueOrDefault(e.Id, 0m),
                 advanceDeduction));
             issues.AddRange(validation.Issues);
+            if (rec?.NetSalaryOverride < 0)
+                issues.Add(new ValidationIssue(e.Name, "Net salary override cannot be negative.", "net_override_negative"));
 
             var b = SalaryCalculator.Compute(e.BaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
+            var finalNetSalary = rec?.NetSalaryOverride ?? b.NetSalary - advanceDeduction;
             list.Add(new MonthlySummaryRow(e.Name, e.BaseSalary, absent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction, advanceDeduction,
-                b.NetSalary - advanceDeduction));
+                finalNetSalary));
         }
 
         if (issues.Count > 0)

@@ -5,6 +5,7 @@
              xmlns:conv="clr-namespace:SalaryManager.App.Converters">
     <Application.Resources>
         <conv:IsNegativeConverter x:Key="IsNegativeConverter"/>
+        <conv:SalaryGroupSummaryConverter x:Key="SalaryGroupSummaryConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <!-- Brand palette -->

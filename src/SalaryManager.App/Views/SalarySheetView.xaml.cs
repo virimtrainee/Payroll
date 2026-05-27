@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using SalaryManager.App.Helpers;
 using SalaryManager.App.ViewModels;
 
 namespace SalaryManager.App.Views;
@@ -13,19 +16,112 @@ namespace SalaryManager.App.Views;
 public partial class SalarySheetView : UserControl
 {
     private bool _initialized;
+    private bool _columnPreferencesReady;
+    private bool _columnWidthHandlersAttached;
+    private bool _applyingColumnWidths;
+    private readonly DispatcherTimer _columnSaveTimer;
 
     public SalarySheetView()
     {
         InitializeComponent();
+        _columnSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(600)
+        };
+        _columnSaveTimer.Tick += (_, _) =>
+        {
+            _columnSaveTimer.Stop();
+            SaveSalaryColumnWidths();
+        };
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (_initialized) return;
         if (DataContext is not SalarySheetViewModel vm) return;
-        _initialized = true;
-        vm.LoadCommand.Execute(null);
+
+        AttachColumnWidthHandlers();
+        ApplySavedColumnWidths(vm);
+        _columnPreferencesReady = true;
+
+        if (!_initialized)
+        {
+            _initialized = true;
+            vm.LoadCommand.Execute(null);
+        }
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _columnSaveTimer.Stop();
+        SaveSalaryColumnWidths();
+    }
+
+    private void AttachColumnWidthHandlers()
+    {
+        if (_columnWidthHandlersAttached) return;
+
+        var descriptor = DependencyPropertyDescriptor.FromProperty(
+            DataGridColumn.WidthProperty,
+            typeof(DataGridColumn));
+        if (descriptor is null) return;
+
+        foreach (var column in SalaryGrid.Columns)
+            descriptor.AddValueChanged(column, OnSalaryColumnWidthChanged);
+
+        _columnWidthHandlersAttached = true;
+    }
+
+    private void OnSalaryColumnWidthChanged(object? sender, EventArgs e)
+    {
+        if (!_columnPreferencesReady || _applyingColumnWidths) return;
+        if (sender is not DataGridColumn { Width.IsAbsolute: true } column) return;
+        if (string.IsNullOrWhiteSpace(DataGridColumnKey.GetKey(column))) return;
+
+        _columnSaveTimer.Stop();
+        _columnSaveTimer.Start();
+    }
+
+    private void ApplySavedColumnWidths(SalarySheetViewModel vm)
+    {
+        var widths = vm.LoadColumnWidths();
+        if (widths.Count == 0) return;
+
+        _applyingColumnWidths = true;
+        try
+        {
+            foreach (var column in SalaryGrid.Columns)
+            {
+                var key = DataGridColumnKey.GetKey(column);
+                if (string.IsNullOrWhiteSpace(key)) continue;
+                if (!widths.TryGetValue(key, out var width)) continue;
+                if (!double.IsFinite(width) || width < 40) continue;
+                column.Width = new DataGridLength(width);
+            }
+        }
+        finally
+        {
+            _applyingColumnWidths = false;
+        }
+    }
+
+    private void SaveSalaryColumnWidths()
+    {
+        if (!_columnPreferencesReady) return;
+        if (DataContext is not SalarySheetViewModel vm) return;
+
+        var widths = new Dictionary<string, double>();
+        foreach (var column in SalaryGrid.Columns)
+        {
+            var key = DataGridColumnKey.GetKey(column);
+            if (string.IsNullOrWhiteSpace(key)) continue;
+            if (!column.Width.IsAbsolute) continue;
+            if (!double.IsFinite(column.Width.Value) || column.Width.Value < 40) continue;
+            widths[key] = column.Width.Value;
+        }
+
+        vm.SaveColumnWidths(widths);
     }
 
     // Ctrl+S saves from anywhere inside the view, including while a cell is being edited
@@ -57,7 +153,7 @@ public partial class SalarySheetView : UserControl
         if (e.Key != Key.Enter) return;
         if (sender is not DataGrid dg || dg.IsReadOnly) return;
 
-        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv. Ded", "Net Salary" };
+        var editableHeaders = new[] { "Absent", "ESIC (₹)", "PF (₹)", "TDS (₹)", "Adv. Ded. (₹)", "Net Salary (₹)" };
         var editableCols = dg.Columns
             .Where(c => editableHeaders.Contains(c.Header?.ToString()))
             .OrderBy(c => c.DisplayIndex)
@@ -125,11 +221,11 @@ public partial class SalarySheetView : UserControl
         return column.Header?.ToString() switch
         {
             "Absent" => true,
-            "ESIC" => row.UsesEsicPf,
-            "PF" => row.UsesEsicPf,
-            "TDS" => row.UsesTds,
-            "Adv. Ded" => true,
-            "Net Salary" => row.IsNetSalaryOverrideEnabled,
+            "ESIC (₹)" => row.UsesEsicPf,
+            "PF (₹)" => row.UsesEsicPf,
+            "TDS (₹)" => row.UsesTds,
+            "Adv. Ded. (₹)" => true,
+            "Net Salary (₹)" => row.IsNetSalaryOverrideEnabled,
             _ => false
         };
     }

@@ -30,6 +30,13 @@ public record MonthlySummaryRow(
     decimal AdvanceDeduction,
     decimal NetSalary);
 
+public record SalaryRevisionReportRow(
+    string EmployeeName,
+    decimal OldSalary,
+    decimal NewSalary,
+    DateTime ChangedAt,
+    string? Note);
+
 public class PdfSlipService
 {
     public string GenerateSlip(SalarySlipData data, string? outputPath = null)
@@ -51,6 +58,13 @@ public class PdfSlipService
     {
         EnsureDirectory(outputPath);
         BuildLedgerDocument(emp, rows, balance).GeneratePdf(outputPath);
+        return outputPath;
+    }
+
+    public string GenerateSalaryRevisionReport(IReadOnlyList<SalaryRevisionReportRow> rows, string outputPath)
+    {
+        EnsureDirectory(outputPath);
+        BuildSalaryRevisionDocument(rows).GeneratePdf(outputPath);
         return outputPath;
     }
 
@@ -305,6 +319,64 @@ public class PdfSlipService
                         }
                     });
                 }
+            });
+        });
+    });
+
+    private static IDocument BuildSalaryRevisionDocument(IReadOnlyList<SalaryRevisionReportRow> rows) => Document.Create(c =>
+    {
+        c.Page(p =>
+        {
+            p.Size(PageSizes.A4);
+            p.Margin(30);
+            p.DefaultTextStyle(t => t.FontSize(10).FontColor("#0F172A"));
+
+            p.Header().Column(col =>
+            {
+                col.Item().Text("SALARY REVISIONS REPORT").FontSize(18).Bold().FontColor("#2563EB");
+                col.Item().Text($"Generated {DateTime.Now:dd MMM yyyy}").FontSize(11).FontColor("#64748B");
+                col.Item().PaddingTop(8).LineHorizontal(0.6f).LineColor("#E2E8F0");
+            });
+
+            p.Content().PaddingVertical(12).Column(col =>
+            {
+                if (rows.Count == 0)
+                {
+                    col.Item().PaddingTop(32).AlignCenter()
+                       .Text("No salary revisions found.")
+                       .FontSize(12).FontColor("#94A3B8").Italic();
+                    return;
+                }
+
+                col.Item().Table(t =>
+                {
+                    t.ColumnsDefinition(cd =>
+                    {
+                        cd.RelativeColumn(3);
+                        cd.RelativeColumn(2);
+                        cd.RelativeColumn(2);
+                        cd.RelativeColumn(2);
+                        cd.RelativeColumn(2);
+                    });
+
+                    t.Header(h =>
+                    {
+                        h.Cell().Background("#F1F5F9").Padding(6).Text("Employee").Bold();
+                        h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Old Salary").Bold();
+                        h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("New Salary").Bold();
+                        h.Cell().Background("#F1F5F9").Padding(6).Text("Date").Bold();
+                        h.Cell().Background("#F1F5F9").Padding(6).Text("Note").Bold();
+                    });
+
+                    foreach (var r in rows)
+                    {
+                        t.Cell().Padding(6).Text(r.EmployeeName);
+                        t.Cell().Padding(6).AlignRight().Text(r.OldSalary.ToString("N2"));
+                        t.Cell().Padding(6).AlignRight().Text(r.NewSalary.ToString("N2")).Bold();
+                        t.Cell().Padding(6).Text(r.ChangedAt.ToString("dd MMM yyyy"));
+                        t.Cell().Padding(6).Text(r.Note ?? "");
+                    }
+                });
             });
         });
     });

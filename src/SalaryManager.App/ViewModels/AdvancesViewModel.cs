@@ -48,15 +48,18 @@ public partial class AdvancesViewModel : ObservableObject
     public ICollectionView EmployeeRailView { get; }
     public RangeObservableCollection<LedgerRow> Ledger { get; } = new();
     public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
+    public AdvanceEntryType[] EntryTypes { get; } = [AdvanceEntryType.Given, AdvanceEntryType.Deducted];
 
     [ObservableProperty] private EmployeeWithBalanceVm? selectedRailItem;
     [ObservableProperty] private Employee? selectedEmployee;
     [ObservableProperty] private decimal currentBalance;
     [ObservableProperty] private string selectedEmployeeInitials = "";
+    [ObservableProperty] private AdvanceEntryType newEntryType = AdvanceEntryType.Given;
     [ObservableProperty] private decimal newAmount;
+    [ObservableProperty] private DateTime? newDate = DateTime.Today;
     [ObservableProperty] private string? newNote;
     [ObservableProperty] private string searchText = string.Empty;
-    [ObservableProperty] private bool showOnlyWithAdvances;
+    [ObservableProperty] private bool showOnlyWithAdvances = true;
     [ObservableProperty] private int filteredCount;
     [ObservableProperty] private bool isLoading;
     [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
@@ -215,13 +218,15 @@ public partial class AdvancesViewModel : ObservableObject
         db.Advances.Add(new Advance
         {
             EmployeeId = SelectedEmployee.Id,
-            Date = DateTime.Today,
+            Date = (NewDate ?? DateTime.Today).Date,
             Amount = NewAmount,
-            EntryType = AdvanceEntryType.Given,
+            EntryType = NewEntryType,
             Note = string.IsNullOrWhiteSpace(NewNote) ? null : NewNote.Trim()
         });
         await db.SaveChangesAsync();
 
+        NewEntryType = AdvanceEntryType.Given;
+        NewDate = DateTime.Today;
         NewAmount = 0;
         NewNote = null;
         await LoadAsync();

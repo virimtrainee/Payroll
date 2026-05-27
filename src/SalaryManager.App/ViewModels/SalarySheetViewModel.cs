@@ -34,9 +34,16 @@ public partial class SalaryRowVm : ObservableObject
     public string? AccountNumber { get; init; }
     public string? IfscCode { get; init; }
     public PaymentMode PaymentMode { get; init; }
+    public string PaymentModeLabel => PaymentMode switch
+    {
+        PaymentMode.Cash => "Cash",
+        PaymentMode.IciciBank => "ICICI",
+        _ => "Other"
+    };
     public bool IsCashDeductionsDisabled { get; init; }
     public bool UsesTds => !IsCashDeductionsDisabled && BaseSalary > 25000m;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
+    public decimal TotalDeductions => Math.Max(0, BaseSalary - NetSalary);
 
     // Editable attendance fields — trigger recalculation on change
     [ObservableProperty] private int daysAbsent;
@@ -87,6 +94,7 @@ public partial class SalaryRowVm : ObservableObject
             NetSalary = IsNetSalaryOverrideEnabled
                 ? Math.Max(0, NetSalaryOverride)
                 : CalculatedNetSalary;
+            OnPropertyChanged(nameof(TotalDeductions));
         }
         finally
         {
@@ -120,6 +128,8 @@ public partial class SalarySheetViewModel : ObservableObject
     [ObservableProperty] private decimal totalAbsenceDeduction;
     [ObservableProperty] private decimal totalAdvanceBalance;
     [ObservableProperty] private int employeeCount;
+    [ObservableProperty] private string searchText = string.Empty;
+    [ObservableProperty] private GroupFilterOptionVm? selectedGroupDropdownFilter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsGridReadOnly))]
@@ -134,6 +144,8 @@ public partial class SalarySheetViewModel : ObservableObject
     public RangeObservableCollection<SalaryRowVm> Rows { get; } = new();
     public ICollectionView RowsView { get; }
     public RangeObservableCollection<SelectableGroupFilterOptionVm> GroupFilterOptions { get; } = new();
+    public RangeObservableCollection<GroupFilterOptionVm> GroupDropdownOptions { get; } = new();
+    public bool IsAllGroupsSelected => GroupFilterOptions.All(g => !g.IsSelected);
 
     private bool _updatingGroupFilter;
     private int _loadVersion;
@@ -148,13 +160,75 @@ public partial class SalarySheetViewModel : ObservableObject
     {
         _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _dialogs = dialogs; _settings = settings;
         RowsView = CollectionViewSource.GetDefaultView(Rows);
+        RowsView.Filter = RowFilter;
     }
 
     partial void OnSelectedMonthChanged(MonthOption value) => LoadCommand.Execute(null);
     partial void OnSelectedYearChanged(int value) => LoadCommand.Execute(null);
+    partial void OnSearchTextChanged(string value) => RowsView.Refresh();
+    partial void OnSelectedGroupDropdownFilterChanged(GroupFilterOptionVm? value)
+    {
+        if (_updatingGroupFilter || value is null) return;
+
+        _updatingGroupFilter = true;
+        try
+        {
+            foreach (var option in GroupFilterOptions)
+                option.IsSelected = value.Id is int id && option.Id == id;
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
+
+        OnPropertyChanged(nameof(IsAllGroupsSelected));
+        LoadCommand.Execute(null);
+    }
+
+    private bool RowFilter(object item)
+    {
+        if (item is not SalaryRowVm row) return false;
+        var search = SearchText.Trim();
+        return string.IsNullOrWhiteSpace(search)
+            || row.Name.Contains(search, StringComparison.OrdinalIgnoreCase);
+    }
 
     [RelayCommand]
     private void ToggleEditMode() => IsEditMode = !IsEditMode;
+
+    public IReadOnlyDictionary<string, double> LoadColumnWidths()
+        => _settings.Load().SalarySheetColumnWidths ?? new Dictionary<string, double>();
+
+    public void SaveColumnWidths(IReadOnlyDictionary<string, double> widths)
+    {
+        var clean = widths
+            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)
+                          && double.IsFinite(kvp.Value)
+                          && kvp.Value >= 40)
+            .ToDictionary(kvp => kvp.Key, kvp => Math.Round(kvp.Value, 2));
+
+        var settings = _settings.Load();
+        _settings.Save(settings with { SalarySheetColumnWidths = clean });
+    }
+
+    [RelayCommand]
+    private void ClearGroupFilters()
+    {
+        _updatingGroupFilter = true;
+        try
+        {
+            foreach (var option in GroupFilterOptions)
+                option.IsSelected = false;
+            SelectedGroupDropdownFilter = GroupDropdownOptions.FirstOrDefault(o => o.Id is null);
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
+
+        OnPropertyChanged(nameof(IsAllGroupsSelected));
+        LoadCommand.Execute(null);
+    }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
@@ -189,7 +263,7 @@ public partial class SalarySheetViewModel : ObservableObject
             var rowGroups = employees.ToDictionary(
                 e => e.Id,
                 e => selectedGroups.Count == 0
-                    ? string.Empty
+                    ? ResolvePrimaryGroupName(e)
                     : ResolveSelectedGroupName(e, selectedGroups));
 
             employees = selectedGroups.Count == 0
@@ -549,6 +623,8 @@ public partial class SalarySheetViewModel : ObservableObject
                 IsSelected = selectedIds.Contains(g.Id)
             })
             .ToListAsync();
+        var dropdownOptions = new List<GroupFilterOptionVm> { new(null, "All Groups") };
+        dropdownOptions.AddRange(groups.Select(g => new GroupFilterOptionVm(g.Id, g.Name)));
 
         _updatingGroupFilter = true;
         try
@@ -557,9 +633,15 @@ public partial class SalarySheetViewModel : ObservableObject
                 option.PropertyChanged -= OnGroupFilterOptionPropertyChanged;
 
             GroupFilterOptions.ReplaceAll(groups);
+            GroupDropdownOptions.ReplaceAll(dropdownOptions);
 
             foreach (var option in GroupFilterOptions)
                 option.PropertyChanged += OnGroupFilterOptionPropertyChanged;
+
+            SelectedGroupDropdownFilter = selectedIds.Count == 1
+                ? GroupDropdownOptions.FirstOrDefault(g => g.Id == selectedIds.First()) ?? GroupDropdownOptions[0]
+                : GroupDropdownOptions[0];
+            OnPropertyChanged(nameof(IsAllGroupsSelected));
         }
         finally
         {
@@ -570,6 +652,20 @@ public partial class SalarySheetViewModel : ObservableObject
     private void OnGroupFilterOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (_updatingGroupFilter || e.PropertyName != nameof(SelectableGroupFilterOptionVm.IsSelected)) return;
+        _updatingGroupFilter = true;
+        try
+        {
+            var selected = GroupFilterOptions.Where(g => g.IsSelected).ToList();
+            SelectedGroupDropdownFilter = selected.Count == 1
+                ? GroupDropdownOptions.FirstOrDefault(g => g.Id == selected[0].Id) ?? GroupDropdownOptions[0]
+                : GroupDropdownOptions.FirstOrDefault(g => g.Id is null);
+        }
+        finally
+        {
+            _updatingGroupFilter = false;
+        }
+
+        OnPropertyChanged(nameof(IsAllGroupsSelected));
         LoadCommand.Execute(null);
     }
 
@@ -671,6 +767,14 @@ public partial class SalarySheetViewModel : ObservableObject
     }
 
     private sealed record SalaryGroupSortOption(int Id, string Name);
+
+    private static string ResolvePrimaryGroupName(Employee employee)
+        => employee.GroupMemberships
+               .Select(m => m.EmployeeGroup?.Name)
+               .Where(n => !string.IsNullOrWhiteSpace(n))
+               .OrderBy(n => n)
+               .FirstOrDefault()
+           ?? "Other";
 
     private static string ResolveSelectedGroupName(Employee employee, IReadOnlyList<SalaryGroupSortOption> selectedGroups)
     {

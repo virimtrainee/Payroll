@@ -25,4 +25,43 @@ public class AppRuntimeStorageTests
 
         Assert.NotNull(db);
     }
+
+    [Fact]
+    public void AppSettingsService_LoadsOldSettingsAndSavesSalaryColumnWidths()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "SalaryManagerTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "settings.json");
+
+        try
+        {
+            File.WriteAllText(path, """{"IciciDebitAccountNo":"1234567890"}""");
+            var service = new AppSettingsService(path);
+
+            var oldSettings = service.Load();
+
+            Assert.Equal("1234567890", oldSettings.IciciDebitAccountNo);
+            Assert.NotNull(oldSettings.SalarySheetColumnWidths);
+            Assert.Empty(oldSettings.SalarySheetColumnWidths);
+
+            service.Save(oldSettings with
+            {
+                SalarySheetColumnWidths = new Dictionary<string, double>
+                {
+                    ["employee"] = 260,
+                    ["netSalary"] = 150
+                }
+            });
+
+            var saved = service.Load();
+
+            Assert.Equal(260, saved.SalarySheetColumnWidths!["employee"]);
+            Assert.Equal(150, saved.SalarySheetColumnWidths["netSalary"]);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
 }

@@ -64,6 +64,76 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public async Task EmployeesDelete_PermanentlyDeletesRelatedRecordsAndPreservesGroups()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.EmployeeGroups.Add(new EmployeeGroup { Id = 10, Name = "Factory" });
+            db.Employees.Add(new Employee { Id = 1, Name = "Delete Me", BaseSalary = 1000m, IsActive = true });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                DaysAbsent = 1
+            });
+            db.Advances.Add(new Advance
+            {
+                EmployeeId = 1,
+                Date = new DateTime(2026, 5, 1),
+                EntryType = AdvanceEntryType.Given,
+                Amount = 500m
+            });
+            db.SalaryRevisions.Add(new SalaryRevision
+            {
+                EmployeeId = 1,
+                OldSalary = 900m,
+                NewSalary = 1000m,
+                ChangedAt = new DateTime(2026, 5, 1)
+            });
+            db.EmployeeGroupMemberships.Add(new EmployeeGroupMembership
+            {
+                EmployeeId = 1,
+                EmployeeGroupId = 10
+            });
+        });
+
+        var dialogs = new CapturingDialogService();
+        var viewModel = new EmployeesViewModel(factory, initializer, dialogs, new ExcelImportService());
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var employee = Assert.Single(viewModel.Employees);
+        await viewModel.DeleteEmployeeCommand.ExecuteAsync(employee);
+
+        var prompt = Assert.Single(dialogs.DestructivePrompts);
+        Assert.Contains("Attendance records: 1", prompt);
+        Assert.Contains("Advance entries: 1", prompt);
+        Assert.Contains("Salary revisions: 1", prompt);
+        Assert.Contains("Group memberships: 1", prompt);
+
+        using var verifyDb = factory.CreateDbContext();
+        Assert.Empty(await verifyDb.Employees.AsNoTracking().ToListAsync());
+        Assert.Empty(await verifyDb.AttendanceRecords.AsNoTracking().ToListAsync());
+        Assert.Empty(await verifyDb.Advances.AsNoTracking().ToListAsync());
+        Assert.Empty(await verifyDb.SalaryRevisions.AsNoTracking().ToListAsync());
+        Assert.Empty(await verifyDb.EmployeeGroupMemberships.AsNoTracking().ToListAsync());
+        Assert.Equal("Factory", Assert.Single(await verifyDb.EmployeeGroups.AsNoTracking().ToListAsync()).Name);
+    }
+
+    [Fact]
+    public async Task Advances_DefaultsToBalanceOnlyFilter()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+
+        var viewModel = new AdvancesViewModel(factory, initializer, new CapturingDialogService());
+
+        Assert.True(viewModel.ShowOnlyWithAdvances);
+    }
+
+    [Fact]
     public async Task SalarySheetLoad_SelectedGroupsIncludeAnyMembership()
     {
         using var factory = new SqliteDbContextFactory();
@@ -313,12 +383,20 @@ public class EmployeeSalarySheetFilterTests
     {
         public List<string> Errors { get; } = [];
         public List<string> Infos { get; } = [];
+        public List<string> DestructivePrompts { get; } = [];
+        public bool DestructiveConfirmResult { get; set; } = true;
 
         public override void Error(string message, string title = "Error")
             => Errors.Add(message);
 
         public override void Info(string message, string title = "Information")
             => Infos.Add(message);
+
+        public override bool ConfirmDestructive(string message, string title = "Confirm Delete")
+        {
+            DestructivePrompts.Add(message);
+            return DestructiveConfirmResult;
+        }
     }
 
     private sealed class SqliteDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

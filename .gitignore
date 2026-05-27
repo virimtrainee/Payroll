@@ -75,6 +75,8 @@ TestSheet_extracted/
 
 # Plans / scratch (kept out of source repo)
 .claude/
+graphify-out/
+.graphify*
 
 # OS junk
 Thumbs.db

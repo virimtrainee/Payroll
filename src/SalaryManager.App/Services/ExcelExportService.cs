@@ -159,4 +159,42 @@ public class ExcelExportService
         wb.SaveAs(path);
         return path;
     }
+
+    public string ExportSalaryRevisions(IReadOnlyList<SalaryRevisionReportRow> rows, string path)
+    {
+        using var wb = new XLWorkbook();
+        var ws = wb.AddWorksheet("Salary Revisions");
+
+        ws.Cell(1, 1).Value = "Salary Revisions Report";
+        ws.Range(1, 1, 1, 5).Merge().Style.Font.SetBold().Font.SetFontSize(14);
+
+        var headers = new[] { "Employee", "Old Salary", "New Salary", "Changed At", "Note" };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            var c = ws.Cell(3, i + 1);
+            c.Value = headers[i];
+            c.Style.Font.Bold = true;
+            c.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
+        }
+
+        int r = 4;
+        foreach (var row in rows)
+        {
+            ws.Cell(r, 1).Value = row.EmployeeName;
+            ws.Cell(r, 2).Value = row.OldSalary;
+            ws.Cell(r, 3).Value = row.NewSalary;
+            ws.Cell(r, 4).Value = row.ChangedAt;
+            ws.Cell(r, 4).Style.DateFormat.Format = "yyyy-MM-dd";
+            ws.Cell(r, 5).Value = row.Note ?? "";
+            r++;
+        }
+
+        if (rows.Count > 0)
+            ws.Range(4, 2, r - 1, 3).Style.NumberFormat.Format = "#,##0.00";
+        ws.Columns().AdjustToContents();
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        wb.SaveAs(path);
+        return path;
+    }
 }

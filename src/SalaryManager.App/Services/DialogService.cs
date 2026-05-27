@@ -11,6 +11,9 @@ public class DialogService
     public virtual bool Confirm(string message, string title = "Confirm")
         => MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
 
+    public virtual bool ConfirmDestructive(string message, string title = "Confirm Delete")
+        => MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+
     public virtual void Info(string message, string title = "Information")
         => MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
 

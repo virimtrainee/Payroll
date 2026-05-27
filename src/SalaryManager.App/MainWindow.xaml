@@ -3,14 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:SalaryManager.App.Views"
         xmlns:vm="clr-namespace:SalaryManager.App.ViewModels"
-        Title="Salary Manager" Height="720" Width="1180"
-        MinWidth="960" MinHeight="580"
+        Title="Salary Manager"
+        Height="820" Width="1360"
+        MinWidth="1100" MinHeight="680"
         WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
         Background="{StaticResource BackgroundBrush}">
 
     <Window.Resources>
-        <!-- Lazy view materialization: WPF only constructs each view when the
-             matching tab is first selected, not at MainWindow.InitializeComponent. -->
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
             <v:DashboardView/>
         </DataTemplate>
@@ -23,172 +26,198 @@
         <DataTemplate DataType="{x:Type vm:ReportsViewModel}">
             <v:ReportsView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:EmployeesViewModel}">
+            <v:EmployeesView/>
+        </DataTemplate>
 
-        <!-- Tab item: sits in the dark strip, blue underline when selected -->
-        <Style x:Key="AppTabItem" TargetType="TabItem">
-            <Setter Property="Foreground" Value="#94A3B8"/>
+        <LinearGradientBrush x:Key="ShellSidebarBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#07162C" Offset="0"/>
+            <GradientStop Color="#082A5A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="ShellTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="TabStripPlacement" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding DataContext.SidebarWidth, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{StaticResource ShellSidebarBrush}">
+                                <DockPanel LastChildFill="True">
+                                    <Border DockPanel.Dock="Top" Padding="14,20,14,16">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="34" Height="34" CornerRadius="7"
+                                                    Background="{StaticResource PrimaryBrush}"
+                                                    BorderBrush="#80BFFF" BorderThickness="1">
+                                                <TextBlock Text="SM"
+                                                           Foreground="White"
+                                                           FontWeight="Bold"
+                                                           FontSize="13"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="Salary Manager"
+                                                       Foreground="White"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Margin="12,0,0,0"
+                                                       Visibility="{Binding DataContext.SidebarTextVisibility, RelativeSource={RelativeSource TemplatedParent}}"
+                                                       VerticalAlignment="Center"/>
+                                            <Button Grid.Column="2"
+                                                    Content="{Binding DataContext.SidebarToggleGlyph, RelativeSource={RelativeSource TemplatedParent}}"
+                                                    Command="{Binding DataContext.ToggleSidebarCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                                    Width="28"
+                                                    Height="28"
+                                                    Margin="8,0,0,0"
+                                                    ToolTip="Collapse sidebar"
+                                                    Foreground="#D6E4F7"
+                                                    Background="#173966"
+                                                    BorderBrush="#2E5C96"
+                                                    BorderThickness="1"
+                                                    FontSize="18"
+                                                    FontWeight="Bold"
+                                                    Cursor="Hand"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border DockPanel.Dock="Top"
+                                            Height="1"
+                                            Background="#18345F"
+                                            Margin="0,0,0,14"/>
+
+                                    <TabPanel IsItemsHost="True"
+                                              KeyboardNavigation.TabIndex="1"
+                                              Background="Transparent"
+                                              Margin="12,0,12,0"/>
+                                </DockPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="{StaticResource BackgroundBrush}">
+                                <ContentPresenter ContentSource="SelectedContent"
+                                                  HorizontalAlignment="Stretch"
+                                                  VerticalAlignment="Stretch"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarNavItem" TargetType="TabItem">
+            <Setter Property="Foreground" Value="#D6E4F7"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Padding" Value="22,0"/>
-            <Setter Property="Height" Value="46"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Padding" Value="16,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="bd"
-                                Background="Transparent"
-                                Padding="{TemplateBinding Padding}"
-                                BorderThickness="0,0,0,3"
-                                BorderBrush="Transparent">
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter ContentSource="Header"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Stretch"
+                                              RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#334155"/>
-                                <Setter Property="Foreground" Value="#CBD5E1"/>
+                                <Setter TargetName="bd" Property="Background" Value="#183D72"/>
+                                <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#334155"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#94A3B8"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Header "Employees" button (white text, sits on the dark bar) -->
-        <Style x:Key="HeaderButton" TargetType="Button">
-            <Setter Property="Foreground" Value="#CBD5E1"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#475569"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#334155"/>
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource PrimaryBrush}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                <Setter Property="Foreground" Value="White"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#93C5FD"/>
+                                <Setter TargetName="bd" Property="BorderThickness" Value="1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- TabControl: dark strip with tabs left + Employees button right, content fills below -->
-        <Style x:Key="AppTabControl" TargetType="TabControl">
-            <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabControl">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <!-- Dark header bar: tabs on left, Employees on right -->
-                            <Border Grid.Row="0"
-                                    Background="{StaticResource SidebarBrush}"
-                                    BorderBrush="#1E293B"
-                                    BorderThickness="0,0,0,1"
-                                    ClipToBounds="True">
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right"
-                                            Style="{StaticResource HeaderButton}"
-                                            Content="Employees"
-                                            VerticalAlignment="Center"
-                                            Margin="0,0,16,0"
-                                            Command="{Binding DataContext.OpenEmployeesCommand,
-                                                      RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                    <TabPanel IsItemsHost="True"
-                                              Background="Transparent"/>
-                                </DockPanel>
-                            </Border>
-                            <!-- Content fills remaining space -->
-                            <ContentPresenter Grid.Row="1"
-                                              ContentSource="SelectedContent"
-                                              HorizontalAlignment="Stretch"
-                                              VerticalAlignment="Stretch"/>
-                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
     </Window.Resources>
 
-    <!-- Single TabControl fills the whole window -->
-    <TabControl Style="{StaticResource AppTabControl}"
+    <TabControl x:Name="MainTabs"
+                Style="{StaticResource ShellTabControl}"
+                SelectedIndex="{Binding SelectedPageIndex, Mode=TwoWay}"
                 KeyboardNavigation.TabNavigation="Cycle">
-        <TabItem Style="{StaticResource AppTabItem}" Content="{Binding DashboardVm}">
+        <TabItem Style="{StaticResource SidebarNavItem}" Content="{Binding DashboardVm}" ToolTip="Dashboard">
             <TabItem.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"
-                          Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent"
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="{Binding SidebarItemAlignment}">
+                    <Path Width="18" Height="18" Stretch="Uniform" Margin="{Binding SidebarIconMargin}"
+                          Stroke="#D6E4F7" StrokeThickness="1.8" Fill="Transparent"
                           StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                          Data="M3,13 L9,7 L13,11 L21,3 M21,3 L15,3 M21,3 L21,9 M3,21 L21,21"/>
-                    <AccessText Text="Dashboard"/>
+                          Data="M4,4 L10,4 L10,10 L4,10 Z M14,4 L20,4 L20,10 L14,10 Z M4,14 L10,14 L10,20 L4,20 Z M14,14 L20,14 L20,20 L14,20 Z"/>
+                    <AccessText Text="Dashboard" Visibility="{Binding SidebarTextVisibility}"/>
                 </StackPanel>
             </TabItem.Header>
         </TabItem>
-        <TabItem Style="{StaticResource AppTabItem}" Content="{Binding SalarySheetVm}">
+
+        <TabItem Style="{StaticResource SidebarNavItem}" Content="{Binding SalarySheetVm}" ToolTip="Salary Sheet">
             <TabItem.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"
-                          Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent"
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="{Binding SidebarItemAlignment}">
+                    <Path Width="18" Height="18" Stretch="Uniform" Margin="{Binding SidebarIconMargin}"
+                          Stroke="#D6E4F7" StrokeThickness="1.8" Fill="Transparent"
                           StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                          Data="M5,4 L19,4 Q21,4,21,6 L21,18 Q21,20,19,20 L5,20 Q3,20,3,18 L3,6 Q3,4,5,4 Z M3,10 L21,10 M9,4 L9,20"/>
-                    <AccessText Text="Salary Sheet"/>
+                          Data="M5,4 L19,4 Q21,4,21,6 L21,18 Q21,20,19,20 L5,20 Q3,20,3,18 L3,6 Q3,4,5,4 Z M3,10 L21,10 M8,4 L8,20"/>
+                    <AccessText Text="Salary Sheet" Visibility="{Binding SidebarTextVisibility}"/>
                 </StackPanel>
             </TabItem.Header>
         </TabItem>
-        <TabItem Style="{StaticResource AppTabItem}" Content="{Binding AdvancesVm}">
+
+        <TabItem Style="{StaticResource SidebarNavItem}" Content="{Binding AdvancesVm}" ToolTip="Advances">
             <TabItem.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"
-                          Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent"
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="{Binding SidebarItemAlignment}">
+                    <Path Width="18" Height="18" Stretch="Uniform" Margin="{Binding SidebarIconMargin}"
+                          Stroke="#D6E4F7" StrokeThickness="1.8" Fill="Transparent"
                           StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                          Data="M2,8 L22,8 M2,8 L2,17 A2,2,0,0,0,4,19 L20,19 A2,2,0,0,0,22,17 L22,8 M2,8 L5,4 L19,4 L22,8"/>
-                    <AccessText Text="Advances"/>
+                          Data="M3,7 L21,7 M4,7 L4,18 Q4,20,6,20 L18,20 Q20,20,20,18 L20,7 M7,7 L8,4 L16,4 L17,7 M8,13 L16,13"/>
+                    <AccessText Text="Advances" Visibility="{Binding SidebarTextVisibility}"/>
                 </StackPanel>
             </TabItem.Header>
         </TabItem>
-        <TabItem Style="{StaticResource AppTabItem}" Content="{Binding ReportsVm}">
+
+        <TabItem Style="{StaticResource SidebarNavItem}" Content="{Binding ReportsVm}" ToolTip="Reports">
             <TabItem.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Width="14" Height="14" Stretch="Uniform" Margin="0,0,7,0"
-                          Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent"
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="{Binding SidebarItemAlignment}">
+                    <Path Width="18" Height="18" Stretch="Uniform" Margin="{Binding SidebarIconMargin}"
+                          Stroke="#D6E4F7" StrokeThickness="1.8" Fill="Transparent"
                           StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                          Data="M4,19 L4,5 M4,19 L20,19 M8,15 L8,9 M12,15 L12,7 M16,15 L16,11"/>
-                    <AccessText Text="Reports"/>
+                          Data="M4,20 L20,20 M6,18 L6,10 M11,18 L11,5 M16,18 L16,13"/>
+                    <AccessText Text="Reports" Visibility="{Binding SidebarTextVisibility}"/>
+                </StackPanel>
+            </TabItem.Header>
+        </TabItem>
+
+        <TabItem Style="{StaticResource SidebarNavItem}" Content="{Binding EmployeesVm}" ToolTip="Employees">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="{Binding SidebarItemAlignment}">
+                    <Path Width="18" Height="18" Stretch="Uniform" Margin="{Binding SidebarIconMargin}"
+                          Stroke="#D6E4F7" StrokeThickness="1.8" Fill="Transparent"
+                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M16,19 L16,17 Q16,15,14,15 L8,15 Q6,15,6,17 L6,19 M11,11 Q14,11,14,8 Q14,5,11,5 Q8,5,8,8 Q8,11,11,11 Z M20,19 L20,17 Q20,15,18,15 M17,11 Q19,11,19,9 Q19,7,17,7"/>
+                    <AccessText Text="Employees" Visibility="{Binding SidebarTextVisibility}"/>
                 </StackPanel>
             </TabItem.Header>
         </TabItem>

@@ -27,6 +27,7 @@ public partial class ReportsViewModel : ObservableObject
     private readonly PdfSlipService _pdf;
     private readonly ExcelExportService _excel;
     private readonly DialogService _dialogs;
+    private readonly AppSettingsService _settings;
 
     public List<MonthOption> Months => Helpers.Months.All;
     public List<int> Years => Helpers.Months.Years();
@@ -42,7 +43,11 @@ public partial class ReportsViewModel : ObservableObject
     [ObservableProperty] private string kpiTotalPayable = "₹0.00";
     [ObservableProperty] private string kpiGross = "₹0.00";
     [ObservableProperty] private string kpiDeductions = "₹0.00";
+    [ObservableProperty] private string kpiTotalAdvances = "₹0.00";
     [ObservableProperty] private int kpiActiveEmployees;
+    [ObservableProperty] private int revisionEntryCount;
+    [ObservableProperty] private int revisionEmployeeCount;
+    [ObservableProperty] private string lastRevisionDate = "—";
     [ObservableProperty] private bool isLoading;
     private bool _updatingGroupFilter;
     private int _loadVersion;
@@ -53,9 +58,10 @@ public partial class ReportsViewModel : ObservableObject
                             DatabaseInitializer dbInit,
                             PdfSlipService pdf,
                             ExcelExportService excel,
-                            DialogService dialogs)
+                            DialogService dialogs,
+                            AppSettingsService settings)
     {
-        _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _dialogs = dialogs;
+        _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _dialogs = dialogs; _settings = settings;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -132,11 +138,32 @@ public partial class ReportsViewModel : ObservableObject
                 activeQuery = activeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
             var active = await activeQuery.CountAsync();
 
+            var advanceQuery = db.Advances.AsNoTracking();
+            var revisionQuery = db.SalaryRevisions.AsNoTracking();
+            if (SelectedGroupFilter?.Id is int filterGroupId)
+            {
+                advanceQuery = advanceQuery.Where(a => a.Employee != null
+                    && a.Employee.GroupMemberships.Any(m => m.EmployeeGroupId == filterGroupId));
+                revisionQuery = revisionQuery.Where(r => r.Employee.GroupMemberships.Any(m => m.EmployeeGroupId == filterGroupId));
+            }
+
+            var advances = await advanceQuery.SumOutstandingAsync();
+            var revisionCount = await revisionQuery.CountAsync();
+            var revisionEmployees = await revisionQuery.Select(r => r.EmployeeId).Distinct().CountAsync();
+            var lastRevision = await revisionQuery
+                .OrderByDescending(r => r.ChangedAt)
+                .Select(r => (DateTime?)r.ChangedAt)
+                .FirstOrDefaultAsync();
+
             if (version != _kpiLoadVersion) return;
             KpiTotalPayable = $"₹{net:N0}";
             KpiGross = $"₹{gross:N0}";
             KpiDeductions = $"₹{ded:N0}";
+            KpiTotalAdvances = $"₹{advances:N0}";
             KpiActiveEmployees = active;
+            RevisionEntryCount = revisionCount;
+            RevisionEmployeeCount = revisionEmployees;
+            LastRevisionDate = lastRevision?.ToString("dd MMM yyyy") ?? "—";
         }
         catch (Exception ex)
         {
@@ -200,6 +227,29 @@ public partial class ReportsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task IciciExcelAsync()
+    {
+        try
+        {
+            var rows = await BuildIciciRowsAsync();
+            if (rows.Count == 0) { _dialogs.Info("No bank-payment employees in this period."); return; }
+
+            var name = $"ICICI-Salary-{SelectedYear:0000}-{SelectedMonth.Number:00}.xlsx";
+            var path = _dialogs.AskSavePath("Excel Workbook (*.xlsx)|*.xlsx", name);
+            if (path is null) return;
+
+            var settings = _settings.Load();
+            var options = _dialogs.AskIciciExportOptions(settings.IciciDebitAccountNo);
+            if (options is null) return;
+            _settings.Save(settings with { IciciDebitAccountNo = options.DebitAccountNo });
+
+            await Task.Run(() => _excel.ExportIciciPayment(rows, options, path));
+            OpenFile(path);
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
     private async Task LedgerPdfAsync()
     {
         try
@@ -228,6 +278,36 @@ public partial class ReportsViewModel : ObservableObject
             if (path is null) return;
             var emp = SelectedEmployee;
             await Task.Run(() => _excel.ExportAdvanceLedger(emp, rows, bal, path));
+            OpenFile(path);
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task RevisionPdfAsync()
+    {
+        try
+        {
+            var rows = await BuildRevisionRowsAsync();
+            var name = $"Salary-Revisions-{DateTime.Now:yyyyMMdd}.pdf";
+            var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", name);
+            if (path is null) return;
+            await Task.Run(() => _pdf.GenerateSalaryRevisionReport(rows, path));
+            OpenFile(path);
+        }
+        catch (Exception ex) { _dialogs.Error(ex.Message); }
+    }
+
+    [RelayCommand]
+    private async Task RevisionExcelAsync()
+    {
+        try
+        {
+            var rows = await BuildRevisionRowsAsync();
+            var name = $"Salary-Revisions-{DateTime.Now:yyyyMMdd}.xlsx";
+            var path = _dialogs.AskSavePath("Excel Workbook (*.xlsx)|*.xlsx", name);
+            if (path is null) return;
+            await Task.Run(() => _excel.ExportSalaryRevisions(rows, path));
             OpenFile(path);
         }
         catch (Exception ex) { _dialogs.Error(ex.Message); }
@@ -296,6 +376,82 @@ public partial class ReportsViewModel : ObservableObject
         return list;
     }
 
+    private async Task<List<IciciPaymentRow>> BuildIciciRowsAsync()
+    {
+        using var db = await _dbf.CreateDbContextAsync();
+        var employeeQuery = db.Employees.AsNoTracking()
+            .Where(e => e.IsActive && e.PaymentMode != PaymentMode.Cash);
+        if (SelectedGroupFilter?.Id is int groupId)
+            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
+        var ids = employees.Select(e => e.Id).ToList();
+        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
+
+        var attendance = await db.AttendanceRecords.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId) && a.Year == SelectedYear && a.Month == SelectedMonth.Number)
+            .ToDictionaryAsync(a => a.EmployeeId, a => a);
+
+        var advanceDeductions = await db.Advances.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId)
+                     && a.SourceKey == sourceKey
+                     && a.EntryType == AdvanceEntryType.Deducted)
+            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
+
+        var balances = await db.Advances.AsNoTracking()
+            .Where(a => ids.Contains(a.EmployeeId))
+            .SumBalancesByEmployeeAsync();
+
+        var issues = new List<ValidationIssue>();
+        var rows = new List<IciciPaymentRow>(employees.Count);
+        foreach (var e in employees)
+        {
+            var rec = attendance.GetValueOrDefault(e.Id);
+            var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
+            var payrollValidation = PayrollValidator.Validate(new PayrollValidationInput(
+                e.Name,
+                e.BaseSalary,
+                SelectedYear,
+                SelectedMonth.Number,
+                rec?.DaysAbsent ?? 0,
+                rec?.EsicDeduction ?? 0m,
+                rec?.PfDeduction ?? 0m,
+                rec?.TdsDeduction ?? 0m,
+                advanceDeduction,
+                balances.GetValueOrDefault(e.Id, 0m),
+                advanceDeduction));
+            issues.AddRange(payrollValidation.Issues);
+
+            var employeeValidation = EmployeeValidator.Validate(new EmployeeValidationInput(
+                e.Name,
+                e.BaseSalary,
+                e.PaymentMode,
+                e.AccountNumber,
+                e.IfscCode,
+                e.JoiningDate));
+            issues.AddRange(employeeValidation.Issues.Select(i => i with { Field = $"{e.Name} - {i.Field}" }));
+
+            var b = SalaryCalculator.Compute(
+                e.BaseSalary,
+                SelectedYear,
+                SelectedMonth.Number,
+                rec?.DaysAbsent ?? 0,
+                rec?.EsicDeduction ?? 0m,
+                rec?.PfDeduction ?? 0m,
+                rec?.TdsDeduction ?? 0m);
+            var amount = rec?.NetSalaryOverride ?? b.NetSalary - advanceDeduction;
+            if (amount <= 0)
+                issues.Add(new ValidationIssue(e.Name, "ICICI export amount must be greater than zero."));
+
+            rows.Add(new IciciPaymentRow(e.Name, e.AccountNumber, e.IfscCode, amount, e.PaymentMode));
+        }
+
+        if (issues.Count > 0)
+            throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
+
+        return rows;
+    }
+
     private async Task<(IReadOnlyList<LedgerRow> Rows, decimal Balance)> BuildLedgerAsync(int employeeId)
     {
         using var db = await _dbf.CreateDbContextAsync();
@@ -305,6 +461,25 @@ public partial class ReportsViewModel : ObservableObject
             .ToListAsync();
         var rows = AdvanceLedger.Build(entries);
         return (rows, rows.LastOrDefault()?.RunningBalance ?? 0m);
+    }
+
+    private async Task<List<SalaryRevisionReportRow>> BuildRevisionRowsAsync()
+    {
+        using var db = await _dbf.CreateDbContextAsync();
+        IQueryable<SalaryRevision> query = db.SalaryRevisions.AsNoTracking().Include(r => r.Employee);
+        if (SelectedGroupFilter?.Id is int groupId)
+            query = query.Where(r => r.Employee.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
+        return await query
+            .OrderByDescending(r => r.ChangedAt)
+            .ThenBy(r => r.Employee.Name)
+            .Select(r => new SalaryRevisionReportRow(
+                r.Employee.Name,
+                r.OldSalary,
+                r.NewSalary,
+                r.ChangedAt,
+                r.Note))
+            .ToListAsync();
     }
 
     private static string Sanitize(string s) => string.Join("_", s.Split(Path.GetInvalidFileNameChars()));

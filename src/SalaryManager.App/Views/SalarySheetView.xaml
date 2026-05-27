@@ -1,506 +1,613 @@
 <UserControl x:Class="SalaryManager.App.Views.SalarySheetView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:helpers="clr-namespace:SalaryManager.App.Helpers"
              PreviewKeyDown="UserControl_PreviewKeyDown">
-    <Grid>
+    <UserControl.Resources>
+        <ResourceDictionary>
+        <Style x:Key="InlineLabel" TargetType="TextBlock" BasedOn="{StaticResource FieldLabel}">
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="RightCellText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="GroupChipCheckBox" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="bd"
+                                CornerRadius="8"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                Background="White"
+                                Padding="12,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#F8FAFC"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#EFF6FF"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#BFDBFE"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="AllChipButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style x:Key="ResizableSalaryColumnHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Cursor" Value="SizeWE"/>
+        </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource BackgroundBrush}">
         <ProgressBar Style="{StaticResource LoadingBar}"
                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
-    <Grid Margin="20,12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock Text="Salary Sheet" Style="{StaticResource PageTitle}"/>
-        </StackPanel>
+        <Grid Margin="18,12,18,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Single-row filter bar -->
-        <Border Grid.Row="1" Style="{StaticResource FilterBar}" Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Grid.Row="0"
+                       Text="Salary Sheet"
+                       Style="{StaticResource PageTitle}"
+                       FontSize="24"
+                       Margin="0,0,0,8"/>
 
-                <TextBlock Text="PERIOD" Style="{StaticResource FieldLabel}"
-                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <ComboBox Width="132" ItemsSource="{Binding Months}"
-                          SelectedItem="{Binding SelectedMonth}" DisplayMemberPath="Name"/>
-                <ComboBox Width="76" ItemsSource="{Binding Years}"
-                          SelectedItem="{Binding SelectedYear}" Margin="8,0,0,0"/>
+            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <TextBlock Text="GROUPS" Style="{StaticResource FieldLabel}"
-                           VerticalAlignment="Center" Margin="14,0,8,0"/>
-                <ScrollViewer Width="240"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled"
-                              VerticalAlignment="Center">
-                    <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Content="{Binding Name}"
-                                          IsChecked="{Binding IsSelected}"
-                                          Foreground="{StaticResource MutedTextBrush}"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,10,0"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="240"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="270"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                <Separator Style="{StaticResource VSep}"/>
-
-                <!-- Edit / Done toggle -->
-                <Button Margin="0,0,8,0" Command="{Binding ToggleEditModeCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-                            <Setter Property="Content" Value="Lock sheet"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsEditMode}" Value="False">
-                                    <Setter Property="Content" Value="Edit sheet"/>
-                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                                    <Setter Property="BorderThickness" Value="1"/>
-                                    <Setter Property="FontWeight" Value="Normal"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
-                <Button Style="{StaticResource SecondaryButton}" Content="Reload"
-                        Margin="0,0,8,0" Command="{Binding LoadCommand}"/>
-                <Button Style="{StaticResource PrimaryButton}" Content="Save"
-                        IsEnabled="{Binding IsEditMode}"
-                        Command="{Binding SaveAttendanceCommand}"/>
-
-                <Separator Style="{StaticResource VSep}"/>
-
-                <Button Style="{StaticResource SecondaryButton}" Content="Cash PDF"
-                        Margin="0,0,8,0" Command="{Binding ExportCashPdfCommand}"/>
-                <Button Style="{StaticResource SecondaryButton}" Content="All PDF"
-                        Margin="0,0,8,0" Command="{Binding ExportSummaryPdfCommand}"/>
-                <Button Style="{StaticResource SecondaryButton}" Content="Export Excel"
-                        Margin="0,0,8,0" Command="{Binding ExportToExcelCommand}"/>
-                <Button Style="{StaticResource SecondaryButton}" Content="ICICI Excel"
-                        Margin="0,0,8,0" Command="{Binding ExportIciciExcelCommand}"/>
-                <Button Style="{StaticResource SecondaryButton}" Content="Post Advances"
-                        Command="{Binding PostDeductionsCommand}"/>
-            </StackPanel>
-        </Border>
-
-        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <!-- Empty state -->
-                <StackPanel Grid.Row="0"
-                            VerticalAlignment="Center" HorizontalAlignment="Center"
-                            Margin="20,40">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Rows.Count}" Value="0">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <TextBlock Style="{StaticResource EmptyStateTitle}"
-                               Text="No active employees for this period"/>
-                    <TextBlock Style="{StaticResource EmptyStateSubtitle}"
-                               Text="Add employees from the Employees window, or pick a different month/year above."/>
-                </StackPanel>
-
-            <DataGrid x:Name="SalaryGrid"
-                      Grid.Row="0"
-                      ItemsSource="{Binding Rows}"
-                      IsReadOnly="{Binding IsGridReadOnly}"
-                      SelectionUnit="Cell"
-                      SelectionMode="Single"
-                      CurrentCellChanged="SalaryGrid_CurrentCellChanged"
-                      PreviewKeyDown="SalaryGrid_PreviewKeyDown">
-                <DataGrid.Style>
-                    <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Rows.Count}" Value="0">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.Style>
-                <DataGrid.GroupStyle>
-                    <GroupStyle>
-                        <GroupStyle.ContainerStyle>
-                            <Style TargetType="{x:Type GroupItem}">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="{x:Type GroupItem}">
-                                            <StackPanel>
-                                                <Border Background="#F8FAFC"
-                                                        BorderBrush="{StaticResource BorderBrush}"
-                                                        BorderThickness="0,0,0,1"
-                                                        Padding="12,8">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding Name}"
-                                                                   FontWeight="SemiBold"
-                                                                   Foreground="{StaticResource TextBrush}"/>
-                                                        <TextBlock Grid.Column="1"
-                                                                   Text="{Binding Converter={StaticResource SalaryGroupSummaryConverter}}"
-                                                                   FontSize="12"
-                                                                   Foreground="{StaticResource MutedTextBrush}"/>
-                                                    </Grid>
-                                                </Border>
-                                                <ItemsPresenter/>
-                                            </StackPanel>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </GroupStyle.ContainerStyle>
-                    </GroupStyle>
-                </DataGrid.GroupStyle>
-                <DataGrid.Columns>
-
-                    <DataGridTextColumn Header="S.No."
-                                        Binding="{Binding SerialNumber}"
-                                        IsReadOnly="True" Width="44">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTemplateColumn Header="Employee" Width="*" MinWidth="170" IsReadOnly="True">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Name}"
-                                               FontWeight="Medium"
-                                               VerticalAlignment="Center"/>
-                                    <CheckBox Grid.Column="1"
-                                              Content="Override"
-                                              IsChecked="{Binding IsNetSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                              Foreground="{StaticResource MutedTextBrush}"
-                                              VerticalAlignment="Center"
-                                              Margin="10,0,0,0"/>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn Header="Base"
-                                        Binding="{Binding BaseSalary, StringFormat=N2}"
-                                        IsReadOnly="True" Width="90">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Right"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <!-- Editable: Absent -->
-                    <DataGridTemplateColumn Header="Absent" Width="68"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DaysAbsent}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding DaysAbsent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         TextAlignment="Center"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="4,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Editable: ESIC -->
-                    <DataGridTemplateColumn Header="ESIC" Width="85"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding EsicDeduction, StringFormat=N2}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Padding="0,0,10,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         IsEnabled="{Binding UsesEsicPf}"
-                                         TextAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="8,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Editable: PF -->
-                    <DataGridTemplateColumn Header="PF" Width="80"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding PfDeduction, StringFormat=N2}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Padding="0,0,10,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding PfDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         IsEnabled="{Binding UsesEsicPf}"
-                                         TextAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="8,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Editable: TDS -->
-                    <DataGridTemplateColumn Header="TDS" Width="85"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Padding="0,0,10,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding TdsDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         IsEnabled="{Binding UsesTds}"
-                                         TextAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="8,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Editable: Adv. Deduct -->
-                    <DataGridTemplateColumn Header="Adv. Ded" Width="90"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding AdvanceDeductionEntry, StringFormat=N2}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Padding="0,0,10,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding AdvanceDeductionEntry, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         TextAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="8,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <!-- Computed read-only -->
-                    <DataGridTextColumn Header="Per-Day"
-                                        Binding="{Binding PerDay, StringFormat=N2}"
-                                        IsReadOnly="True" Width="82">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Right"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTextColumn Header="Deduction"
-                                        Binding="{Binding Deduction, StringFormat=N2}"
-                                        IsReadOnly="True" Width="88">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Right"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTextColumn Header="Adv. Bal"
-                                        Binding="{Binding AdvanceBalance, StringFormat=N2}"
-                                        IsReadOnly="True" Width="82">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="HorizontalAlignment" Value="Right"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTemplateColumn Header="Net Salary" Width="104"
-                                            CellStyle="{StaticResource EditableCell}">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding NetSalary, StringFormat=N2}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           FontWeight="Bold"
-                                           Foreground="{StaticResource PrimaryBrush}"
-                                           Padding="0,0,10,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                        <DataGridTemplateColumn.CellEditingTemplate>
-                            <DataTemplate>
-                                <TextBox Text="{Binding NetSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         IsEnabled="{Binding IsNetSalaryOverrideEnabled}"
-                                         TextAlignment="Right"
-                                         VerticalContentAlignment="Center"
-                                         BorderThickness="0" Padding="8,0"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellEditingTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTemplateColumn Header="Slip" Width="82" IsReadOnly="True">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Button Content="PDF"
-                                        Style="{StaticResource SecondaryButton}"
-                                        Padding="10,3" Margin="5,2"
-                                        Command="{Binding DataContext.GenerateSlipCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                </DataGrid.Columns>
-            </DataGrid>
-
-                <Border Grid.Row="1"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="0,1,0,0"
-                        Background="#F8FAFC"
-                        Padding="12,8">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Rows.Count}" Value="0">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="TOTALS" Style="{StaticResource FieldLabel}"
-                                       VerticalAlignment="Center" Margin="0,0,14,0"/>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="Base "/><Run Text="{Binding TotalGross, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="Absent "/><Run Text="{Binding TotalDaysAbsent}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="ESIC "/><Run Text="{Binding TotalEsic, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="PF "/><Run Text="{Binding TotalPf, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="TDS "/><Run Text="{Binding TotalTds, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="Adv. Ded "/><Run Text="{Binding TotalAdvanceDeduction, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="Deduction "/><Run Text="{Binding TotalAbsenceDeduction, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock Margin="0,0,18,0">
-                                <Run Text="Adv. Bal "/><Run Text="{Binding TotalAdvanceBalance, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock>
-                                <Run Text="Net "/><Run Text="{Binding TotalNet, StringFormat={}₹{0:N2}}" FontWeight="SemiBold"/>
-                            </TextBlock>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Month" Style="{StaticResource InlineLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="112"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox ItemsSource="{Binding Months}"
+                                          Style="{StaticResource PayrollModernComboBox}"
+                                          materialDesign:HintAssist.Hint="Month"
+                                          SelectedItem="{Binding SelectedMonth}"
+                                          DisplayMemberPath="Name"/>
+                                <ComboBox Grid.Column="2"
+                                          Style="{StaticResource PayrollModernComboBox}"
+                                          materialDesign:HintAssist.Hint="Year"
+                                          ItemsSource="{Binding Years}"
+                                          SelectedItem="{Binding SelectedYear}"/>
+                            </Grid>
                         </StackPanel>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-        </Border>
 
-        <!-- Total payable bar — gradient + breakdown -->
-        <Border Grid.Row="3" CornerRadius="10" Margin="0,8,0,0" Padding="18,0" Height="56" BorderThickness="0">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                    <GradientStop Color="#2563EB" Offset="0"/>
-                    <GradientStop Color="#3B82F6" Offset="0.6"/>
-                    <GradientStop Color="#60A5FA" Offset="1"/>
-                </LinearGradientBrush>
-            </Border.Background>
-            <Border.Effect>
-                <DropShadowEffect Color="#1D4ED8" Opacity="0.28" BlurRadius="20" ShadowDepth="6"/>
-            </Border.Effect>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Group" Style="{StaticResource InlineLabel}"/>
+                            <ComboBox ItemsSource="{Binding GroupDropdownOptions}"
+                                      Style="{StaticResource PayrollModernComboBox}"
+                                      materialDesign:HintAssist.Hint="Group"
+                                      SelectedItem="{Binding SelectedGroupDropdownFilter}"
+                                      DisplayMemberPath="Name"/>
+                        </StackPanel>
 
-                <!-- Left: label + breakdown -->
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="TOTAL PAYABLE" Foreground="#DBEAFE"
-                               FontSize="11" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBlock Foreground="#BFDBFE" FontSize="12">
-                            <Run Text="Gross "/>
-                            <Run Text="{Binding TotalGross, StringFormat={}₹{0:N0}}"
-                                 Foreground="White" FontWeight="SemiBold"/>
-                            <Run Text="  ·  Deductions " Foreground="#BFDBFE"/>
-                            <Run Text="{Binding TotalDeduction, StringFormat={}₹{0:N0}}"
-                                 Foreground="White" FontWeight="SemiBold"/>
-                            <Run Text="  ·  " Foreground="#BFDBFE"/>
-                            <Run Text="{Binding EmployeeCount}" Foreground="White" FontWeight="SemiBold"/>
-                            <Run Text=" employees" Foreground="#BFDBFE"/>
-                        </TextBlock>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="Search Employee" Style="{StaticResource InlineLabel}"/>
+                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     Tag="Search by name..."/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="6"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Bottom">
+                            <Button Margin="0,0,10,0"
+                                    Command="{Binding ToggleEditModeCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                        <Setter Property="Content" Value="Edit Sheet"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                                <Setter Property="Content" Value="Lock Sheet"/>
+                                                <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Style="{StaticResource SecondaryButton}"
+                                    Content="Save"
+                                    IsEnabled="{Binding IsEditMode}"
+                                    Margin="0,0,10,0"
+                                    Command="{Binding SaveAttendanceCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}"
+                                    Content="Reload"
+                                    Margin="0,0,10,0"
+                                    Command="{Binding LoadCommand}"/>
+                            <Button Style="{StaticResource PrimaryButton}"
+                                    Content="Add Employee"
+                                    Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Group"
+                                   Style="{StaticResource FieldLabel}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <ScrollViewer Grid.Column="1"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="All"
+                                        Command="{Binding ClearGroupFiltersCommand}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource AllChipButton}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsAllGroupsSelected}" Value="True">
+                                                    <Setter Property="Background" Value="#EFF6FF"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="#BFDBFE"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Name}"
+                                                      IsChecked="{Binding IsSelected}"
+                                                      Style="{StaticResource GroupChipCheckBox}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Export"
+                                       Style="{StaticResource FieldLabel}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,12,0"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Cash PDF"
+                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportCashPdfCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="All PDF"
+                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportSummaryPdfCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="ICICI Excel"
+                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportIciciExcelCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Excel"
+                                    Margin="0,0,8,0" Padding="12,7" Command="{Binding ExportToExcelCommand}"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Post Advances"
+                                    Padding="12,7"
+                                    Command="{Binding PostDeductionsCommand}"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+                <Grid>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20,40">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Style="{StaticResource EmptyStateTitle}"
+                                   Text="No active employees for this period"/>
+                        <TextBlock Style="{StaticResource EmptyStateSubtitle}"
+                                   Text="Add employees from the Employees page, or pick a different month/group."/>
                     </StackPanel>
-                </StackPanel>
 
-                <!-- Right: big amount -->
-                <TextBlock Grid.Column="2"
-                           Text="{Binding TotalNet, StringFormat={}₹{0:N2}}"
-                           Foreground="White" FontSize="24" FontWeight="Bold"
-                           VerticalAlignment="Center"/>
-            </Grid>
-        </Border>
-    </Grid>
+                    <DataGrid x:Name="SalaryGrid"
+                              ItemsSource="{Binding RowsView}"
+                              IsReadOnly="{Binding IsGridReadOnly}"
+                              RowHeight="44"
+                              CanUserResizeColumns="True"
+                              ColumnHeaderStyle="{StaticResource ResizableSalaryColumnHeader}"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              SelectionUnit="Cell"
+                              SelectionMode="Single"
+                              CurrentCellChanged="SalaryGrid_CurrentCellChanged"
+                              PreviewKeyDown="SalaryGrid_PreviewKeyDown">
+                        <DataGrid.Style>
+                            <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Style>
+                        <DataGrid.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <StackPanel>
+                                                        <Border Background="#F8FAFC"
+                                                                BorderBrush="{StaticResource BorderBrush}"
+                                                                BorderThickness="0,0,0,1"
+                                                                Padding="12,9">
+                                                            <Grid>
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TextBrush}"/>
+                                                                <TextBlock HorizontalAlignment="Right"
+                                                                           Text="{Binding Converter={StaticResource SalaryGroupSummaryConverter}}"
+                                                                           FontSize="12"
+                                                                           Foreground="{StaticResource MutedTextBrush}"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <ItemsPresenter/>
+                                                    </StackPanel>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </DataGrid.GroupStyle>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="S.No."
+                                                helpers:DataGridColumnKey.Key="serial"
+                                                Binding="{Binding SerialNumber}"
+                                                IsReadOnly="True"
+                                                Width="62">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <DataGridTemplateColumn Header="Employee" helpers:DataGridColumnKey.Key="employee" Width="*" MinWidth="190" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"/>
+                                            <CheckBox Grid.Column="1"
+                                                      Content="Override"
+                                                      IsChecked="{Binding IsNetSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      Foreground="{StaticResource MutedTextBrush}"
+                                                      FontSize="12"
+                                                      VerticalAlignment="Center"
+                                                      Margin="10,0,0,0"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Group"
+                                                helpers:DataGridColumnKey.Key="group"
+                                                Binding="{Binding GroupDisplayName}"
+                                                IsReadOnly="True"
+                                                Width="120"/>
+
+                            <DataGridTemplateColumn Header="Payment" helpers:DataGridColumnKey.Key="payment" Width="100" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="6" Padding="12,4" HorizontalAlignment="Left" BorderThickness="1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#D1FAE5"/>
+                                                    <Setter Property="BorderBrush" Value="#A7F3D0"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PaymentMode}" Value="Cash">
+                                                            <Setter Property="Background" Value="#F1F5F9"/>
+                                                            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding PaymentMode}" Value="IciciBank">
+                                                            <Setter Property="Background" Value="#DBEAFE"/>
+                                                            <Setter Property="BorderBrush" Value="#93C5FD"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding PaymentModeLabel}" FontSize="12" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#047857"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding PaymentMode}" Value="Cash">
+                                                                <Setter Property="Foreground" Value="#475569"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding PaymentMode}" Value="IciciBank">
+                                                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Base Salary (₹)"
+                                                helpers:DataGridColumnKey.Key="baseSalary"
+                                                Binding="{Binding BaseSalary, StringFormat=N2}"
+                                                IsReadOnly="True"
+                                                Width="126"
+                                                ElementStyle="{StaticResource RightCellText}"/>
+
+                            <DataGridTemplateColumn Header="Absent" helpers:DataGridColumnKey.Key="absent" Width="78"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DaysAbsent}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding DaysAbsent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="4,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="ESIC (₹)" helpers:DataGridColumnKey.Key="esic" Width="96"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding EsicDeduction, StringFormat=N2}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding UsesEsicPf}"
+                                                 TextAlignment="Right"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="8,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="PF (₹)" helpers:DataGridColumnKey.Key="pf" Width="92"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding PfDeduction, StringFormat=N2}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding PfDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding UsesEsicPf}"
+                                                 TextAlignment="Right"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="8,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="TDS (₹)" helpers:DataGridColumnKey.Key="tds" Width="96"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding TdsDeduction, StringFormat=N2}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding TdsDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding UsesTds}"
+                                                 TextAlignment="Right"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="8,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Deductions (₹)"
+                                                helpers:DataGridColumnKey.Key="deductions"
+                                                Binding="{Binding TotalDeductions, StringFormat=N2}"
+                                                IsReadOnly="True"
+                                                Width="126"
+                                                ElementStyle="{StaticResource RightCellText}"/>
+
+                            <DataGridTemplateColumn Header="Adv. Ded. (₹)" helpers:DataGridColumnKey.Key="advanceDeduction" Width="116"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding AdvanceDeductionEntry, StringFormat=N2}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding AdvanceDeductionEntry, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextAlignment="Right"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="8,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Adv. Balance (₹)"
+                                                helpers:DataGridColumnKey.Key="advanceBalance"
+                                                Binding="{Binding AdvanceBalance, StringFormat=N2}"
+                                                IsReadOnly="True"
+                                                Width="132">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource RightCellText}">
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Foreground" Value="#EA580C"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AdvanceBalance}" Value="0">
+                                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <DataGridTemplateColumn Header="Net Salary (₹)" helpers:DataGridColumnKey.Key="netSalary" Width="128"
+                                                    CellStyle="{StaticResource EditableCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding NetSalary, StringFormat=N2}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource PrimaryBrush}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding NetSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding IsNetSalaryOverrideEnabled}"
+                                                 TextAlignment="Right"
+                                                 VerticalContentAlignment="Center"
+                                                 BorderThickness="0"
+                                                 Padding="8,0"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Header="Slip" helpers:DataGridColumnKey.Key="slip" Width="82" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="PDF"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="12,4"
+                                                Margin="5,2"
+                                                Command="{Binding DataContext.GenerateSlipCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="3"
+                    Margin="0,12,0,0"
+                    CornerRadius="8"
+                    BorderBrush="#BFDBFE"
+                    BorderThickness="1"
+                    Background="White"
+                    Padding="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="280"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Margin="18,10">
+                        <TextBlock Text="Gross Pay" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalGross, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="18,10">
+                        <TextBlock Text="Deductions" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalAbsenceDeduction, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="18,10">
+                        <TextBlock Text="Adv. Deducted" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalAdvanceDeduction, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="18,10">
+                        <TextBlock Text="Advance Balance" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalAdvanceBalance, StringFormat={}₹{0:N2}}" FontSize="18" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Border Grid.Column="4"
+                            Background="{StaticResource PrimaryBrush}"
+                            CornerRadius="0,8,8,0"
+                            Padding="22,10">
+                        <StackPanel>
+                            <TextBlock Text="Net Payable" Foreground="#DBEAFE" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalNet, StringFormat={}₹{0:N2}}"
+                                       Foreground="White"
+                                       FontSize="24"
+                                       FontWeight="Bold"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

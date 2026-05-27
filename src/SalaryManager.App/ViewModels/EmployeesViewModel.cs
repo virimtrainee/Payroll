@@ -15,6 +15,19 @@ using SalaryManager.Data.Validation;
 
 namespace SalaryManager.App.ViewModels;
 
+public enum EmployeeStatusFilter
+{
+    Active,
+    Inactive,
+    All
+}
+
+public sealed record GroupSummaryVm(string Name, int Count);
+public sealed class EmployeeDeletedEventArgs(int employeeId) : EventArgs
+{
+    public int EmployeeId { get; } = employeeId;
+}
+
 public partial class EmployeesViewModel : ObservableObject
 {
     private readonly IDbContextFactory<AppDbContext> _dbf;
@@ -24,21 +37,37 @@ public partial class EmployeesViewModel : ObservableObject
 
     public Helpers.RangeObservableCollection<Employee> Employees { get; } = new();
     public Helpers.RangeObservableCollection<EmployeeGroup> Groups { get; } = new();
+    public Helpers.RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
+    public Helpers.RangeObservableCollection<GroupSummaryVm> GroupSummaries { get; } = new();
     public Helpers.RangeObservableCollection<GroupEmployeeAssignmentVm> GroupAssignmentRows { get; } = new();
+    public EmployeeStatusFilter[] StatusFilters { get; } =
+        [EmployeeStatusFilter.Active, EmployeeStatusFilter.Inactive, EmployeeStatusFilter.All];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EmployeeListTitle))]
     private bool showInactive;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EmployeeListTitle))]
+    private EmployeeStatusFilter selectedStatusFilter = EmployeeStatusFilter.Active;
     [ObservableProperty] private string searchText = string.Empty;
+    [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
     [ObservableProperty] private Employee? selected;
     [ObservableProperty] private EmployeeGroup? selectedGroup;
     [ObservableProperty] private string newGroupName = string.Empty;
     [ObservableProperty] private string selectedGroupName = string.Empty;
     private int _loadVersion;
     private int _groupAssignmentLoadVersion;
+    private bool _updatingGroupFilter;
+
+    public event EventHandler<EmployeeDeletedEventArgs>? EmployeePermanentlyDeleted;
 
     public Window? OwnerWindow { get; set; }
-    public string EmployeeListTitle => ShowInactive ? "Inactive employees" : "Active employees";
+    public string EmployeeListTitle => SelectedStatusFilter switch
+    {
+        EmployeeStatusFilter.Inactive => "Inactive employees",
+        EmployeeStatusFilter.All => "All employees",
+        _ => "Active employees"
+    };
 
     public EmployeesViewModel(IDbContextFactory<AppDbContext> dbf,
                               DatabaseInitializer dbInit,
@@ -52,8 +81,18 @@ public partial class EmployeesViewModel : ObservableObject
         LoadCommand.Execute(null);
     }
 
-    partial void OnShowInactiveChanged(bool value) => LoadCommand.Execute(null);
+    partial void OnShowInactiveChanged(bool value) =>
+        SelectedStatusFilter = value ? EmployeeStatusFilter.Inactive : EmployeeStatusFilter.Active;
+    partial void OnSelectedStatusFilterChanged(EmployeeStatusFilter value)
+    {
+        ShowInactive = value == EmployeeStatusFilter.Inactive;
+        LoadCommand.Execute(null);
+    }
     partial void OnSearchTextChanged(string value) => LoadCommand.Execute(null);
+    partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
+    {
+        if (!_updatingGroupFilter) LoadCommand.Execute(null);
+    }
     partial void OnSelectedGroupChanged(EmployeeGroup? value)
     {
         SelectedGroupName = value?.Name ?? string.Empty;
@@ -70,8 +109,18 @@ public partial class EmployeesViewModel : ObservableObject
 
             using var db = await _dbf.CreateDbContextAsync();
             IQueryable<Employee> query = db.Employees.AsNoTracking()
-                .Where(e => e.IsActive == !ShowInactive)
+                .Include(e => e.GroupMemberships)
+                    .ThenInclude(m => m.EmployeeGroup)
                 .OrderBy(e => e.Name);
+            query = SelectedStatusFilter switch
+            {
+                EmployeeStatusFilter.Inactive => query.Where(e => !e.IsActive),
+                EmployeeStatusFilter.All => query,
+                _ => query.Where(e => e.IsActive)
+            };
+            if (SelectedGroupFilter?.Id is int groupId)
+                query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
+
             var list = await query.ToListAsync();
             var search = SearchText.Trim();
             if (!string.IsNullOrWhiteSpace(search))
@@ -81,10 +130,31 @@ public partial class EmployeesViewModel : ObservableObject
                     .ToList();
             }
             var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+            var groupCounts = await db.EmployeeGroupMemberships.AsNoTracking()
+                .GroupBy(m => m.EmployeeGroupId)
+                .Select(g => new { GroupId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.GroupId, g => g.Count);
 
             if (version != _loadVersion) return;
+            var selectedFilterId = SelectedGroupFilter?.Id;
             Employees.ReplaceAll(list);
             Groups.ReplaceAll(groups);
+            GroupSummaries.ReplaceAll(groups.Select(g => new GroupSummaryVm(g.Name, groupCounts.GetValueOrDefault(g.Id))));
+
+            _updatingGroupFilter = true;
+            try
+            {
+                var filterOptions = new[] { new GroupFilterOptionVm(null, "All Groups") }
+                    .Concat(groups.Select(g => new GroupFilterOptionVm(g.Id, g.Name)))
+                    .ToList();
+                GroupFilterOptions.ReplaceAll(filterOptions);
+                SelectedGroupFilter = GroupFilterOptions.FirstOrDefault(g => g.Id == selectedFilterId) ?? GroupFilterOptions[0];
+            }
+            finally
+            {
+                _updatingGroupFilter = false;
+            }
+
             SelectedGroup = SelectedGroup is null
                 ? Groups.FirstOrDefault()
                 : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
@@ -335,6 +405,45 @@ public partial class EmployeesViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task DeleteEmployeeAsync(Employee? emp)
+    {
+        if (emp is null) return;
+
+        try
+        {
+            using var countDb = await _dbf.CreateDbContextAsync();
+            var impact = new EmployeeDeleteImpact(
+                await countDb.AttendanceRecords.AsNoTracking().CountAsync(a => a.EmployeeId == emp.Id),
+                await countDb.Advances.AsNoTracking().CountAsync(a => a.EmployeeId == emp.Id),
+                await countDb.SalaryRevisions.AsNoTracking().CountAsync(r => r.EmployeeId == emp.Id),
+                await countDb.EmployeeGroupMemberships.AsNoTracking().CountAsync(m => m.EmployeeId == emp.Id));
+
+            var message =
+                $"Permanently delete '{emp.Name}'?\n\n" +
+                "This cannot be undone. The employee and these related records will be deleted:\n\n" +
+                $"Attendance records: {impact.AttendanceRecords}\n" +
+                $"Advance entries: {impact.Advances}\n" +
+                $"Salary revisions: {impact.SalaryRevisions}\n" +
+                $"Group memberships: {impact.GroupMemberships}";
+
+            if (!_dialogs.ConfirmDestructive(message, "Permanently delete employee")) return;
+
+            using var db = await _dbf.CreateDbContextAsync();
+            var tracked = await db.Employees.FindAsync(emp.Id);
+            if (tracked is null) return;
+
+            db.Employees.Remove(tracked);
+            await db.SaveChangesAsync();
+            await LoadAsync();
+            EmployeePermanentlyDeleted?.Invoke(this, new EmployeeDeletedEventArgs(emp.Id));
+        }
+        catch (Exception ex)
+        {
+            _dialogs.Error(ex.Message);
+        }
+    }
+
+    [RelayCommand]
     private async Task CyclePaymentModeAsync(Employee? emp)
     {
         if (emp is null) return;
@@ -548,4 +657,10 @@ public partial class EmployeesViewModel : ObservableObject
 
     private static string FormatImportIssues(IReadOnlyList<ValidationIssue> issues)
         => ValidationResult.FromErrors(issues).ToDisplayString();
+
+    private sealed record EmployeeDeleteImpact(
+        int AttendanceRecords,
+        int Advances,
+        int SalaryRevisions,
+        int GroupMemberships);
 }

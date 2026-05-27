@@ -9,7 +9,7 @@
         Background="{StaticResource BackgroundBrush}">
 
     <Window.Resources>
-        <!-- Payment mode radio button styled as a segment pill -->
+        <!-- Payment mode radio button styled as a compact segment -->
         <Style x:Key="SegmentRadio" TargetType="RadioButton">
             <Setter Property="Padding" Value="16,0"/>
             <Setter Property="Height" Value="34"/>
@@ -20,7 +20,7 @@
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="bd"
                                 Background="#F1F5F9"
-                                CornerRadius="99"
+                                CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
                             <TextBlock x:Name="txt"
                                        Text="{TemplateBinding Content}"

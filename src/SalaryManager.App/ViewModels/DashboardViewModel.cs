@@ -26,8 +26,11 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty] private int activeEmployees;
     [ObservableProperty] private decimal grossPayroll;
     [ObservableProperty] private decimal outstandingAdvances;
+    [ObservableProperty] private int employeesWithPendingAdvances;
     [ObservableProperty] private int attendanceSavedThisMonth;
     [ObservableProperty] private int totalEmployees;
+    [ObservableProperty] private int salaryChangesCount;
+    [ObservableProperty] private decimal totalRevisionIncrease;
     [ObservableProperty] private string currentPeriod = DateTime.Now.ToString("MMMM yyyy");
     [ObservableProperty] private bool isLoading;
 
@@ -57,10 +60,20 @@ public partial class DashboardViewModel : ObservableObject
             TotalEmployees = await db.Employees.CountAsync();
             ActiveEmployees = await db.Employees.CountAsync(e => e.IsActive);
             GrossPayroll = await db.Employees.Where(e => e.IsActive).SumAsync(e => e.BaseSalary);
-            OutstandingAdvances = await db.Advances.AsNoTracking().SumOutstandingAsync();
+            var balancesByEmployee = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
+            OutstandingAdvances = balancesByEmployee.Values.Sum();
+            EmployeesWithPendingAdvances = balancesByEmployee.Count(kv => kv.Value != 0m);
 
             AttendanceSavedThisMonth = await db.AttendanceRecords.CountAsync(
                 a => a.Year == now.Year && a.Month == now.Month);
+
+            var currentMonthRevisions = await db.SalaryRevisions.AsNoTracking()
+                .Where(r => r.ChangedAt.Year == now.Year && r.ChangedAt.Month == now.Month)
+                .ToListAsync();
+            SalaryChangesCount = currentMonthRevisions.Count;
+            TotalRevisionIncrease = currentMonthRevisions
+                .Where(r => r.NewSalary > r.OldSalary)
+                .Sum(r => r.NewSalary - r.OldSalary);
 
             var recentAdv = await db.Advances.AsNoTracking()
                 .Include(a => a.Employee)

@@ -24,7 +24,9 @@ public class ExcelExportService
         template.AddVariable("Rows", rows);
         template.Generate();
 
-        ApplyMonthlySummaryTotals(template.Workbook.Worksheet(1), rows);
+        var ws = template.Workbook.Worksheet(1);
+        ApplyMonthlySummaryTotals(ws, rows);
+        ApplyMonthlySummaryLayout(ws);
         SaveReport(template, path);
         return path;
     }
@@ -66,7 +68,7 @@ public class ExcelExportService
             r++;
         }
 
-        ws.Columns().AdjustToContents();
+        ApplyIciciPaymentLayout(ws);
         EnsureDirectory(path);
         wb.SaveAs(path);
         return path;
@@ -86,6 +88,7 @@ public class ExcelExportService
         template.AddVariable("BalanceText", balance.ToString("N2", CultureInfo.CurrentCulture));
         template.AddVariable("Rows", data);
         template.Generate();
+        ApplyAdvanceLedgerLayout(template.Workbook.Worksheet("Advance Ledger"));
         SaveReport(template, path);
         return path;
     }
@@ -95,14 +98,13 @@ public class ExcelExportService
         using var template = new XLTemplate(ExcelReportTemplateFactory.CreateSalaryRevisionsTemplate());
         template.AddVariable("Rows", rows);
         template.Generate();
+        ApplySalaryRevisionsLayout(template.Workbook.Worksheet("Salary Revisions"));
         SaveReport(template, path);
         return path;
     }
 
     private static void SaveReport(XLTemplate template, string path)
     {
-        foreach (var ws in template.Workbook.Worksheets)
-            ws.Columns().AdjustToContents();
         EnsureDirectory(path);
         template.SaveAs(path);
     }
@@ -125,6 +127,24 @@ public class ExcelExportService
         ws.Cell(totalRow, 7).Value = rows.Sum(row => row.TdsDeduction);
         ws.Cell(totalRow, 8).Value = rows.Sum(row => row.AdvanceDeduction);
         ws.Cell(totalRow, 9).Value = rows.Sum(row => row.NetSalary);
+    }
+
+    private static void ApplyMonthlySummaryLayout(IXLWorksheet ws)
+        => SetColumnWidths(ws, 28, 14, 12, 14, 12, 12, 12, 18, 14);
+
+    private static void ApplyIciciPaymentLayout(IXLWorksheet ws)
+        => SetColumnWidths(ws, 22, 12, 18, 28, 20, 16, 14, 14, 20);
+
+    private static void ApplyAdvanceLedgerLayout(IXLWorksheet ws)
+        => SetColumnWidths(ws, 13, 12, 14, 32, 14);
+
+    private static void ApplySalaryRevisionsLayout(IXLWorksheet ws)
+        => SetColumnWidths(ws, 28, 14, 14, 14, 32);
+
+    private static void SetColumnWidths(IXLWorksheet ws, params double[] widths)
+    {
+        for (var i = 0; i < widths.Length; i++)
+            ws.Column(i + 1).Width = widths[i];
     }
 
     private sealed record AdvanceLedgerExportRow(

@@ -15,6 +15,19 @@ namespace SalaryManager.Tests;
 public class AsyncViewModelLoadTests
 {
     [Fact]
+    public async Task EmployeesConstructor_DoesNotStartLoadBeforeExplicitCommand()
+    {
+        using var factory = new SequencedDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        var dialogs = NewDialogService();
+
+        _ = new EmployeesViewModel(factory, initializer, dialogs, new ExcelImportService());
+        await Task.Delay(100);
+
+        Assert.Equal(0, factory.AsyncCreateCount);
+    }
+
+    [Fact]
     public async Task AttendanceLoad_StaleFailureIsIgnoredWhenNewerLoadCompletes()
     {
         using var factory = new SequencedDbContextFactory();
@@ -49,6 +62,7 @@ public class AsyncViewModelLoadTests
         var viewModel = new SalarySheetViewModel(
             factory,
             initializer,
+            new MonthlyPayrollService(factory),
             new PdfSlipService(),
             new ExcelExportService(),
             dialogs,
@@ -84,6 +98,9 @@ public class AsyncViewModelLoadTests
         private readonly Queue<Func<CancellationToken, Task<AppDbContext>>> _asyncContexts = new();
         private readonly SqliteConnection _connection;
         private readonly DbContextOptions<AppDbContext> _options;
+        private int _asyncCreateCount;
+
+        public int AsyncCreateCount => Volatile.Read(ref _asyncCreateCount);
 
         public SequencedDbContextFactory()
         {
@@ -105,6 +122,7 @@ public class AsyncViewModelLoadTests
 
         public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
         {
+            Interlocked.Increment(ref _asyncCreateCount);
             Func<CancellationToken, Task<AppDbContext>>? next = null;
             lock (_gate)
             {

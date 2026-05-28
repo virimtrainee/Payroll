@@ -41,6 +41,7 @@ public partial class App : Application
         sc.AddSingleton<PdfSlipService>();
         sc.AddSingleton<ExcelExportService>();
         sc.AddSingleton<ExcelImportService>();
+        sc.AddSingleton<MonthlyPayrollService>();
         sc.AddSingleton<DialogService>();
         sc.AddSingleton<BackupService>();
         sc.AddSingleton<AppSettingsService>();

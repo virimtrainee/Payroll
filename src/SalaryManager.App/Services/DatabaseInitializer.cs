@@ -22,6 +22,7 @@ public class DatabaseInitializer
                 PrepareRuntimeData();
                 using var db = factory.CreateDbContext();
                 db.Database.Migrate();
+                ApplyStartupPragmas(db);
                 _tcs.TrySetResult();
             }
             catch (Exception ex)
@@ -35,5 +36,14 @@ public class DatabaseInitializer
     {
         Directory.CreateDirectory(AppPaths.DataDirectory);
         Directory.CreateDirectory(AppPaths.SlipsDirectory);
+    }
+
+    private static void ApplyStartupPragmas(AppDbContext db)
+    {
+        if (!db.Database.IsSqlite())
+            return;
+
+        db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+        db.Database.ExecuteSqlRaw("PRAGMA synchronous=NORMAL;");
     }
 }

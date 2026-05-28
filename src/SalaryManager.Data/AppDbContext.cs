@@ -55,6 +55,7 @@ public class AppDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(a => new { a.EmployeeId, a.Year, a.Month }).IsUnique();
+            e.HasIndex(a => new { a.Year, a.Month, a.EmployeeId });
         });
 
         mb.Entity<Advance>(e =>
@@ -70,6 +71,8 @@ public class AppDbContext : DbContext
 
             e.HasIndex(a => new { a.EmployeeId, a.Date });
             e.HasIndex(a => new { a.EmployeeId, a.SourceKey }).IsUnique();
+            e.HasIndex(a => new { a.SourceKey, a.EntryType, a.EmployeeId });
+            e.HasIndex(a => new { a.Date, a.Id });
         });
 
         mb.Entity<SalaryRevision>(e =>
@@ -82,6 +85,7 @@ public class AppDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(r => new { r.EmployeeId, r.ChangedAt });
+            e.HasIndex(r => r.ChangedAt);
         });
 
         mb.Entity<EmployeeGroup>(e =>

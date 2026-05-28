@@ -23,6 +23,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly DatabaseInitializer _dbInit;
     private readonly BackupService _backup;
     private readonly DialogService _dialogs;
+    private readonly MonthlyPayrollService _monthlyPayroll;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAttendanceComplete))]
@@ -63,8 +64,6 @@ public partial class DashboardViewModel : ObservableObject
     public ObservableCollection<RecentAdvanceVm> RecentAdvances { get; } = new();
     public ObservableCollection<RevisionVm> RecentRevisions { get; } = new();
 
-    private static readonly string CashGroupNormalizedName = GroupNameNormalizer.Normalize("Cash");
-
     public bool IsAttendanceComplete => ActiveEmployees > 0 && AttendanceSavedThisMonth >= ActiveEmployees;
     public int AttendanceRemainingCount => Math.Max(0, ActiveEmployees - AttendanceSavedThisMonth);
     public string AttendanceStatusText => IsAttendanceComplete ? "Completed" : "Pending";
@@ -86,9 +85,10 @@ public partial class DashboardViewModel : ObservableObject
     public DashboardViewModel(IDbContextFactory<AppDbContext> dbf,
                               DatabaseInitializer dbInit,
                               BackupService backup,
-                              DialogService dialogs)
+                              DialogService dialogs,
+                              MonthlyPayrollService monthlyPayroll)
     {
-        _dbf = dbf; _dbInit = dbInit; _backup = backup; _dialogs = dialogs;
+        _dbf = dbf; _dbInit = dbInit; _backup = backup; _dialogs = dialogs; _monthlyPayroll = monthlyPayroll;
     }
 
     [RelayCommand]
@@ -99,21 +99,20 @@ public partial class DashboardViewModel : ObservableObject
         {
             await _dbInit.ReadyTask;
 
-            CurrentPeriod = DateTime.Now.ToString("MMMM yyyy");
-            using var db = await _dbf.CreateDbContextAsync();
             var now = DateTime.Now;
+            CurrentPeriod = now.ToString("MMMM yyyy");
+            var currentMonthStart = new DateTime(now.Year, now.Month, 1);
+            var nextMonthStart = currentMonthStart.AddMonths(1);
+            var payroll = await _monthlyPayroll.LoadAsync(new MonthlyPayrollRequest(now.Year, now.Month));
+            using var db = await _dbf.CreateDbContextAsync();
 
             TotalEmployees = await db.Employees.CountAsync();
-            var activeEmployees = await db.Employees.AsNoTracking()
-                .Include(e => e.GroupMemberships)
-                    .ThenInclude(m => m.EmployeeGroup)
-                .Where(e => e.IsActive)
-                .OrderBy(e => e.Name)
-                .ToListAsync();
-            var activeEmployeeIds = activeEmployees.Select(e => e.Id).ToList();
-            ActiveEmployees = activeEmployees.Count;
-            GrossPayroll = await CalculateGrossPayrollAsync(db, activeEmployees, now.Year, now.Month);
-            PayablePayroll = await CalculatePayablePayrollAsync(db, activeEmployees, now.Year, now.Month);
+            var activeEmployeeIds = payroll.Rows.Select(r => r.EmployeeId).ToList();
+            ActiveEmployees = payroll.Rows.Count;
+            GrossPayroll = payroll.Rows.Sum(r => Math.Max(0m, r.EffectiveBaseSalary));
+            PayablePayroll = payroll.Rows
+                .Where(r => r.EffectiveBaseSalary >= 0m && r.Breakdown is not null)
+                .Sum(r => Math.Max(0m, r.NetSalary));
             var balancesByEmployee = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
             OutstandingAdvances = balancesByEmployee.Values.Sum();
             EmployeesWithPendingAdvances = balancesByEmployee.Count(kv => kv.Value != 0m);
@@ -127,7 +126,7 @@ public partial class DashboardViewModel : ObservableObject
                 .CountAsync();
 
             var currentMonthRevisions = await db.SalaryRevisions.AsNoTracking()
-                .Where(r => r.ChangedAt.Year == now.Year && r.ChangedAt.Month == now.Month)
+                .Where(r => r.ChangedAt >= currentMonthStart && r.ChangedAt < nextMonthStart)
                 .ToListAsync();
             SalaryChangesCount = currentMonthRevisions.Count;
             TotalRevisionIncrease = currentMonthRevisions
@@ -189,90 +188,4 @@ public partial class DashboardViewModel : ObservableObject
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
-
-    private static async Task<decimal> CalculatePayablePayrollAsync(
-        AppDbContext db,
-        IReadOnlyList<Employee> activeEmployees,
-        int year,
-        int month)
-    {
-        if (activeEmployees.Count == 0)
-            return 0m;
-
-        var employeeIds = activeEmployees.Select(e => e.Id).ToList();
-        var sourceKey = AdvanceSourceKeys.Salary(year, month);
-        var attendance = await db.AttendanceRecords.AsNoTracking()
-            .Where(a => employeeIds.Contains(a.EmployeeId)
-                     && a.Year == year
-                     && a.Month == month)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a);
-        var advanceDeductions = await db.Advances.AsNoTracking()
-            .Where(a => employeeIds.Contains(a.EmployeeId)
-                     && a.SourceKey == sourceKey
-                     && a.EntryType == AdvanceEntryType.Deducted)
-            .GroupBy(a => a.EmployeeId)
-            .Select(g => new { EmployeeId = g.Key, Amount = g.Sum(a => a.Amount) })
-            .ToDictionaryAsync(x => x.EmployeeId, x => x.Amount);
-
-        decimal total = 0m;
-        foreach (var employee in activeEmployees)
-        {
-            attendance.TryGetValue(employee.Id, out var record);
-            var effectiveBaseSalary = EffectiveBaseSalary(employee, record);
-            if (effectiveBaseSalary < 0m)
-                continue;
-
-            var daysAbsent = record?.DaysAbsent ?? 0;
-            var esic = UsesEsicPf(employee, effectiveBaseSalary) ? record?.EsicDeduction ?? 0m : 0m;
-            var pf = UsesEsicPf(employee, effectiveBaseSalary) ? record?.PfDeduction ?? 0m : 0m;
-            var tds = UsesTds(employee, effectiveBaseSalary) ? record?.TdsDeduction ?? 0m : 0m;
-            var advanceDeduction = advanceDeductions.GetValueOrDefault(employee.Id, 0m);
-            var breakdown = SalaryCalculator.Compute(effectiveBaseSalary, year, month, daysAbsent, esic, pf, tds);
-            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(record);
-            total += Math.Max(0m, historicalNetOverride ?? breakdown.NetSalary - advanceDeduction);
-        }
-
-        return total;
-    }
-
-    private static async Task<decimal> CalculateGrossPayrollAsync(
-        AppDbContext db,
-        IReadOnlyList<Employee> activeEmployees,
-        int year,
-        int month)
-    {
-        if (activeEmployees.Count == 0)
-            return 0m;
-
-        var employeeIds = activeEmployees.Select(e => e.Id).ToList();
-        var attendance = await db.AttendanceRecords.AsNoTracking()
-            .Where(a => employeeIds.Contains(a.EmployeeId)
-                     && a.Year == year
-                     && a.Month == month)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a);
-
-        return activeEmployees.Sum(employee =>
-        {
-            attendance.TryGetValue(employee.Id, out var record);
-            return Math.Max(0m, EffectiveBaseSalary(employee, record));
-        });
-    }
-
-    private static decimal EffectiveBaseSalary(Employee employee, AttendanceRecord? attendance)
-        => attendance?.BaseSalaryOverride ?? employee.BaseSalary;
-
-    private static decimal? EffectiveHistoricalNetSalaryOverride(AttendanceRecord? attendance)
-        => attendance?.BaseSalaryOverride is null ? attendance?.NetSalaryOverride : null;
-
-    private static bool UsesEsicPf(Employee employee, decimal baseSalary)
-        => !HasCashDeductionsDisabled(employee) && baseSalary <= 25000m;
-
-    private static bool UsesTds(Employee employee, decimal baseSalary)
-        => !HasCashDeductionsDisabled(employee) && baseSalary > 25000m;
-
-    private static bool HasCashDeductionsDisabled(Employee employee)
-        => employee.PaymentMode == PaymentMode.Cash
-        || employee.GroupMemberships.Any(m =>
-            m.EmployeeGroup is not null
-            && GroupNameNormalizer.Normalize(m.EmployeeGroup.Name) == CashGroupNormalizedName);
 }

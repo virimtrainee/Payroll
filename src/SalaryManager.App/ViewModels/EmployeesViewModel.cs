@@ -62,6 +62,7 @@ public partial class EmployeesViewModel : ObservableObject
     private bool _updatingGroupFilter;
 
     public event EventHandler<EmployeeDeletedEventArgs>? EmployeePermanentlyDeleted;
+    public event EventHandler? EmployeeDataChanged;
 
     public Window? OwnerWindow { get; set; }
     public bool HasSelectedGroup => SelectedGroup is not null;
@@ -81,7 +82,6 @@ public partial class EmployeesViewModel : ObservableObject
         _dbInit = dbInit;
         _dialogs = dialogs;
         _importer = importer;
-        LoadCommand.Execute(null);
     }
 
     partial void OnShowInactiveChanged(bool value) =>
@@ -176,7 +176,7 @@ public partial class EmployeesViewModel : ObservableObject
         var path = _dialogs.AskOpenPath("Excel Workbook (*.xlsx)|*.xlsx");
         if (path is null) return;
 
-        var import = _importer.ReadEmployees(path);
+        var import = await Task.Run(() => _importer.ReadEmployees(path));
         if (import.Error is not null) { await _dialogs.ErrorAsync(import.Error); return; }
         if (import.Issues.Count > 0)
         {
@@ -221,6 +221,7 @@ public partial class EmployeesViewModel : ObservableObject
 
             if (added > 0) await db.SaveChangesAsync();
             await LoadAsync();
+            if (added > 0) NotifyEmployeeDataChanged();
 
             var msg = $"Imported {added} employee{(added == 1 ? "" : "s")}.";
             if (skippedExisting > 0) msg += $" {skippedExisting} skipped (name already exists).";
@@ -260,6 +261,7 @@ public partial class EmployeesViewModel : ObservableObject
             await SaveMembershipsAsync(db, employee.Id, vm.Groups.Where(g => g.IsSelected).Select(g => g.Id));
             await db.SaveChangesAsync();
             await LoadAsync();
+            NotifyEmployeeDataChanged();
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
@@ -318,6 +320,7 @@ public partial class EmployeesViewModel : ObservableObject
         await SaveMembershipsAsync(db, tracked.Id, vm.Groups.Where(g => g.IsSelected).Select(g => g.Id));
         await db.SaveChangesAsync();
         await LoadAsync();
+        NotifyEmployeeDataChanged();
     }
 
     [RelayCommand]
@@ -383,6 +386,7 @@ public partial class EmployeesViewModel : ObservableObject
         await db.SaveChangesAsync();
         await _dialogs.InfoAsync("Saved.");
         await LoadAsync();
+        NotifyEmployeeDataChanged();
     }
 
     [RelayCommand]
@@ -395,6 +399,7 @@ public partial class EmployeesViewModel : ObservableObject
         tracked.IsActive = !tracked.IsActive;
         await db.SaveChangesAsync();
         await LoadAsync();
+        NotifyEmployeeDataChanged();
     }
 
     [RelayCommand]
@@ -428,6 +433,7 @@ public partial class EmployeesViewModel : ObservableObject
             db.Employees.Remove(tracked);
             await db.SaveChangesAsync();
             await LoadAsync();
+            NotifyEmployeeDataChanged();
             EmployeePermanentlyDeleted?.Invoke(this, new EmployeeDeletedEventArgs(emp.Id));
         }
         catch (Exception ex)
@@ -451,6 +457,7 @@ public partial class EmployeesViewModel : ObservableObject
         };
         await db.SaveChangesAsync();
         await LoadAsync();
+        NotifyEmployeeDataChanged();
     }
 
     [RelayCommand]
@@ -467,6 +474,7 @@ public partial class EmployeesViewModel : ObservableObject
             NewGroupName = string.Empty;
             await LoadAsync();
             SelectedGroup = Groups.FirstOrDefault(g => GroupNameNormalizer.Normalize(g.Name) == GroupNameNormalizer.Normalize(name));
+            NotifyEmployeeDataChanged();
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
@@ -486,6 +494,7 @@ public partial class EmployeesViewModel : ObservableObject
             group.Name = name;
             await db.SaveChangesAsync();
             await LoadAsync();
+            NotifyEmployeeDataChanged();
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
@@ -504,6 +513,7 @@ public partial class EmployeesViewModel : ObservableObject
             db.EmployeeGroups.Remove(group);
             await db.SaveChangesAsync();
             await LoadAsync();
+            NotifyEmployeeDataChanged();
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
@@ -540,6 +550,7 @@ public partial class EmployeesViewModel : ObservableObject
             await db.SaveChangesAsync();
             await _dialogs.InfoAsync("Group assignments saved.");
             await LoadAsync();
+            NotifyEmployeeDataChanged();
         }
         catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
     }
@@ -650,6 +661,9 @@ public partial class EmployeesViewModel : ObservableObject
 
     private static string FormatImportIssues(IReadOnlyList<ValidationIssue> issues)
         => ValidationResult.FromErrors(issues).ToDisplayString();
+
+    private void NotifyEmployeeDataChanged()
+        => EmployeeDataChanged?.Invoke(this, EventArgs.Empty);
 
     private sealed record EmployeeDeleteImpact(
         int AttendanceRecords,

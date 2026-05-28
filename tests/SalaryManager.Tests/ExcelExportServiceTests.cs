@@ -33,6 +33,8 @@ public class ExcelExportServiceTests
             Assert.Equal(30000m, ws.Cell(6, 2).GetValue<decimal>());
             Assert.Equal(500m, ws.Cell(6, 4).GetValue<decimal>());
             Assert.Equal(29280m, ws.Cell(6, 9).GetValue<decimal>());
+            Assert.Equal(28d, ws.Column(1).Width, 2);
+            Assert.Equal(18d, ws.Column(8).Width, 2);
         }
         finally
         {
@@ -63,6 +65,8 @@ public class ExcelExportServiceTests
             Assert.Equal("FT", ws.Cell(2, 2).GetString());
             Assert.Equal("NEFT", ws.Cell(3, 2).GetString());
             Assert.Equal(1234.5m, ws.Cell(2, 7).GetValue<decimal>());
+            Assert.Equal(22d, ws.Column(1).Width, 2);
+            Assert.Equal(28d, ws.Column(4).Width, 2);
         }
         finally
         {
@@ -106,6 +110,7 @@ public class ExcelExportServiceTests
             Assert.Equal(1000m, ws.Cell(5, 3).GetValue<decimal>());
             Assert.Equal("Deducted", ws.Cell(6, 2).GetString());
             Assert.Equal(750m, ws.Cell(6, 5).GetValue<decimal>());
+            Assert.Equal(32d, ws.Column(4).Width, 2);
         }
         finally
         {
@@ -135,6 +140,7 @@ public class ExcelExportServiceTests
             Assert.Equal(12000m, ws.Cell(4, 3).GetValue<decimal>());
             Assert.Equal(new DateTime(2026, 5, 20), ws.Cell(4, 4).GetValue<DateTime>());
             Assert.Equal("Annual", ws.Cell(4, 5).GetString());
+            Assert.Equal(32d, ws.Column(5).Width, 2);
         }
         finally
         {

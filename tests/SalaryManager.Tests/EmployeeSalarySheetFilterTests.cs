@@ -384,6 +384,88 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public async Task SalarySheetLoad_JoiningMonthWithoutAttendanceAppliesProRata()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee
+            {
+                Id = 1,
+                Name = "A",
+                BaseSalary = 10000m,
+                JoiningDate = new DateTime(2026, 5, 10),
+                IsActive = true
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(9, row.ProRataDays);
+        Assert.Equal(9, row.DaysAbsent);
+    }
+
+    [Fact]
+    public async Task SalarySheetLoad_ExistingJoiningMonthAttendanceSuppressesProRata()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee
+            {
+                Id = 1,
+                Name = "A",
+                BaseSalary = 10000m,
+                JoiningDate = new DateTime(2026, 5, 10),
+                IsActive = true
+            });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                DaysAbsent = 0
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(0, row.ProRataDays);
+        Assert.Equal(0, row.DaysAbsent);
+    }
+
+    [Fact]
+    public async Task SalarySheetLoad_BaseOverrideEqualToEmployeeSalaryStillShowsEnabled()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                BaseSalaryOverride = 10000m
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.True(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(10000m, row.BaseSalaryOverride);
+    }
+
+    [Fact]
     public async Task AttendanceSave_PreservesBaseOverrideAndUsesEffectiveSalaryForDeductions()
     {
         using var factory = new SqliteDbContextFactory();
@@ -463,11 +545,60 @@ public class EmployeeSalarySheetFilterTests
                 new AttendanceRecord { EmployeeId = 2, Year = now.Year, Month = now.Month, BaseSalaryOverride = 20000m });
         });
 
-        var viewModel = new DashboardViewModel(factory, initializer, new BackupService(), NewDialogService());
+        var viewModel = NewDashboardViewModel(factory, initializer);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         Assert.Equal(30000m, viewModel.GrossPayroll);
         Assert.Equal(27777m, viewModel.PayablePayroll);
+    }
+
+    [Fact]
+    public async Task DashboardSalaryChanges_UsesCurrentMonthDateRange()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        var now = DateTime.Now;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var nextMonthStart = monthStart.AddMonths(1);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.SalaryRevisions.AddRange(
+                new SalaryRevision
+                {
+                    EmployeeId = 1,
+                    OldSalary = 10000m,
+                    NewSalary = 11000m,
+                    ChangedAt = monthStart.AddSeconds(-1)
+                },
+                new SalaryRevision
+                {
+                    EmployeeId = 1,
+                    OldSalary = 10000m,
+                    NewSalary = 11200m,
+                    ChangedAt = monthStart
+                },
+                new SalaryRevision
+                {
+                    EmployeeId = 1,
+                    OldSalary = 10000m,
+                    NewSalary = 11500m,
+                    ChangedAt = nextMonthStart.AddSeconds(-1)
+                },
+                new SalaryRevision
+                {
+                    EmployeeId = 1,
+                    OldSalary = 10000m,
+                    NewSalary = 12000m,
+                    ChangedAt = nextMonthStart
+                });
+        });
+
+        var viewModel = NewDashboardViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, viewModel.SalaryChangesCount);
+        Assert.Equal(2700m, viewModel.TotalRevisionIncrease);
     }
 
     [Fact]
@@ -558,11 +689,16 @@ public class EmployeeSalarySheetFilterTests
     private static ReportsViewModel NewReportsViewModel(
         IDbContextFactory<AppDbContext> factory,
         DatabaseInitializer initializer)
-        => new(factory, initializer, new PdfSlipService(), new ExcelExportService(), NewDialogService(), new AppSettingsService())
+        => new(factory, initializer, new PdfSlipService(), new ExcelExportService(), new MonthlyPayrollService(factory), NewDialogService(), new AppSettingsService())
         {
             SelectedYear = 2026,
             SelectedMonth = SalaryManager.App.Helpers.Months.All.Single(m => m.Number == 5)
         };
+
+    private static DashboardViewModel NewDashboardViewModel(
+        IDbContextFactory<AppDbContext> factory,
+        DatabaseInitializer initializer)
+        => new(factory, initializer, new BackupService(), NewDialogService(), new MonthlyPayrollService(factory));
 
     private static SalarySheetViewModel NewSalarySheetViewModel(
         IDbContextFactory<AppDbContext> factory,
@@ -572,6 +708,7 @@ public class EmployeeSalarySheetFilterTests
         var viewModel = new SalarySheetViewModel(
             factory,
             initializer,
+            new MonthlyPayrollService(factory),
             new PdfSlipService(),
             new ExcelExportService(),
             dialogs ?? NewDialogService(),

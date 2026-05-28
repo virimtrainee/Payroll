@@ -26,6 +26,7 @@ public partial class ReportsViewModel : ObservableObject
     private readonly DatabaseInitializer _dbInit;
     private readonly PdfSlipService _pdf;
     private readonly ExcelExportService _excel;
+    private readonly MonthlyPayrollService _monthlyPayroll;
     private readonly DialogService _dialogs;
     private readonly AppSettingsService _settings;
 
@@ -59,10 +60,11 @@ public partial class ReportsViewModel : ObservableObject
                             DatabaseInitializer dbInit,
                             PdfSlipService pdf,
                             ExcelExportService excel,
+                            MonthlyPayrollService monthlyPayroll,
                             DialogService dialogs,
                             AppSettingsService settings)
     {
-        _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _dialogs = dialogs; _settings = settings;
+        _dbf = dbf; _dbInit = dbInit; _pdf = pdf; _excel = excel; _monthlyPayroll = monthlyPayroll; _dialogs = dialogs; _settings = settings;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -128,17 +130,14 @@ public partial class ReportsViewModel : ObservableObject
         var version = Interlocked.Increment(ref _kpiLoadVersion);
         try
         {
-            var rows = await BuildSummaryRowsAsync();
+            var snapshot = await LoadCurrentPayrollSnapshotAsync();
+            var rows = BuildValidatedSummaryRows(snapshot);
             var gross = rows.Sum(r => r.BaseSalary);
             var net = rows.Sum(r => r.NetSalary);
             var ded = gross - net;
+            var active = snapshot.Rows.Count;
 
             using var db = await _dbf.CreateDbContextAsync();
-            var activeQuery = db.Employees.Where(e => e.IsActive);
-            if (SelectedGroupFilter?.Id is int groupId)
-                activeQuery = activeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
-            var active = await activeQuery.CountAsync();
-
             var advanceQuery = db.Advances.AsNoTracking();
             var revisionQuery = db.SalaryRevisions.AsNoTracking();
             if (SelectedGroupFilter?.Id is int filterGroupId)
@@ -345,159 +344,67 @@ public partial class ReportsViewModel : ObservableObject
 
     private async Task<List<MonthlySummaryRow>> BuildSummaryRowsAsync()
     {
-        using var db = await _dbf.CreateDbContextAsync();
-        var employeeQuery = db.Employees.AsNoTracking()
-            .Include(e => e.GroupMemberships)
-                .ThenInclude(m => m.EmployeeGroup)
-            .Where(e => e.IsActive);
-        if (SelectedGroupFilter?.Id is int groupId)
-            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
-
-        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
-        var ids = employees.Select(e => e.Id).ToList();
-        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
-        var attendance = await db.AttendanceRecords.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId) && a.Year == SelectedYear && a.Month == SelectedMonth.Number)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a);
-
-        var advanceDeductions = await db.Advances.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId)
-                     && a.SourceKey == sourceKey
-                     && a.EntryType == AdvanceEntryType.Deducted)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
-
-        var balances = await db.Advances.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId))
-            .SumBalancesByEmployeeAsync();
-
-        var list = new List<MonthlySummaryRow>(employees.Count);
-        var issues = new List<ValidationIssue>();
-        foreach (var e in employees)
-        {
-            var rec = attendance.GetValueOrDefault(e.Id);
-            var effectiveBaseSalary = EffectiveBaseSalary(e, rec);
-            var absent = rec?.DaysAbsent ?? 0;
-            var esic = UsesEsicPf(e, effectiveBaseSalary) ? rec?.EsicDeduction ?? 0m : 0m;
-            var pf = UsesEsicPf(e, effectiveBaseSalary) ? rec?.PfDeduction ?? 0m : 0m;
-            var tds = UsesTds(e, effectiveBaseSalary) ? rec?.TdsDeduction ?? 0m : 0m;
-            var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
-            var validation = PayrollValidator.Validate(new PayrollValidationInput(
-                e.Name,
-                effectiveBaseSalary,
-                SelectedYear,
-                SelectedMonth.Number,
-                absent,
-                esic,
-                pf,
-                tds,
-                advanceDeduction,
-                balances.GetValueOrDefault(e.Id, 0m),
-                advanceDeduction));
-            issues.AddRange(validation.Issues);
-            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(rec);
-            if (historicalNetOverride < 0)
-                issues.Add(new ValidationIssue(e.Name, "Net salary override cannot be negative.", "net_override_negative"));
-            if (validation.Issues.Count > 0 || historicalNetOverride < 0)
-                continue;
-
-            var b = SalaryCalculator.Compute(effectiveBaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
-            var finalNetSalary = historicalNetOverride ?? b.NetSalary - advanceDeduction;
-            list.Add(new MonthlySummaryRow(e.Name, effectiveBaseSalary, absent, b.Deduction,
-                b.EsicDeduction, b.PfDeduction, b.TdsDeduction, advanceDeduction,
-                finalNetSalary));
-        }
-
-        if (issues.Count > 0)
-            throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
-
-        return list;
+        var snapshot = await LoadCurrentPayrollSnapshotAsync();
+        return BuildValidatedSummaryRows(snapshot);
     }
 
     private async Task<List<IciciPaymentRow>> BuildIciciRowsAsync()
     {
-        using var db = await _dbf.CreateDbContextAsync();
-        var employeeQuery = db.Employees.AsNoTracking()
-            .Include(e => e.GroupMemberships)
-                .ThenInclude(m => m.EmployeeGroup)
-            .Where(e => e.IsActive && e.PaymentMode != PaymentMode.Cash);
-        if (SelectedGroupFilter?.Id is int groupId)
-            employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
-
-        var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
-        var ids = employees.Select(e => e.Id).ToList();
-        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
-
-        var attendance = await db.AttendanceRecords.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId) && a.Year == SelectedYear && a.Month == SelectedMonth.Number)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a);
-
-        var advanceDeductions = await db.Advances.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId)
-                     && a.SourceKey == sourceKey
-                     && a.EntryType == AdvanceEntryType.Deducted)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount);
-
-        var balances = await db.Advances.AsNoTracking()
-            .Where(a => ids.Contains(a.EmployeeId))
-            .SumBalancesByEmployeeAsync();
-
+        var snapshot = await LoadCurrentPayrollSnapshotAsync();
+        var paymentRows = snapshot.Rows
+            .Where(r => r.PaymentMode != PaymentMode.Cash)
+            .ToList();
         var issues = new List<ValidationIssue>();
-        var rows = new List<IciciPaymentRow>(employees.Count);
-        foreach (var e in employees)
+        var rows = new List<IciciPaymentRow>(paymentRows.Count);
+        foreach (var row in paymentRows)
         {
-            var rec = attendance.GetValueOrDefault(e.Id);
-            var effectiveBaseSalary = EffectiveBaseSalary(e, rec);
-            var esic = UsesEsicPf(e, effectiveBaseSalary) ? rec?.EsicDeduction ?? 0m : 0m;
-            var pf = UsesEsicPf(e, effectiveBaseSalary) ? rec?.PfDeduction ?? 0m : 0m;
-            var tds = UsesTds(e, effectiveBaseSalary) ? rec?.TdsDeduction ?? 0m : 0m;
-            var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
-            var payrollValidation = PayrollValidator.Validate(new PayrollValidationInput(
-                e.Name,
-                effectiveBaseSalary,
-                SelectedYear,
-                SelectedMonth.Number,
-                rec?.DaysAbsent ?? 0,
-                esic,
-                pf,
-                tds,
-                advanceDeduction,
-                balances.GetValueOrDefault(e.Id, 0m),
-                advanceDeduction));
-            issues.AddRange(payrollValidation.Issues);
+            issues.AddRange(row.ValidationIssues);
 
             var employeeValidation = EmployeeValidator.Validate(new EmployeeValidationInput(
-                e.Name,
-                e.BaseSalary,
-                e.PaymentMode,
-                e.AccountNumber,
-                e.IfscCode,
-                e.JoiningDate));
-            issues.AddRange(employeeValidation.Issues.Select(i => i with { Field = $"{e.Name} - {i.Field}" }));
-            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(rec);
-            if (historicalNetOverride < 0)
-                issues.Add(new ValidationIssue(e.Name, "Net salary override cannot be negative.", "net_override_negative"));
-            if (payrollValidation.Issues.Count > 0 || historicalNetOverride < 0)
+                row.Name,
+                row.EmployeeBaseSalary,
+                row.PaymentMode,
+                row.AccountNumber,
+                row.IfscCode,
+                row.JoiningDate));
+            issues.AddRange(employeeValidation.Issues.Select(i => i with { Field = $"{row.Name} - {i.Field}" }));
+            if (row.ValidationIssues.Count > 0)
                 continue;
 
-            var b = SalaryCalculator.Compute(
-                effectiveBaseSalary,
-                SelectedYear,
-                SelectedMonth.Number,
-                rec?.DaysAbsent ?? 0,
-                esic,
-                pf,
-                tds);
-            var amount = historicalNetOverride ?? b.NetSalary - advanceDeduction;
+            var amount = row.NetSalary;
             if (amount <= 0)
-                issues.Add(new ValidationIssue(e.Name, "ICICI export amount must be greater than zero."));
+                issues.Add(new ValidationIssue(row.Name, "ICICI export amount must be greater than zero."));
 
-            rows.Add(new IciciPaymentRow(e.Name, e.AccountNumber, e.IfscCode, amount, e.PaymentMode));
+            rows.Add(new IciciPaymentRow(row.Name, row.AccountNumber, row.IfscCode, amount, row.PaymentMode));
         }
 
         if (issues.Count > 0)
             throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
 
         return rows;
+    }
+
+    private Task<MonthlyPayrollSnapshot> LoadCurrentPayrollSnapshotAsync()
+    {
+        IReadOnlyCollection<int>? groupIds = SelectedGroupFilter?.Id is int groupId
+            ? new[] { groupId }
+            : null;
+
+        return _monthlyPayroll.LoadAsync(new MonthlyPayrollRequest(
+            SelectedYear,
+            SelectedMonth.Number,
+            groupIds));
+    }
+
+    private static List<MonthlySummaryRow> BuildValidatedSummaryRows(MonthlyPayrollSnapshot snapshot)
+    {
+        var issues = snapshot.Rows.SelectMany(r => r.ValidationIssues).ToList();
+        if (issues.Count > 0)
+            throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
+
+        return snapshot.Rows
+            .Select(r => r.ToMonthlySummaryRow())
+            .ToList();
     }
 
     private async Task<(IReadOnlyList<LedgerRow> Rows, decimal Balance)> BuildLedgerAsync(int employeeId)

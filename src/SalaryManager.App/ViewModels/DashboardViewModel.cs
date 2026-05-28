@@ -112,7 +112,7 @@ public partial class DashboardViewModel : ObservableObject
                 .ToListAsync();
             var activeEmployeeIds = activeEmployees.Select(e => e.Id).ToList();
             ActiveEmployees = activeEmployees.Count;
-            GrossPayroll = activeEmployees.Sum(e => e.BaseSalary);
+            GrossPayroll = await CalculateGrossPayrollAsync(db, activeEmployees, now.Year, now.Month);
             PayablePayroll = await CalculatePayablePayrollAsync(db, activeEmployees, now.Year, now.Month);
             var balancesByEmployee = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
             OutstandingAdvances = balancesByEmployee.Values.Sum();
@@ -218,23 +218,57 @@ public partial class DashboardViewModel : ObservableObject
         foreach (var employee in activeEmployees)
         {
             attendance.TryGetValue(employee.Id, out var record);
+            var effectiveBaseSalary = EffectiveBaseSalary(employee, record);
+            if (effectiveBaseSalary < 0m)
+                continue;
+
             var daysAbsent = record?.DaysAbsent ?? 0;
-            var esic = UsesEsicPf(employee) ? record?.EsicDeduction ?? 0m : 0m;
-            var pf = UsesEsicPf(employee) ? record?.PfDeduction ?? 0m : 0m;
-            var tds = UsesTds(employee) ? record?.TdsDeduction ?? 0m : 0m;
+            var esic = UsesEsicPf(employee, effectiveBaseSalary) ? record?.EsicDeduction ?? 0m : 0m;
+            var pf = UsesEsicPf(employee, effectiveBaseSalary) ? record?.PfDeduction ?? 0m : 0m;
+            var tds = UsesTds(employee, effectiveBaseSalary) ? record?.TdsDeduction ?? 0m : 0m;
             var advanceDeduction = advanceDeductions.GetValueOrDefault(employee.Id, 0m);
-            var breakdown = SalaryCalculator.Compute(employee.BaseSalary, year, month, daysAbsent, esic, pf, tds);
-            total += Math.Max(0m, record?.NetSalaryOverride ?? breakdown.NetSalary - advanceDeduction);
+            var breakdown = SalaryCalculator.Compute(effectiveBaseSalary, year, month, daysAbsent, esic, pf, tds);
+            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(record);
+            total += Math.Max(0m, historicalNetOverride ?? breakdown.NetSalary - advanceDeduction);
         }
 
         return total;
     }
 
-    private static bool UsesEsicPf(Employee employee)
-        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary <= 25000m;
+    private static async Task<decimal> CalculateGrossPayrollAsync(
+        AppDbContext db,
+        IReadOnlyList<Employee> activeEmployees,
+        int year,
+        int month)
+    {
+        if (activeEmployees.Count == 0)
+            return 0m;
 
-    private static bool UsesTds(Employee employee)
-        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary > 25000m;
+        var employeeIds = activeEmployees.Select(e => e.Id).ToList();
+        var attendance = await db.AttendanceRecords.AsNoTracking()
+            .Where(a => employeeIds.Contains(a.EmployeeId)
+                     && a.Year == year
+                     && a.Month == month)
+            .ToDictionaryAsync(a => a.EmployeeId, a => a);
+
+        return activeEmployees.Sum(employee =>
+        {
+            attendance.TryGetValue(employee.Id, out var record);
+            return Math.Max(0m, EffectiveBaseSalary(employee, record));
+        });
+    }
+
+    private static decimal EffectiveBaseSalary(Employee employee, AttendanceRecord? attendance)
+        => attendance?.BaseSalaryOverride ?? employee.BaseSalary;
+
+    private static decimal? EffectiveHistoricalNetSalaryOverride(AttendanceRecord? attendance)
+        => attendance?.BaseSalaryOverride is null ? attendance?.NetSalaryOverride : null;
+
+    private static bool UsesEsicPf(Employee employee, decimal baseSalary)
+        => !HasCashDeductionsDisabled(employee) && baseSalary <= 25000m;
+
+    private static bool UsesTds(Employee employee, decimal baseSalary)
+        => !HasCashDeductionsDisabled(employee) && baseSalary > 25000m;
 
     private static bool HasCashDeductionsDisabled(Employee employee)
         => employee.PaymentMode == PaymentMode.Cash

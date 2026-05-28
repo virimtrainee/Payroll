@@ -340,19 +340,29 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="96"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}"
                                                        FontWeight="SemiBold"
                                                        Style="{StaticResource LeftCellText}"
                                                        VerticalAlignment="Center"/>
                                             <CheckBox Grid.Column="1"
-                                                      Content="OD"
-                                                      IsChecked="{Binding IsNetSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Content="Override"
+                                                      IsChecked="{Binding IsBaseSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                       IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                       Foreground="{StaticResource MutedTextBrush}"
                                                       FontSize="12"
                                                       VerticalAlignment="Center"
-                                                      Margin="10,0,0,0"/>
+                                                      Margin="10,0,6,0"/>
+                                            <TextBox Grid.Column="2"
+                                                     Text="{Binding BaseSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                                     IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                     ToolTip="{Binding BaseSalaryOverrideValidationMessage}"
+                                                     TextAlignment="Right"
+                                                     VerticalContentAlignment="Center"
+                                                     Height="28"
+                                                     Padding="6,0"
+                                                     Visibility="{Binding IsBaseSalaryOverrideEnabled, Converter={StaticResource BoolToVis}}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -410,7 +420,7 @@
 
                             <DataGridTextColumn Header="Base (₹)"
                                                 helpers:DataGridColumnKey.Key="baseSalary"
-                                                Binding="{Binding BaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                Binding="{Binding EffectiveBaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                 IsReadOnly="True"
                                                 HeaderStyle="{StaticResource SalaryHeaderRight}"
                                                 Width="110"
@@ -556,8 +566,9 @@
 
                             <DataGridTemplateColumn Header="Net" helpers:DataGridColumnKey.Key="netSalary" Width="106"
                                                     MinWidth="100"
+                                                    IsReadOnly="True"
                                                     HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
+                                                    CellStyle="{StaticResource SalaryReadOnlyCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding NetSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
@@ -566,16 +577,6 @@
                                                    Foreground="{StaticResource PrimaryBrush}"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding NetSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding IsNetSalaryOverrideEnabled}"
-                                                 TextAlignment="Right"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="8,0"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
 
                         </DataGrid.Columns>

@@ -26,11 +26,17 @@ public partial class SalaryRowVm : ObservableObject
     public string Name { get; init; } = string.Empty;
     public string GroupDisplayName { get; init; } = string.Empty;
     public int ProRataDays { get; init; }
-    public decimal BaseSalary { get; init; }
+    public decimal EmployeeBaseSalary { get; init; }
+    public decimal BaseSalary => EffectiveBaseSalary;
+    public decimal EffectiveBaseSalary
+        => IsBaseSalaryOverrideEnabled && BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
+            ? overrideSalary
+            : EmployeeBaseSalary;
     public int Year { get; init; }
     public int Month { get; init; }
     public decimal AdvanceBalance { get; init; }
     public decimal ExistingSalaryAdvanceDeduction { get; init; }
+    public decimal? HistoricalNetSalaryOverride { get; init; }
     public string? AccountNumber { get; init; }
     public string? IfscCode { get; init; }
     public PaymentMode PaymentMode { get; init; }
@@ -41,9 +47,19 @@ public partial class SalaryRowVm : ObservableObject
         _ => "Other"
     };
     public bool IsCashDeductionsDisabled { get; init; }
-    public bool UsesTds => !IsCashDeductionsDisabled && BaseSalary > 25000m;
+    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveBaseSalary > 25000m;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
-    public decimal TotalDeductions => Math.Max(0, BaseSalary - NetSalary);
+    public decimal TotalDeductions => Math.Max(0, EffectiveBaseSalary - NetSalary);
+    public bool HasInvalidBaseSalaryOverride => IsBaseSalaryOverrideEnabled
+        && (!BaseSalaryOverride.HasValue || BaseSalaryOverride.Value < 0m);
+    public string BaseSalaryOverrideValidationMessage
+        => !IsBaseSalaryOverrideEnabled
+            ? string.Empty
+            : !BaseSalaryOverride.HasValue
+                ? "Override base salary is required."
+                : BaseSalaryOverride.Value < 0m
+                    ? "Override base salary cannot be negative."
+                    : string.Empty;
 
     // Editable attendance fields — trigger recalculation on change
     [ObservableProperty] private int daysAbsent;
@@ -51,8 +67,8 @@ public partial class SalaryRowVm : ObservableObject
     [ObservableProperty] private decimal pfDeduction;
     [ObservableProperty] private decimal tdsDeduction;
     [ObservableProperty] private decimal advanceDeductionEntry;
-    [ObservableProperty] private bool isNetSalaryOverrideEnabled;
-    [ObservableProperty] private decimal netSalaryOverride;
+    [ObservableProperty] private bool isBaseSalaryOverrideEnabled;
+    [ObservableProperty] private decimal? baseSalaryOverride;
 
     // Computed display fields — updated by Recalculate()
     [ObservableProperty] private decimal perDay;
@@ -60,46 +76,73 @@ public partial class SalaryRowVm : ObservableObject
     [ObservableProperty] private decimal calculatedNetSalary;
     [ObservableProperty] private decimal netSalary;
 
-    private bool _isRecalculating;
-
     partial void OnDaysAbsentChanged(int value) => Recalculate();
     partial void OnEsicDeductionChanged(decimal value) => Recalculate();
     partial void OnPfDeductionChanged(decimal value) => Recalculate();
     partial void OnTdsDeductionChanged(decimal value) => Recalculate();
     partial void OnAdvanceDeductionEntryChanged(decimal value) => Recalculate();
-    partial void OnIsNetSalaryOverrideEnabledChanged(bool value) => Recalculate();
-    partial void OnNetSalaryOverrideChanged(decimal value)
+    partial void OnIsBaseSalaryOverrideEnabledChanged(bool value)
     {
-        if (!_isRecalculating)
-            Recalculate();
+        if (value && !BaseSalaryOverride.HasValue)
+            BaseSalaryOverride = EmployeeBaseSalary;
+        if (!value)
+            BaseSalaryOverride = null;
+
+        OnSalaryBasisChanged();
+    }
+
+    partial void OnBaseSalaryOverrideChanged(decimal? value) => OnSalaryBasisChanged();
+
+    private void OnSalaryBasisChanged()
+    {
+        if (!HasInvalidBaseSalaryOverride)
+            ClearInapplicableDeductions();
+
+        OnPropertyChanged(nameof(EffectiveBaseSalary));
+        OnPropertyChanged(nameof(BaseSalary));
+        OnPropertyChanged(nameof(UsesTds));
+        OnPropertyChanged(nameof(UsesEsicPf));
+        OnPropertyChanged(nameof(TotalDeductions));
+        OnPropertyChanged(nameof(HasInvalidBaseSalaryOverride));
+        OnPropertyChanged(nameof(BaseSalaryOverrideValidationMessage));
+        Recalculate();
+    }
+
+    private void ClearInapplicableDeductions()
+    {
+        if (UsesTds)
+        {
+            if (EsicDeduction != 0m) EsicDeduction = 0m;
+            if (PfDeduction != 0m) PfDeduction = 0m;
+        }
+        else
+        {
+            if (TdsDeduction != 0m) TdsDeduction = 0m;
+        }
     }
 
     public void Recalculate()
     {
-        _isRecalculating = true;
-        try
+        if (HasInvalidBaseSalaryOverride)
         {
-            var b = SalaryCalculator.Compute(BaseSalary, Year, Month,
-                Math.Max(0, DaysAbsent),
-                UsesEsicPf ? Math.Max(0, EsicDeduction) : 0m,
-                UsesEsicPf ? Math.Max(0, PfDeduction) : 0m,
-                UsesTds ? Math.Max(0, TdsDeduction) : 0m);
-            PerDay = b.PerDayRate;
-            Deduction = b.Deduction;
-            CalculatedNetSalary = b.NetSalary - Math.Max(0, AdvanceDeductionEntry);
-            if (!IsNetSalaryOverrideEnabled)
-            {
-                NetSalaryOverride = CalculatedNetSalary;
-            }
-            NetSalary = IsNetSalaryOverrideEnabled
-                ? Math.Max(0, NetSalaryOverride)
-                : CalculatedNetSalary;
             OnPropertyChanged(nameof(TotalDeductions));
+            return;
         }
-        finally
-        {
-            _isRecalculating = false;
-        }
+
+        var b = SalaryCalculator.Compute(EffectiveBaseSalary, Year, Month,
+            Math.Max(0, DaysAbsent),
+            UsesEsicPf ? Math.Max(0, EsicDeduction) : 0m,
+            UsesEsicPf ? Math.Max(0, PfDeduction) : 0m,
+            UsesTds ? Math.Max(0, TdsDeduction) : 0m);
+        PerDay = b.PerDayRate;
+        Deduction = b.Deduction;
+        CalculatedNetSalary = b.NetSalary - Math.Max(0, AdvanceDeductionEntry);
+        NetSalary = !IsBaseSalaryOverrideEnabled && HistoricalNetSalaryOverride is decimal netOverride
+            ? Math.Max(0, netOverride)
+            : CalculatedNetSalary;
+        OnPropertyChanged(nameof(EffectiveBaseSalary));
+        OnPropertyChanged(nameof(BaseSalary));
+        OnPropertyChanged(nameof(TotalDeductions));
     }
 }
 
@@ -313,17 +356,24 @@ public partial class SalarySheetViewModel : ObservableObject
                     EmployeeId = e.Id,
                     Name = e.Name,
                     GroupDisplayName = rowGroups[e.Id],
-                    BaseSalary = e.BaseSalary,
+                    EmployeeBaseSalary = e.BaseSalary,
                     Year = SelectedYear,
                     Month = SelectedMonth.Number,
                     AdvanceBalance = balances.GetValueOrDefault(e.Id, 0m),
                     ExistingSalaryAdvanceDeduction = salaryAdvanceDeductions.GetValueOrDefault(e.Id, 0m),
+                    HistoricalNetSalaryOverride = rec?.BaseSalaryOverride is null ? rec?.NetSalaryOverride : null,
                     AccountNumber = e.AccountNumber,
                     IfscCode = e.IfscCode,
                     PaymentMode = e.PaymentMode,
                     IsCashDeductionsDisabled = HasCashDeductionsDisabled(e),
                     ProRataDays = proRata,
                 };
+
+                if (rec?.BaseSalaryOverride is decimal baseSalaryOverride)
+                {
+                    row.BaseSalaryOverride = baseSalaryOverride;
+                    row.IsBaseSalaryOverrideEnabled = true;
+                }
 
                 // Set editable fields without triggering partial recalc individually
                 row.DaysAbsent = (rec?.DaysAbsent ?? 0) + proRata;
@@ -332,12 +382,6 @@ public partial class SalarySheetViewModel : ObservableObject
                 row.TdsDeduction = row.UsesTds ? rec?.TdsDeduction ?? 0m : 0m;
                 row.AdvanceDeductionEntry = row.ExistingSalaryAdvanceDeduction;
                 row.Recalculate();
-                if (rec?.NetSalaryOverride is decimal netSalaryOverride)
-                {
-                    row.IsNetSalaryOverrideEnabled = true;
-                    row.NetSalaryOverride = Math.Max(0, netSalaryOverride);
-                    row.Recalculate();
-                }
 
                 row.PropertyChanged += (_, _) => RefreshTotals();
 
@@ -387,7 +431,8 @@ public partial class SalarySheetViewModel : ObservableObject
                     rec.EsicDeduction = EffectiveEsicDeduction(r);
                     rec.PfDeduction = EffectivePfDeduction(r);
                     rec.TdsDeduction = EffectiveTdsDeduction(r);
-                    rec.NetSalaryOverride = EffectiveNetSalaryOverride(r);
+                    rec.BaseSalaryOverride = EffectiveBaseSalaryOverride(r);
+                    rec.NetSalaryOverride = null;
                 }
                 else
                 {
@@ -400,7 +445,8 @@ public partial class SalarySheetViewModel : ObservableObject
                         EsicDeduction = EffectiveEsicDeduction(r),
                         PfDeduction = EffectivePfDeduction(r),
                         TdsDeduction = EffectiveTdsDeduction(r),
-                        NetSalaryOverride = EffectiveNetSalaryOverride(r),
+                        BaseSalaryOverride = EffectiveBaseSalaryOverride(r),
+                        NetSalaryOverride = null,
                     });
                 }
             }
@@ -661,28 +707,43 @@ public partial class SalarySheetViewModel : ObservableObject
     private static List<MonthlySummaryRow> BuildMonthlySummaryRows(IEnumerable<SalaryRowVm> rows)
         => rows.Select(r =>
         {
-            var b = SalaryCalculator.Compute(r.BaseSalary, r.Year, r.Month, r.DaysAbsent,
+            var b = SalaryCalculator.Compute(r.EffectiveBaseSalary, r.Year, r.Month, r.DaysAbsent,
                 EffectiveEsicDeduction(r), EffectivePfDeduction(r), EffectiveTdsDeduction(r));
-            return new MonthlySummaryRow(r.Name, r.BaseSalary, r.DaysAbsent, b.Deduction,
+            return new MonthlySummaryRow(r.Name, r.EffectiveBaseSalary, r.DaysAbsent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction,
                 Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary);
         }).ToList();
 
     private static ValidationResult ValidateRows(IEnumerable<SalaryRowVm> rows, bool includeAdvance)
     {
-        var issues = rows
-            .SelectMany(row => PayrollValidator.Validate(ToPayrollInput(row, includeAdvance)).Issues)
+        var rowList = rows.ToList();
+        var issues = rowList
+            .SelectMany(ValidateBaseSalaryOverride)
             .ToList();
-        issues.AddRange(rows
-            .Where(row => row.IsNetSalaryOverrideEnabled && row.NetSalaryOverride < 0)
+        issues.AddRange(rowList
+            .SelectMany(row => PayrollValidator.Validate(ToPayrollInput(row, includeAdvance)).Issues)
+            .ToList());
+        issues.AddRange(rowList
+            .Where(row => !row.IsBaseSalaryOverrideEnabled && row.HistoricalNetSalaryOverride < 0)
             .Select(row => new ValidationIssue(row.Name, "Net salary override cannot be negative.", "net_override_negative")));
         return new ValidationResult(issues);
+    }
+
+    private static IEnumerable<ValidationIssue> ValidateBaseSalaryOverride(SalaryRowVm row)
+    {
+        if (!row.IsBaseSalaryOverrideEnabled)
+            yield break;
+
+        if (!row.BaseSalaryOverride.HasValue)
+            yield return new ValidationIssue(row.Name, "Override base salary is required.", "base_override_required");
+        else if (row.BaseSalaryOverride.Value < 0m)
+            yield return new ValidationIssue(row.Name, "Override base salary cannot be negative.", "base_override_negative");
     }
 
     private static PayrollValidationInput ToPayrollInput(SalaryRowVm row, bool includeAdvance)
         => new(
             row.Name,
-            row.BaseSalary,
+            row.EffectiveBaseSalary,
             row.Year,
             row.Month,
             row.DaysAbsent,
@@ -702,8 +763,10 @@ public partial class SalarySheetViewModel : ObservableObject
     private static decimal EffectiveTdsDeduction(SalaryRowVm row)
         => row.UsesTds ? Math.Max(0, row.TdsDeduction) : 0m;
 
-    private static decimal? EffectiveNetSalaryOverride(SalaryRowVm row)
-        => row.IsNetSalaryOverrideEnabled ? Math.Max(0, row.NetSalaryOverride) : null;
+    private static decimal? EffectiveBaseSalaryOverride(SalaryRowVm row)
+        => row.IsBaseSalaryOverrideEnabled && row.BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
+            ? overrideSalary
+            : null;
 
     private static bool HasCashDeductionsDisabled(Employee employee)
         => employee.PaymentMode == PaymentMode.Cash
@@ -718,7 +781,7 @@ public partial class SalarySheetViewModel : ObservableObject
         {
             var employeeValidation = EmployeeValidator.Validate(new EmployeeValidationInput(
                 row.Name,
-                row.BaseSalary,
+                row.EmployeeBaseSalary,
                 row.AccountNumber,
                 row.IfscCode,
                 row.PaymentMode,

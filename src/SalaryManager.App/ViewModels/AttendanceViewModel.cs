@@ -20,7 +20,9 @@ public partial class AttendanceRow : ObservableObject
 {
     public int EmployeeId { get; init; }
     public string Name { get; init; } = string.Empty;
-    public decimal BaseSalary { get; init; }
+    public decimal EmployeeBaseSalary { get; init; }
+    public decimal? BaseSalaryOverride { get; init; }
+    public decimal BaseSalary => BaseSalaryOverride ?? EmployeeBaseSalary;
     public bool UsesTds => BaseSalary > 25000m;
     public bool UsesEsicPf => !UsesTds;
 
@@ -91,15 +93,18 @@ public partial class AttendanceViewModel : ObservableObject
             foreach (var e in employees)
             {
                 var rec = existing.GetValueOrDefault(e.Id);
+                var effectiveBaseSalary = rec?.BaseSalaryOverride ?? e.BaseSalary;
+                var usesTds = effectiveBaseSalary > 25000m;
                 newRows.Add(new AttendanceRow
                 {
                     EmployeeId = e.Id,
                     Name = e.Name,
-                    BaseSalary = e.BaseSalary,
+                    EmployeeBaseSalary = e.BaseSalary,
+                    BaseSalaryOverride = rec?.BaseSalaryOverride,
                     DaysAbsent = rec?.DaysAbsent ?? 0,
-                    EsicDeduction = e.BaseSalary <= 25000m ? rec?.EsicDeduction ?? 0m : 0m,
-                    PfDeduction = e.BaseSalary <= 25000m ? rec?.PfDeduction ?? 0m : 0m,
-                    TdsDeduction = e.BaseSalary > 25000m ? rec?.TdsDeduction ?? 0m : 0m,
+                    EsicDeduction = !usesTds ? rec?.EsicDeduction ?? 0m : 0m,
+                    PfDeduction = !usesTds ? rec?.PfDeduction ?? 0m : 0m,
+                    TdsDeduction = usesTds ? rec?.TdsDeduction ?? 0m : 0m,
                 });
             }
 

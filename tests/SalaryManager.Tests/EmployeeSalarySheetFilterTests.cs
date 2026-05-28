@@ -204,7 +204,7 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
-    public async Task SalarySheetSave_NetSalaryOverridePersistsReloadsAndUpdatesTotals()
+    public async Task SalarySheetSave_BaseSalaryOverridePersistsReloadsAndUpdatesTotals()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -217,28 +217,32 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Rows);
-        row.IsNetSalaryOverrideEnabled = true;
-        row.NetSalaryOverride = 7777m;
+        row.IsBaseSalaryOverrideEnabled = true;
+        row.BaseSalaryOverride = 12000m;
 
-        Assert.Equal(7777m, row.NetSalary);
-        Assert.Equal(7777m, viewModel.TotalNet);
-        Assert.Equal(2223m, viewModel.TotalDeduction);
+        Assert.Equal(12000m, row.EffectiveBaseSalary);
+        Assert.Equal(12000m, row.NetSalary);
+        Assert.Equal(12000m, viewModel.TotalGross);
+        Assert.Equal(12000m, viewModel.TotalNet);
+        Assert.Equal(0m, viewModel.TotalDeduction);
 
         await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
 
         using (var verifyDb = factory.CreateDbContext())
         {
             var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
-            Assert.Equal(7777m, saved.NetSalaryOverride);
+            Assert.Equal(12000m, saved.BaseSalaryOverride);
+            Assert.Null(saved.NetSalaryOverride);
         }
 
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var reloaded = Assert.Single(viewModel.Rows);
-        Assert.True(reloaded.IsNetSalaryOverrideEnabled);
-        Assert.Equal(7777m, reloaded.NetSalaryOverride);
-        Assert.Equal(7777m, reloaded.NetSalary);
-        Assert.Equal(7777m, viewModel.TotalNet);
+        Assert.True(reloaded.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(12000m, reloaded.BaseSalaryOverride);
+        Assert.Equal(12000m, reloaded.EffectiveBaseSalary);
+        Assert.Equal(12000m, reloaded.NetSalary);
+        Assert.Equal(12000m, viewModel.TotalNet);
     }
 
     [Fact]
@@ -265,11 +269,205 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(967.74m, viewModel.TotalAbsenceDeduction);
         Assert.Equal(28882.26m, viewModel.TotalNet);
 
-        row.IsNetSalaryOverrideEnabled = true;
-        row.NetSalaryOverride = 25000m;
+        row.IsBaseSalaryOverrideEnabled = true;
+        row.BaseSalaryOverride = 20000m;
 
-        Assert.Equal(25000m, viewModel.TotalNet);
-        Assert.Equal(5000m, viewModel.TotalDeduction);
+        Assert.True(row.UsesEsicPf);
+        Assert.False(row.UsesTds);
+        Assert.Equal(0m, row.TdsDeduction);
+        Assert.Equal(20000m, viewModel.TotalGross);
+        Assert.Equal(19304.84m, viewModel.TotalNet);
+        Assert.Equal(695.16m, viewModel.TotalDeduction);
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_BlankOrNegativeBaseOverrideIsBlocked()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var dialogs = NewDialogService();
+        var viewModel = NewSalarySheetViewModel(factory, initializer, dialogs);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        row.IsBaseSalaryOverrideEnabled = true;
+        row.BaseSalaryOverride = null;
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        await dialogs.Received().ErrorAsync(
+            Arg.Is<string>(message => message.Contains("Override base salary is required.")),
+            Arg.Any<string>());
+
+        row.BaseSalaryOverride = -1m;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        await dialogs.Received().ErrorAsync(
+            Arg.Is<string>(message => message.Contains("Override base salary cannot be negative.")),
+            Arg.Any<string>());
+
+        using var verifyDb = factory.CreateDbContext();
+        Assert.Empty(await verifyDb.AttendanceRecords.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_UncheckedBaseOverrideClearsOverrideAndLegacyNetOverride()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                BaseSalaryOverride = 12000m,
+                NetSalaryOverride = 7777m
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.True(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(12000m, row.EffectiveBaseSalary);
+        Assert.Equal(12000m, row.NetSalary);
+
+        row.IsBaseSalaryOverrideEnabled = false;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using var verifyDb = factory.CreateDbContext();
+        var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+        Assert.Null(saved.BaseSalaryOverride);
+        Assert.Null(saved.NetSalaryOverride);
+    }
+
+    [Fact]
+    public async Task SalarySheetLoad_HistoricalNetOverrideStillAppliesUntilSalarySheetSave()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                NetSalaryOverride = 7777m
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(7777m, row.NetSalary);
+        Assert.Equal(7777m, viewModel.TotalNet);
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using var verifyDb = factory.CreateDbContext();
+        var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+        Assert.Null(saved.BaseSalaryOverride);
+        Assert.Null(saved.NetSalaryOverride);
+    }
+
+    [Fact]
+    public async Task AttendanceSave_PreservesBaseOverrideAndUsesEffectiveSalaryForDeductions()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+            db.AttendanceRecords.Add(new AttendanceRecord
+            {
+                EmployeeId = 1,
+                Year = 2026,
+                Month = 5,
+                BaseSalaryOverride = 20000m,
+                EsicDeduction = 100m,
+                PfDeduction = 200m,
+                TdsDeduction = 500m
+            });
+        });
+
+        var viewModel = NewAttendanceViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(20000m, row.BaseSalary);
+        Assert.True(row.UsesEsicPf);
+        Assert.False(row.UsesTds);
+        Assert.Equal(100m, row.EsicDeduction);
+        Assert.Equal(200m, row.PfDeduction);
+        Assert.Equal(0m, row.TdsDeduction);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        using var verifyDb = factory.CreateDbContext();
+        var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+        Assert.Equal(20000m, saved.BaseSalaryOverride);
+        Assert.Equal(100m, saved.EsicDeduction);
+        Assert.Equal(200m, saved.PfDeduction);
+        Assert.Equal(0m, saved.TdsDeduction);
+    }
+
+    [Fact]
+    public async Task ReportsKpis_UseBaseOverrideAndHistoricalNetOverrideFallback()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "Legacy", BaseSalary = 10000m, IsActive = true },
+                new Employee { Id = 2, Name = "Base Override", BaseSalary = 30000m, IsActive = true });
+            db.AttendanceRecords.AddRange(
+                new AttendanceRecord { EmployeeId = 1, Year = 2026, Month = 5, NetSalaryOverride = 7777m },
+                new AttendanceRecord { EmployeeId = 2, Year = 2026, Month = 5, BaseSalaryOverride = 20000m });
+        });
+
+        var viewModel = NewReportsViewModel(factory, initializer);
+        await viewModel.LoadKpisCommand.ExecuteAsync(null);
+
+        Assert.Contains("30,000", viewModel.KpiGross);
+        Assert.Contains("27,777", viewModel.KpiTotalPayable);
+        Assert.Contains("2,223", viewModel.KpiDeductions);
+    }
+
+    [Fact]
+    public async Task DashboardPayroll_UsesBaseOverrideAndHistoricalNetOverrideFallback()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        var now = DateTime.Now;
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "Legacy", BaseSalary = 10000m, IsActive = true },
+                new Employee { Id = 2, Name = "Base Override", BaseSalary = 30000m, IsActive = true });
+            db.AttendanceRecords.AddRange(
+                new AttendanceRecord { EmployeeId = 1, Year = now.Year, Month = now.Month, NetSalaryOverride = 7777m },
+                new AttendanceRecord { EmployeeId = 2, Year = now.Year, Month = now.Month, BaseSalaryOverride = 20000m });
+        });
+
+        var viewModel = new DashboardViewModel(factory, initializer, new BackupService(), NewDialogService());
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(30000m, viewModel.GrossPayroll);
+        Assert.Equal(27777m, viewModel.PayablePayroll);
     }
 
     [Fact]
@@ -348,16 +546,35 @@ public class EmployeeSalarySheetFilterTests
         DatabaseInitializer initializer)
         => new(factory, initializer, NewDialogService(), new ExcelImportService());
 
-    private static SalarySheetViewModel NewSalarySheetViewModel(
+    private static AttendanceViewModel NewAttendanceViewModel(
         IDbContextFactory<AppDbContext> factory,
         DatabaseInitializer initializer)
+        => new(factory, initializer, NewDialogService())
+        {
+            SelectedYear = 2026,
+            SelectedMonth = SalaryManager.App.Helpers.Months.All.Single(m => m.Number == 5)
+        };
+
+    private static ReportsViewModel NewReportsViewModel(
+        IDbContextFactory<AppDbContext> factory,
+        DatabaseInitializer initializer)
+        => new(factory, initializer, new PdfSlipService(), new ExcelExportService(), NewDialogService(), new AppSettingsService())
+        {
+            SelectedYear = 2026,
+            SelectedMonth = SalaryManager.App.Helpers.Months.All.Single(m => m.Number == 5)
+        };
+
+    private static SalarySheetViewModel NewSalarySheetViewModel(
+        IDbContextFactory<AppDbContext> factory,
+        DatabaseInitializer initializer,
+        DialogService? dialogs = null)
     {
         var viewModel = new SalarySheetViewModel(
             factory,
             initializer,
             new PdfSlipService(),
             new ExcelExportService(),
-            NewDialogService(),
+            dialogs ?? NewDialogService(),
             new AppSettingsService())
         {
             SelectedYear = 2026,

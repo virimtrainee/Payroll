@@ -346,7 +346,10 @@ public partial class ReportsViewModel : ObservableObject
     private async Task<List<MonthlySummaryRow>> BuildSummaryRowsAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
-        var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
+        var employeeQuery = db.Employees.AsNoTracking()
+            .Include(e => e.GroupMemberships)
+                .ThenInclude(m => m.EmployeeGroup)
+            .Where(e => e.IsActive);
         if (SelectedGroupFilter?.Id is int groupId)
             employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
@@ -372,14 +375,15 @@ public partial class ReportsViewModel : ObservableObject
         foreach (var e in employees)
         {
             var rec = attendance.GetValueOrDefault(e.Id);
+            var effectiveBaseSalary = EffectiveBaseSalary(e, rec);
             var absent = rec?.DaysAbsent ?? 0;
-            var esic = rec?.EsicDeduction ?? 0m;
-            var pf = rec?.PfDeduction ?? 0m;
-            var tds = rec?.TdsDeduction ?? 0m;
+            var esic = UsesEsicPf(e, effectiveBaseSalary) ? rec?.EsicDeduction ?? 0m : 0m;
+            var pf = UsesEsicPf(e, effectiveBaseSalary) ? rec?.PfDeduction ?? 0m : 0m;
+            var tds = UsesTds(e, effectiveBaseSalary) ? rec?.TdsDeduction ?? 0m : 0m;
             var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
             var validation = PayrollValidator.Validate(new PayrollValidationInput(
                 e.Name,
-                e.BaseSalary,
+                effectiveBaseSalary,
                 SelectedYear,
                 SelectedMonth.Number,
                 absent,
@@ -390,12 +394,15 @@ public partial class ReportsViewModel : ObservableObject
                 balances.GetValueOrDefault(e.Id, 0m),
                 advanceDeduction));
             issues.AddRange(validation.Issues);
-            if (rec?.NetSalaryOverride < 0)
+            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(rec);
+            if (historicalNetOverride < 0)
                 issues.Add(new ValidationIssue(e.Name, "Net salary override cannot be negative.", "net_override_negative"));
+            if (validation.Issues.Count > 0 || historicalNetOverride < 0)
+                continue;
 
-            var b = SalaryCalculator.Compute(e.BaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
-            var finalNetSalary = rec?.NetSalaryOverride ?? b.NetSalary - advanceDeduction;
-            list.Add(new MonthlySummaryRow(e.Name, e.BaseSalary, absent, b.Deduction,
+            var b = SalaryCalculator.Compute(effectiveBaseSalary, SelectedYear, SelectedMonth.Number, absent, esic, pf, tds);
+            var finalNetSalary = historicalNetOverride ?? b.NetSalary - advanceDeduction;
+            list.Add(new MonthlySummaryRow(e.Name, effectiveBaseSalary, absent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction, advanceDeduction,
                 finalNetSalary));
         }
@@ -410,6 +417,8 @@ public partial class ReportsViewModel : ObservableObject
     {
         using var db = await _dbf.CreateDbContextAsync();
         var employeeQuery = db.Employees.AsNoTracking()
+            .Include(e => e.GroupMemberships)
+                .ThenInclude(m => m.EmployeeGroup)
             .Where(e => e.IsActive && e.PaymentMode != PaymentMode.Cash);
         if (SelectedGroupFilter?.Id is int groupId)
             employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
@@ -437,16 +446,20 @@ public partial class ReportsViewModel : ObservableObject
         foreach (var e in employees)
         {
             var rec = attendance.GetValueOrDefault(e.Id);
+            var effectiveBaseSalary = EffectiveBaseSalary(e, rec);
+            var esic = UsesEsicPf(e, effectiveBaseSalary) ? rec?.EsicDeduction ?? 0m : 0m;
+            var pf = UsesEsicPf(e, effectiveBaseSalary) ? rec?.PfDeduction ?? 0m : 0m;
+            var tds = UsesTds(e, effectiveBaseSalary) ? rec?.TdsDeduction ?? 0m : 0m;
             var advanceDeduction = advanceDeductions.GetValueOrDefault(e.Id, 0m);
             var payrollValidation = PayrollValidator.Validate(new PayrollValidationInput(
                 e.Name,
-                e.BaseSalary,
+                effectiveBaseSalary,
                 SelectedYear,
                 SelectedMonth.Number,
                 rec?.DaysAbsent ?? 0,
-                rec?.EsicDeduction ?? 0m,
-                rec?.PfDeduction ?? 0m,
-                rec?.TdsDeduction ?? 0m,
+                esic,
+                pf,
+                tds,
                 advanceDeduction,
                 balances.GetValueOrDefault(e.Id, 0m),
                 advanceDeduction));
@@ -460,16 +473,21 @@ public partial class ReportsViewModel : ObservableObject
                 e.IfscCode,
                 e.JoiningDate));
             issues.AddRange(employeeValidation.Issues.Select(i => i with { Field = $"{e.Name} - {i.Field}" }));
+            var historicalNetOverride = EffectiveHistoricalNetSalaryOverride(rec);
+            if (historicalNetOverride < 0)
+                issues.Add(new ValidationIssue(e.Name, "Net salary override cannot be negative.", "net_override_negative"));
+            if (payrollValidation.Issues.Count > 0 || historicalNetOverride < 0)
+                continue;
 
             var b = SalaryCalculator.Compute(
-                e.BaseSalary,
+                effectiveBaseSalary,
                 SelectedYear,
                 SelectedMonth.Number,
                 rec?.DaysAbsent ?? 0,
-                rec?.EsicDeduction ?? 0m,
-                rec?.PfDeduction ?? 0m,
-                rec?.TdsDeduction ?? 0m);
-            var amount = rec?.NetSalaryOverride ?? b.NetSalary - advanceDeduction;
+                esic,
+                pf,
+                tds);
+            var amount = historicalNetOverride ?? b.NetSalary - advanceDeduction;
             if (amount <= 0)
                 issues.Add(new ValidationIssue(e.Name, "ICICI export amount must be greater than zero."));
 
@@ -518,13 +536,14 @@ public partial class ReportsViewModel : ObservableObject
             .SumOutstandingAsync();
 
         var daysAbsent = attendance?.DaysAbsent ?? 0;
-        var esic = UsesEsicPf(employee) ? attendance?.EsicDeduction ?? 0m : 0m;
-        var pf = UsesEsicPf(employee) ? attendance?.PfDeduction ?? 0m : 0m;
-        var tds = UsesTds(employee) ? attendance?.TdsDeduction ?? 0m : 0m;
+        var effectiveBaseSalary = EffectiveBaseSalary(employee, attendance);
+        var esic = UsesEsicPf(employee, effectiveBaseSalary) ? attendance?.EsicDeduction ?? 0m : 0m;
+        var pf = UsesEsicPf(employee, effectiveBaseSalary) ? attendance?.PfDeduction ?? 0m : 0m;
+        var tds = UsesTds(employee, effectiveBaseSalary) ? attendance?.TdsDeduction ?? 0m : 0m;
 
         var validation = PayrollValidator.Validate(new PayrollValidationInput(
             employee.Name,
-            employee.BaseSalary,
+            effectiveBaseSalary,
             SelectedYear,
             SelectedMonth.Number,
             daysAbsent,
@@ -535,12 +554,13 @@ public partial class ReportsViewModel : ObservableObject
             advanceBalance,
             advanceDeduction));
         var issues = validation.Issues.ToList();
-        if (attendance?.NetSalaryOverride < 0)
+        var slipNetOverride = EffectiveHistoricalNetSalaryOverride(attendance);
+        if (slipNetOverride < 0)
             issues.Add(new ValidationIssue(employee.Name, "Net salary override cannot be negative.", "net_override_negative"));
         if (issues.Count > 0)
             throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
 
-        var breakdown = SalaryCalculator.Compute(employee.BaseSalary, SelectedYear, SelectedMonth.Number, daysAbsent, esic, pf, tds);
+        var breakdown = SalaryCalculator.Compute(effectiveBaseSalary, SelectedYear, SelectedMonth.Number, daysAbsent, esic, pf, tds);
         return new SalarySlipData(
             employee,
             SelectedYear,
@@ -548,7 +568,7 @@ public partial class ReportsViewModel : ObservableObject
             breakdown,
             advanceBalance,
             advanceDeduction,
-            attendance?.NetSalaryOverride);
+            slipNetOverride);
     }
 
     private async Task<List<SalaryRevisionReportRow>> BuildRevisionRowsAsync()
@@ -586,11 +606,17 @@ public partial class ReportsViewModel : ObservableObject
         catch { OpenFile(path); }
     }
 
-    private static bool UsesEsicPf(Employee employee)
-        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary <= 25000m;
+    private static decimal EffectiveBaseSalary(Employee employee, AttendanceRecord? attendance)
+        => attendance?.BaseSalaryOverride ?? employee.BaseSalary;
 
-    private static bool UsesTds(Employee employee)
-        => !HasCashDeductionsDisabled(employee) && employee.BaseSalary > 25000m;
+    private static decimal? EffectiveHistoricalNetSalaryOverride(AttendanceRecord? attendance)
+        => attendance?.BaseSalaryOverride is null ? attendance?.NetSalaryOverride : null;
+
+    private static bool UsesEsicPf(Employee employee, decimal baseSalary)
+        => !HasCashDeductionsDisabled(employee) && baseSalary <= 25000m;
+
+    private static bool UsesTds(Employee employee, decimal baseSalary)
+        => !HasCashDeductionsDisabled(employee) && baseSalary > 25000m;
 
     private static bool HasCashDeductionsDisabled(Employee employee)
         => employee.PaymentMode == PaymentMode.Cash

@@ -19,6 +19,7 @@ public sealed record MonthlyPayrollRow(
     string Name,
     decimal EmployeeBaseSalary,
     decimal EffectiveBaseSalary,
+    decimal SalaryPaid,
     DateTime? JoiningDate,
     string? AccountNumber,
     string? IfscCode,
@@ -36,7 +37,7 @@ public sealed record MonthlyPayrollRow(
     SalaryBreakdown? Breakdown,
     IReadOnlyList<ValidationIssue> ValidationIssues)
 {
-    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveBaseSalary > 25000m;
+    public bool UsesTds => !IsCashDeductionsDisabled && SalaryPaid > 25000m;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
     public decimal NetSalaryBeforeAdvance => Breakdown?.NetSalary ?? 0m;
     public decimal NetSalary => HistoricalNetSalaryOverride ?? NetSalaryBeforeAdvance - AdvanceDeduction;
@@ -45,6 +46,7 @@ public sealed record MonthlyPayrollRow(
         => new(
             Name,
             EffectiveBaseSalary,
+            SalaryPaid,
             DaysAbsent,
             Breakdown?.Deduction ?? 0m,
             Breakdown?.EsicDeduction ?? 0m,
@@ -133,13 +135,19 @@ public class MonthlyPayrollService
                 .OrderBy(g => g.Name)
                 .ToList();
 
-            var effectiveBaseSalary = record?.BaseSalaryOverride ?? employee.BaseSalary;
+            var effectiveBaseSalary = employee.BaseSalary;
+            var daysAbsent = record?.DaysAbsent ?? 0;
+            var defaultSalaryPaid = SalaryCalculator.CalculateDefaultSalaryPaid(
+                effectiveBaseSalary,
+                request.Year,
+                request.Month,
+                daysAbsent);
+            var salaryPaid = record?.BaseSalaryOverride ?? defaultSalaryPaid;
             var isCashDeductionsDisabled =
                 employee.PaymentMode == PaymentMode.Cash
                 || groups.Any(g => GroupNameNormalizer.Normalize(g.Name) == CashGroupNormalizedName);
-            var usesTds = !isCashDeductionsDisabled && effectiveBaseSalary > 25000m;
+            var usesTds = !isCashDeductionsDisabled && salaryPaid > 25000m;
             var usesEsicPf = !isCashDeductionsDisabled && !usesTds;
-            var daysAbsent = record?.DaysAbsent ?? 0;
             var esic = usesEsicPf ? record?.EsicDeduction ?? 0m : 0m;
             var pf = usesEsicPf ? record?.PfDeduction ?? 0m : 0m;
             var tds = usesTds ? record?.TdsDeduction ?? 0m : 0m;
@@ -160,7 +168,8 @@ public class MonthlyPayrollService
                 tds,
                 advanceDeduction,
                 advanceBalance,
-                advanceDeduction));
+                advanceDeduction,
+                salaryPaid));
             var issues = validation.Issues.ToList();
             if (historicalNetOverride < 0)
                 issues.Add(new ValidationIssue(employee.Name, "Net salary override cannot be negative.", "net_override_negative"));
@@ -168,8 +177,9 @@ public class MonthlyPayrollService
             SalaryBreakdown? breakdown = null;
             if (issues.Count == 0)
             {
-                breakdown = SalaryCalculator.Compute(
+                breakdown = SalaryCalculator.ComputeFromSalaryPaid(
                     effectiveBaseSalary,
+                    salaryPaid,
                     request.Year,
                     request.Month,
                     daysAbsent,
@@ -183,6 +193,7 @@ public class MonthlyPayrollService
                 employee.Name,
                 employee.BaseSalary,
                 effectiveBaseSalary,
+                salaryPaid,
                 employee.JoiningDate,
                 employee.AccountNumber,
                 employee.IfscCode,

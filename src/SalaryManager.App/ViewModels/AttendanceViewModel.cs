@@ -22,14 +22,35 @@ public partial class AttendanceRow : ObservableObject
     public string Name { get; init; } = string.Empty;
     public decimal EmployeeBaseSalary { get; init; }
     public decimal? BaseSalaryOverride { get; init; }
-    public decimal BaseSalary => BaseSalaryOverride ?? EmployeeBaseSalary;
-    public bool UsesTds => BaseSalary > 25000m;
+    public int Year { get; init; }
+    public int Month { get; init; }
+    public decimal BaseSalary => EmployeeBaseSalary;
+    public decimal DefaultSalaryPaid
+    {
+        get
+        {
+            if (EmployeeBaseSalary < 0m || Year < 1 || Month is < 1 or > 12)
+                return EmployeeBaseSalary;
+
+            return SalaryCalculator.CalculateDefaultSalaryPaid(EmployeeBaseSalary, Year, Month, Math.Max(0, DaysAbsent));
+        }
+    }
+    public decimal EffectiveSalaryPaid => BaseSalaryOverride ?? DefaultSalaryPaid;
+    public bool UsesTds => EffectiveSalaryPaid > 25000m;
     public bool UsesEsicPf => !UsesTds;
 
     [ObservableProperty] private int daysAbsent;
     [ObservableProperty] private decimal esicDeduction;
     [ObservableProperty] private decimal pfDeduction;
     [ObservableProperty] private decimal tdsDeduction;
+
+    partial void OnDaysAbsentChanged(int value)
+    {
+        OnPropertyChanged(nameof(DefaultSalaryPaid));
+        OnPropertyChanged(nameof(EffectiveSalaryPaid));
+        OnPropertyChanged(nameof(UsesTds));
+        OnPropertyChanged(nameof(UsesEsicPf));
+    }
 }
 
 public partial class AttendanceViewModel : ObservableObject
@@ -93,14 +114,17 @@ public partial class AttendanceViewModel : ObservableObject
             foreach (var e in employees)
             {
                 var rec = existing.GetValueOrDefault(e.Id);
-                var effectiveBaseSalary = rec?.BaseSalaryOverride ?? e.BaseSalary;
-                var usesTds = effectiveBaseSalary > 25000m;
+                var salaryPaid = rec?.BaseSalaryOverride
+                    ?? SalaryCalculator.CalculateDefaultSalaryPaid(e.BaseSalary, SelectedYear, SelectedMonth.Number, rec?.DaysAbsent ?? 0);
+                var usesTds = salaryPaid > 25000m;
                 newRows.Add(new AttendanceRow
                 {
                     EmployeeId = e.Id,
                     Name = e.Name,
                     EmployeeBaseSalary = e.BaseSalary,
                     BaseSalaryOverride = rec?.BaseSalaryOverride,
+                    Year = SelectedYear,
+                    Month = SelectedMonth.Number,
                     DaysAbsent = rec?.DaysAbsent ?? 0,
                     EsicDeduction = !usesTds ? rec?.EsicDeduction ?? 0m : 0m,
                     PfDeduction = !usesTds ? rec?.PfDeduction ?? 0m : 0m,
@@ -188,7 +212,7 @@ public partial class AttendanceViewModel : ObservableObject
         var issues = rows
             .SelectMany(row => PayrollValidator.Validate(new PayrollValidationInput(
                 row.Name,
-                row.BaseSalary,
+                row.EmployeeBaseSalary,
                 year,
                 month,
                 row.DaysAbsent,
@@ -196,7 +220,8 @@ public partial class AttendanceViewModel : ObservableObject
                 row.PfDeduction,
                 row.TdsDeduction,
                 0m,
-                0m)).Issues)
+                0m,
+                SalaryPaid: row.BaseSalaryOverride)).Issues)
             .ToList();
         return new ValidationResult(issues);
     }

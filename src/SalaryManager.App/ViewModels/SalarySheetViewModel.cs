@@ -27,11 +27,8 @@ public partial class SalaryRowVm : ObservableObject
     public string GroupDisplayName { get; init; } = string.Empty;
     public int ProRataDays { get; init; }
     public decimal EmployeeBaseSalary { get; init; }
-    public decimal BaseSalary => EffectiveBaseSalary;
-    public decimal EffectiveBaseSalary
-        => IsBaseSalaryOverrideEnabled && BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
-            ? overrideSalary
-            : EmployeeBaseSalary;
+    public decimal BaseSalary => EmployeeBaseSalary;
+    public decimal EffectiveBaseSalary => EmployeeBaseSalary;
     public int Year { get; init; }
     public int Month { get; init; }
     public decimal AdvanceBalance { get; init; }
@@ -47,19 +44,84 @@ public partial class SalaryRowVm : ObservableObject
         _ => "Other"
     };
     public bool IsCashDeductionsDisabled { get; init; }
-    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveBaseSalary > 25000m;
+    public decimal DefaultSalaryPaid
+    {
+        get
+        {
+            if (EmployeeBaseSalary < 0m || Year < 1 || Month is < 1 or > 12)
+                return EmployeeBaseSalary;
+
+            return SalaryCalculator.CalculateDefaultSalaryPaid(
+                EmployeeBaseSalary,
+                Year,
+                Month,
+                Math.Max(0, DaysAbsent));
+        }
+    }
+    public decimal EffectiveSalaryPaid
+        => IsBaseSalaryOverrideEnabled && BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
+            ? overrideSalary
+            : DefaultSalaryPaid;
+    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveSalaryPaid > 25000m;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
-    public decimal TotalDeductions => Math.Max(0, EffectiveBaseSalary - NetSalary);
+    public decimal TotalDeductions => Math.Max(0, EffectiveSalaryPaid - NetSalary);
     public bool HasInvalidBaseSalaryOverride => IsBaseSalaryOverrideEnabled
         && (!BaseSalaryOverride.HasValue || BaseSalaryOverride.Value < 0m);
-    public string BaseSalaryOverrideValidationMessage
+    public string SalaryPaidValidationMessage
         => !IsBaseSalaryOverrideEnabled
             ? string.Empty
             : !BaseSalaryOverride.HasValue
-                ? "Override base salary is required."
+                ? "Salary paid is required."
                 : BaseSalaryOverride.Value < 0m
-                    ? "Override base salary cannot be negative."
+                    ? "Salary paid cannot be negative."
                     : string.Empty;
+    public decimal? SalaryPaid
+    {
+        get => IsBaseSalaryOverrideEnabled ? BaseSalaryOverride : DefaultSalaryPaid;
+        set
+        {
+            if (value.HasValue)
+            {
+                if (value.Value == DefaultSalaryPaid)
+                {
+                    if (IsBaseSalaryOverrideEnabled)
+                    {
+                        IsBaseSalaryOverrideEnabled = false;
+                    }
+                    else if (BaseSalaryOverride.HasValue)
+                    {
+                        BaseSalaryOverride = null;
+                    }
+                    else
+                    {
+                        OnPropertyChanged(nameof(SalaryPaid));
+                    }
+
+                    return;
+                }
+
+                BaseSalaryOverride = value;
+                if (!IsBaseSalaryOverrideEnabled)
+                    IsBaseSalaryOverrideEnabled = true;
+                else
+                    OnPropertyChanged(nameof(SalaryPaid));
+                return;
+            }
+
+            if (IsBaseSalaryOverrideEnabled)
+            {
+                IsBaseSalaryOverrideEnabled = false;
+            }
+            else if (BaseSalaryOverride.HasValue)
+            {
+                BaseSalaryOverride = null;
+            }
+            else
+            {
+                OnPropertyChanged(nameof(SalaryPaid));
+            }
+        }
+    }
     private int _recalculationSuppression;
     private bool IsRecalculationSuppressed => _recalculationSuppression > 0;
 
@@ -90,9 +152,13 @@ public partial class SalaryRowVm : ObservableObject
         _recalculationSuppression++;
         try
         {
-            BaseSalaryOverride = isBaseSalaryOverrideEnabled ? baseSalaryOverride : null;
-            IsBaseSalaryOverrideEnabled = isBaseSalaryOverrideEnabled;
             DaysAbsent = daysAbsent;
+            var hasCustomSalaryPaid = isBaseSalaryOverrideEnabled
+                && baseSalaryOverride.HasValue
+                && baseSalaryOverride.Value != DefaultSalaryPaid;
+
+            BaseSalaryOverride = hasCustomSalaryPaid ? baseSalaryOverride : null;
+            IsBaseSalaryOverrideEnabled = hasCustomSalaryPaid;
             EsicDeduction = esicDeduction;
             PfDeduction = pfDeduction;
             TdsDeduction = tdsDeduction;
@@ -106,7 +172,13 @@ public partial class SalaryRowVm : ObservableObject
         RefreshSalaryBasisAndRecalculate();
     }
 
-    partial void OnDaysAbsentChanged(int value) => RecalculateIfNotSuppressed();
+    partial void OnDaysAbsentChanged(int value)
+    {
+        OnPropertyChanged(nameof(DefaultSalaryPaid));
+        if (!IsBaseSalaryOverrideEnabled)
+            OnPropertyChanged(nameof(SalaryPaid));
+        RefreshSalaryBasisIfNotSuppressed();
+    }
     partial void OnEsicDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
     partial void OnPfDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
     partial void OnTdsDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
@@ -116,17 +188,30 @@ public partial class SalaryRowVm : ObservableObject
         if (!IsRecalculationSuppressed)
         {
             if (value && !BaseSalaryOverride.HasValue)
-                BaseSalaryOverride = EmployeeBaseSalary;
+                BaseSalaryOverride = DefaultSalaryPaid;
             if (!value)
                 BaseSalaryOverride = null;
         }
 
         OnSalaryBasisChanged();
+        OnPropertyChanged(nameof(SalaryPaid));
     }
 
-    partial void OnBaseSalaryOverrideChanged(decimal? value) => OnSalaryBasisChanged();
+    partial void OnBaseSalaryOverrideChanged(decimal? value)
+    {
+        OnPropertyChanged(nameof(SalaryPaid));
+        OnSalaryBasisChanged();
+    }
 
     private void OnSalaryBasisChanged()
+    {
+        if (IsRecalculationSuppressed)
+            return;
+
+        RefreshSalaryBasisAndRecalculate();
+    }
+
+    private void RefreshSalaryBasisIfNotSuppressed()
     {
         if (IsRecalculationSuppressed)
             return;
@@ -151,11 +236,14 @@ public partial class SalaryRowVm : ObservableObject
 
         OnPropertyChanged(nameof(EffectiveBaseSalary));
         OnPropertyChanged(nameof(BaseSalary));
+        OnPropertyChanged(nameof(DefaultSalaryPaid));
+        OnPropertyChanged(nameof(EffectiveSalaryPaid));
+        OnPropertyChanged(nameof(SalaryPaid));
         OnPropertyChanged(nameof(UsesTds));
         OnPropertyChanged(nameof(UsesEsicPf));
         OnPropertyChanged(nameof(TotalDeductions));
         OnPropertyChanged(nameof(HasInvalidBaseSalaryOverride));
-        OnPropertyChanged(nameof(BaseSalaryOverrideValidationMessage));
+        OnPropertyChanged(nameof(SalaryPaidValidationMessage));
         Recalculate();
     }
 
@@ -186,7 +274,7 @@ public partial class SalaryRowVm : ObservableObject
             return;
         }
 
-        var b = SalaryCalculator.Compute(EffectiveBaseSalary, Year, Month,
+        var b = SalaryCalculator.ComputeFromSalaryPaid(EmployeeBaseSalary, EffectiveSalaryPaid, Year, Month,
             Math.Max(0, DaysAbsent),
             UsesEsicPf ? Math.Max(0, EsicDeduction) : 0m,
             UsesEsicPf ? Math.Max(0, PfDeduction) : 0m,
@@ -199,6 +287,9 @@ public partial class SalaryRowVm : ObservableObject
             : CalculatedNetSalary;
         OnPropertyChanged(nameof(EffectiveBaseSalary));
         OnPropertyChanged(nameof(BaseSalary));
+        OnPropertyChanged(nameof(DefaultSalaryPaid));
+        OnPropertyChanged(nameof(EffectiveSalaryPaid));
+        OnPropertyChanged(nameof(SalaryPaid));
         OnPropertyChanged(nameof(TotalDeductions));
     }
 }
@@ -212,6 +303,13 @@ public partial class SalarySheetViewModel : ObservableObject
     private readonly ExcelExportService _excel;
     private readonly DialogService _dialogs;
     private readonly AppSettingsService _settings;
+    private readonly object _totalRefreshLock = new();
+    private readonly SynchronizationContext? _totalRefreshSynchronizationContext = SynchronizationContext.Current;
+    private CancellationTokenSource? _totalRefreshCts;
+    private int _totalRefreshSuppression;
+    private bool _suppressedTotalRefreshRequested;
+
+    public static TimeSpan TotalRefreshDebounceDelay { get; } = TimeSpan.FromMilliseconds(150);
 
     public List<MonthOption> Months => Helpers.Months.All;
     public List<int> Years => Helpers.Months.Years();
@@ -229,8 +327,6 @@ public partial class SalarySheetViewModel : ObservableObject
     [ObservableProperty] private decimal totalAbsenceDeduction;
     [ObservableProperty] private decimal totalAdvanceBalance;
     [ObservableProperty] private int employeeCount;
-    [ObservableProperty] private string searchText = string.Empty;
-    [ObservableProperty] private GroupFilterOptionVm? selectedGroupDropdownFilter;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsGridReadOnly))]
@@ -244,11 +340,7 @@ public partial class SalarySheetViewModel : ObservableObject
 
     public RangeObservableCollection<SalaryRowVm> Rows { get; } = new();
     public ICollectionView RowsView { get; }
-    public RangeObservableCollection<SelectableGroupFilterOptionVm> GroupFilterOptions { get; } = new();
-    public RangeObservableCollection<GroupFilterOptionVm> GroupDropdownOptions { get; } = new();
-    public bool IsAllGroupsSelected => GroupFilterOptions.All(g => !g.IsSelected);
 
-    private bool _updatingGroupFilter;
     private int _loadVersion;
     private static readonly HashSet<string> TotalRefreshInputProperties = new(StringComparer.Ordinal)
     {
@@ -258,7 +350,8 @@ public partial class SalarySheetViewModel : ObservableObject
         nameof(SalaryRowVm.TdsDeduction),
         nameof(SalaryRowVm.AdvanceDeductionEntry),
         nameof(SalaryRowVm.IsBaseSalaryOverrideEnabled),
-        nameof(SalaryRowVm.BaseSalaryOverride)
+        nameof(SalaryRowVm.BaseSalaryOverride),
+        nameof(SalaryRowVm.SalaryPaid)
     };
 
     public SalarySheetViewModel(IDbContextFactory<AppDbContext> dbf,
@@ -271,41 +364,24 @@ public partial class SalarySheetViewModel : ObservableObject
     {
         _dbf = dbf; _dbInit = dbInit; _payroll = payroll; _pdf = pdf; _excel = excel; _dialogs = dialogs; _settings = settings;
         RowsView = CollectionViewSource.GetDefaultView(Rows);
-        RowsView.Filter = RowFilter;
     }
 
     partial void OnSelectedMonthChanged(MonthOption value) => LoadCommand.Execute(null);
     partial void OnSelectedYearChanged(int value) => LoadCommand.Execute(null);
-    partial void OnSearchTextChanged(string value) => RowsView.Refresh();
-    partial void OnSelectedGroupDropdownFilterChanged(GroupFilterOptionVm? value)
-    {
-        if (_updatingGroupFilter || value is null) return;
-
-        _updatingGroupFilter = true;
-        try
-        {
-            foreach (var option in GroupFilterOptions)
-                option.IsSelected = value.Id is int id && option.Id == id;
-        }
-        finally
-        {
-            _updatingGroupFilter = false;
-        }
-
-        OnPropertyChanged(nameof(IsAllGroupsSelected));
-        LoadCommand.Execute(null);
-    }
-
-    private bool RowFilter(object item)
-    {
-        if (item is not SalaryRowVm row) return false;
-        var search = SearchText.Trim();
-        return string.IsNullOrWhiteSpace(search)
-            || row.Name.Contains(search, StringComparison.OrdinalIgnoreCase);
-    }
 
     [RelayCommand]
-    private void ToggleEditMode() => IsEditMode = !IsEditMode;
+    private async Task ToggleEditModeAsync()
+    {
+        if (!IsEditMode)
+        {
+            IsEditMode = true;
+            return;
+        }
+
+        FlushPendingTotalRefresh();
+        if (await SaveAttendanceCoreAsync(showSuccessMessage: false))
+            IsEditMode = false;
+    }
 
     public IReadOnlyDictionary<string, double> LoadColumnWidths()
         => _settings.Load().SalarySheetColumnWidths ?? new Dictionary<string, double>();
@@ -322,23 +398,106 @@ public partial class SalarySheetViewModel : ObservableObject
         _settings.Save(settings with { SalarySheetColumnWidths = clean });
     }
 
-    [RelayCommand]
-    private void ClearGroupFilters()
+    public void ResetSalaryPaidToCalculated(IEnumerable<SalaryRowVm> rows)
+        => RunBulkEdit(rows, row => row.SalaryPaid = null);
+
+    public void FillSalaryPaidWithBase(IEnumerable<SalaryRowVm> rows)
+        => ResetSalaryPaidToCalculated(rows);
+
+    public void ClearSalaryPaid(IEnumerable<SalaryRowVm> rows)
+        => RunBulkEdit(rows, row => row.SalaryPaid = null);
+
+    public void ZeroDeductions(IEnumerable<SalaryRowVm> rows, IEnumerable<string> selectedColumnKeys)
     {
-        _updatingGroupFilter = true;
+        var deductionKeys = selectedColumnKeys
+            .Where(SalarySheetGridSelection.IsDeductionColumnKey)
+            .ToHashSet(StringComparer.Ordinal);
+        if (deductionKeys.Count == 0)
+        {
+            deductionKeys.Add("esic");
+            deductionKeys.Add("pf");
+            deductionKeys.Add("tds");
+            deductionKeys.Add("advanceDeduction");
+        }
+
+        RunBulkEdit(rows, row =>
+        {
+            if (deductionKeys.Contains("esic"))
+                row.EsicDeduction = 0m;
+            if (deductionKeys.Contains("pf"))
+                row.PfDeduction = 0m;
+            if (deductionKeys.Contains("tds"))
+                row.TdsDeduction = 0m;
+            if (deductionKeys.Contains("advanceDeduction"))
+                row.AdvanceDeductionEntry = 0m;
+        });
+    }
+
+    public bool ApplyAdvanceDeduction(IEnumerable<SalaryRowVm> rows, decimal amount)
+    {
+        if (amount < 0m)
+            return false;
+
+        RunBulkEdit(rows, row => row.AdvanceDeductionEntry = amount);
+        return true;
+    }
+
+    public async Task PromptAndApplyAdvanceDeductionAsync(IEnumerable<SalaryRowVm> rows)
+    {
+        var rowList = rows.Distinct().ToList();
+        if (!IsEditMode || rowList.Count == 0)
+            return;
+
+        var amount = await _dialogs.AskNonNegativeDecimalAsync(
+            "Set Advance Deduction",
+            "Advance deduction",
+            0m,
+            "Apply");
+        if (!amount.HasValue)
+            return;
+
+        if (!ApplyAdvanceDeduction(rowList, amount.Value))
+            await _dialogs.ErrorAsync("Advance deduction cannot be negative.", "Invalid amount");
+    }
+
+    private void RunBulkEdit(IEnumerable<SalaryRowVm> rows, Action<SalaryRowVm> edit)
+    {
+        if (!IsEditMode)
+            return;
+
+        var rowList = rows.Distinct().ToList();
+        if (rowList.Count == 0)
+            return;
+
+        _totalRefreshSuppression++;
         try
         {
-            foreach (var option in GroupFilterOptions)
-                option.IsSelected = false;
-            SelectedGroupDropdownFilter = GroupDropdownOptions.FirstOrDefault(o => o.Id is null);
+            foreach (var row in rowList)
+                edit(row);
         }
         finally
         {
-            _updatingGroupFilter = false;
+            _totalRefreshSuppression--;
+            if (_totalRefreshSuppression == 0 && _suppressedTotalRefreshRequested)
+            {
+                _suppressedTotalRefreshRequested = false;
+                ScheduleTotalRefresh();
+            }
         }
+    }
 
-        OnPropertyChanged(nameof(IsAllGroupsSelected));
-        LoadCommand.Execute(null);
+    [RelayCommand]
+    private async Task ResetTableAsync()
+    {
+        FlushPendingTotalRefresh();
+        var shouldReset = await _dialogs.ConfirmWarningAsync(
+            "Reset the salary table? Unsaved changes in this table will be discarded.",
+            "Reset Table",
+            "Reset");
+        if (!shouldReset)
+            return;
+
+        await LoadAsync();
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -353,16 +512,8 @@ public partial class SalarySheetViewModel : ObservableObject
             await _dbInit.ReadyTask;
 
             using var db = await _dbf.CreateDbContextAsync();
-            await LoadGroupFiltersAsync(db);
 
-            var selectedGroups = GroupFilterOptions
-                .Where(g => g.IsSelected)
-                .Select(g => new SalaryGroupSortOption(g.Id, g.Name))
-                .OrderBy(g => g.Name)
-                .ToList();
-            var selectedGroupIds = selectedGroups.Select(g => g.Id).ToList();
-
-            var snapshot = await _payroll.LoadAsync(new MonthlyPayrollRequest(year, month, selectedGroupIds));
+            var snapshot = await _payroll.LoadAsync(new MonthlyPayrollRequest(year, month));
             if (version != _loadVersion) return;
 
             var attendanceStates = await LoadAttendanceStatesAsync(
@@ -374,16 +525,9 @@ public partial class SalarySheetViewModel : ObservableObject
 
             var rowGroups = snapshot.Rows.ToDictionary(
                 r => r.EmployeeId,
-                r => selectedGroups.Count == 0
-                    ? r.PrimaryGroupName
-                    : ResolveSelectedGroupName(r, selectedGroups));
+                r => r.PrimaryGroupName);
 
-            var payrollRows = selectedGroups.Count == 0
-                ? snapshot.Rows.OrderBy(r => r.Name).ToList()
-                : snapshot.Rows
-                    .OrderBy(r => rowGroups[r.EmployeeId])
-                    .ThenBy(r => r.Name)
-                    .ToList();
+            var payrollRows = snapshot.Rows.OrderBy(r => r.Name).ToList();
 
             var newRows = new List<SalaryRowVm>(payrollRows.Count);
             int serial = 0;
@@ -434,8 +578,12 @@ public partial class SalarySheetViewModel : ObservableObject
                 row.PropertyChanged -= OnSalaryRowPropertyChanged;
             foreach (var row in newRows)
                 row.PropertyChanged += OnSalaryRowPropertyChanged;
-            Rows.ReplaceAll(newRows);
-            ApplyRowGrouping(selectedGroups.Count > 0);
+            using (RowsView.DeferRefresh())
+            {
+                Rows.ReplaceAll(newRows);
+            }
+
+            CancelPendingTotalRefresh();
             RefreshTotals();
         }
         catch (Exception ex)
@@ -453,11 +601,18 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveAttendanceAsync()
     {
+        FlushPendingTotalRefresh();
+        await SaveAttendanceCoreAsync(showSuccessMessage: true);
+    }
+
+    private async Task<bool> SaveAttendanceCoreAsync(bool showSuccessMessage)
+    {
+        FlushPendingTotalRefresh();
         try
         {
             using var db = await _dbf.CreateDbContextAsync();
             var validation = ValidateRows(Rows, includeAdvance: false);
-            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
+            if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return false; }
 
             var empIds = Rows.Select(r => r.EmployeeId).ToList();
             var existing = await db.AttendanceRecords
@@ -497,70 +652,17 @@ public partial class SalarySheetViewModel : ObservableObject
             }
 
             await db.SaveChangesAsync();
-            await _dialogs.InfoAsync("Attendance saved.");
+            if (showSuccessMessage)
+                await _dialogs.InfoAsync("Attendance saved.");
+            return true;
         }
-        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
-    }
-
-    [RelayCommand]
-    private async Task PostDeductionsAsync()
-    {
-        var rows = Rows.ToList();
-        if (rows.Count == 0) { await _dialogs.ErrorAsync("No salary rows loaded."); return; }
-        var validation = ValidateRows(rows, includeAdvance: true);
-        if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
-
-        var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
-        var postIds = rows.Select(r => r.EmployeeId).ToList();
-
-        try
-        {
-            using var db = await _dbf.CreateDbContextAsync();
-
-            var existing = await db.Advances
-                .Where(a => postIds.Contains(a.EmployeeId)
-                         && a.SourceKey == sourceKey)
-                .ToDictionaryAsync(a => a.EmployeeId);
-
-            foreach (var row in rows)
-            {
-                var amount = row.AdvanceDeductionEntry;
-                if (amount <= 0)
-                {
-                    if (existing.TryGetValue(row.EmployeeId, out var remove))
-                        db.Advances.Remove(remove);
-                    continue;
-                }
-
-                if (existing.TryGetValue(row.EmployeeId, out var advance))
-                {
-                    advance.Date = new DateTime(SelectedYear, SelectedMonth.Number, 1);
-                    advance.Amount = amount;
-                    advance.EntryType = AdvanceEntryType.Deducted;
-                }
-                else
-                {
-                    db.Advances.Add(new Advance
-                    {
-                        EmployeeId = row.EmployeeId,
-                        Date = new DateTime(SelectedYear, SelectedMonth.Number, 1),
-                        Amount = amount,
-                        EntryType = AdvanceEntryType.Deducted,
-                        Note = sourceKey,
-                        SourceKey = sourceKey
-                    });
-                }
-            }
-
-            await db.SaveChangesAsync();
-            await LoadAsync();
-        }
-        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); }
+        catch (Exception ex) { await _dialogs.ErrorAsync(ex.Message); return false; }
     }
 
     [RelayCommand]
     private async Task ExportToExcelAsync()
     {
+        FlushPendingTotalRefresh();
         try
         {
             var defaultName = $"Payroll-{SelectedYear:0000}-{SelectedMonth.Number:00}.xlsx";
@@ -582,6 +684,7 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportSummaryPdfAsync()
     {
+        FlushPendingTotalRefresh();
         try
         {
             var defaultName = $"Payroll-{SelectedYear:0000}-{SelectedMonth.Number:00}.pdf";
@@ -603,6 +706,7 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportCashPdfAsync()
     {
+        FlushPendingTotalRefresh();
         try
         {
             var cashRows = Rows.Where(r => r.PaymentMode == PaymentMode.Cash).ToList();
@@ -626,6 +730,7 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportIciciExcelAsync()
     {
+        FlushPendingTotalRefresh();
         try
         {
             var defaultName = $"ICICI-Salary-{SelectedYear:0000}-{SelectedMonth.Number:00}.xlsx";
@@ -681,86 +786,92 @@ public partial class SalarySheetViewModel : ObservableObject
             .ToDictionaryAsync(a => a.EmployeeId);
     }
 
-    private async Task LoadGroupFiltersAsync(AppDbContext db)
-    {
-        var selectedIds = GroupFilterOptions
-            .Where(g => g.IsSelected)
-            .Select(g => g.Id)
-            .ToHashSet();
-
-        var groups = await db.EmployeeGroups.AsNoTracking()
-            .OrderBy(g => g.Name)
-            .Select(g => new SelectableGroupFilterOptionVm
-            {
-                Id = g.Id,
-                Name = g.Name,
-                IsSelected = selectedIds.Contains(g.Id)
-            })
-            .ToListAsync();
-        var dropdownOptions = new List<GroupFilterOptionVm> { new(null, "All Groups") };
-        dropdownOptions.AddRange(groups.Select(g => new GroupFilterOptionVm(g.Id, g.Name)));
-
-        _updatingGroupFilter = true;
-        try
-        {
-            foreach (var option in GroupFilterOptions)
-                option.PropertyChanged -= OnGroupFilterOptionPropertyChanged;
-
-            GroupFilterOptions.ReplaceAll(groups);
-            GroupDropdownOptions.ReplaceAll(dropdownOptions);
-
-            foreach (var option in GroupFilterOptions)
-                option.PropertyChanged += OnGroupFilterOptionPropertyChanged;
-
-            SelectedGroupDropdownFilter = selectedIds.Count == 1
-                ? GroupDropdownOptions.FirstOrDefault(g => g.Id == selectedIds.First()) ?? GroupDropdownOptions[0]
-                : GroupDropdownOptions[0];
-            OnPropertyChanged(nameof(IsAllGroupsSelected));
-        }
-        finally
-        {
-            _updatingGroupFilter = false;
-        }
-    }
-
-    private void OnGroupFilterOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (_updatingGroupFilter || e.PropertyName != nameof(SelectableGroupFilterOptionVm.IsSelected)) return;
-        _updatingGroupFilter = true;
-        try
-        {
-            var selected = GroupFilterOptions.Where(g => g.IsSelected).ToList();
-            SelectedGroupDropdownFilter = selected.Count == 1
-                ? GroupDropdownOptions.FirstOrDefault(g => g.Id == selected[0].Id) ?? GroupDropdownOptions[0]
-                : GroupDropdownOptions.FirstOrDefault(g => g.Id is null);
-        }
-        finally
-        {
-            _updatingGroupFilter = false;
-        }
-
-        OnPropertyChanged(nameof(IsAllGroupsSelected));
-        LoadCommand.Execute(null);
-    }
-
-    private void ApplyRowGrouping(bool isGrouped)
-    {
-        RowsView.GroupDescriptions.Clear();
-        if (isGrouped)
-            RowsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(SalaryRowVm.GroupDisplayName)));
-        RowsView.Refresh();
-    }
-
     private void OnSalaryRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (string.IsNullOrEmpty(e.PropertyName) || TotalRefreshInputProperties.Contains(e.PropertyName))
+            ScheduleTotalRefresh();
+    }
+
+    public void FlushPendingTotalRefresh()
+    {
+        CancelPendingTotalRefresh();
+        RefreshTotals();
+    }
+
+    private void ScheduleTotalRefresh()
+    {
+        if (_totalRefreshSuppression > 0)
+        {
+            _suppressedTotalRefreshRequested = true;
+            return;
+        }
+
+        CancellationTokenSource cts;
+        lock (_totalRefreshLock)
+        {
+            _totalRefreshCts?.Cancel();
+            _totalRefreshCts?.Dispose();
+            _totalRefreshCts = new CancellationTokenSource();
+            cts = _totalRefreshCts;
+        }
+
+        _ = RefreshTotalsAfterDelayAsync(cts, cts.Token);
+    }
+
+    private async Task RefreshTotalsAfterDelayAsync(CancellationTokenSource cts, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TotalRefreshDebounceDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        lock (_totalRefreshLock)
+        {
+            if (!ReferenceEquals(_totalRefreshCts, cts))
+                return;
+
+            _totalRefreshCts = null;
+        }
+
+        cts.Dispose();
+        DispatchRefreshTotals();
+    }
+
+    private void DispatchRefreshTotals()
+    {
+        if (_totalRefreshSynchronizationContext is null)
+        {
             RefreshTotals();
+            return;
+        }
+
+        _totalRefreshSynchronizationContext.Post(_ => RefreshTotals(), null);
+    }
+
+    private void CancelPendingTotalRefresh()
+    {
+        CancellationTokenSource? cts;
+        lock (_totalRefreshLock)
+        {
+            cts = _totalRefreshCts;
+            _totalRefreshCts = null;
+        }
+
+        if (cts is null)
+            return;
+
+        cts.Cancel();
+        cts.Dispose();
     }
 
     private void RefreshTotals()
     {
         TotalNet = Rows.Sum(r => r.NetSalary);
-        TotalGross = Rows.Sum(r => r.BaseSalary);
+        TotalGross = Rows.Sum(r => r.EffectiveSalaryPaid);
         TotalDaysAbsent = Rows.Sum(r => r.DaysAbsent);
         TotalEsic = Rows.Sum(EffectiveEsicDeduction);
         TotalPf = Rows.Sum(EffectivePfDeduction);
@@ -775,9 +886,9 @@ public partial class SalarySheetViewModel : ObservableObject
     private static List<MonthlySummaryRow> BuildMonthlySummaryRows(IEnumerable<SalaryRowVm> rows)
         => rows.Select(r =>
         {
-            var b = SalaryCalculator.Compute(r.EffectiveBaseSalary, r.Year, r.Month, r.DaysAbsent,
+            var b = SalaryCalculator.ComputeFromSalaryPaid(r.EmployeeBaseSalary, r.EffectiveSalaryPaid, r.Year, r.Month, r.DaysAbsent,
                 EffectiveEsicDeduction(r), EffectivePfDeduction(r), EffectiveTdsDeduction(r));
-            return new MonthlySummaryRow(r.Name, r.EffectiveBaseSalary, r.DaysAbsent, b.Deduction,
+            return new MonthlySummaryRow(r.Name, r.EffectiveBaseSalary, b.SalaryPaid, r.DaysAbsent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction,
                 Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary);
         }).ToList();
@@ -803,9 +914,9 @@ public partial class SalarySheetViewModel : ObservableObject
             yield break;
 
         if (!row.BaseSalaryOverride.HasValue)
-            yield return new ValidationIssue(row.Name, "Override base salary is required.", "base_override_required");
+            yield return new ValidationIssue(row.Name, "Salary paid is required.", "base_override_required");
         else if (row.BaseSalaryOverride.Value < 0m)
-            yield return new ValidationIssue(row.Name, "Override base salary cannot be negative.", "base_override_negative");
+            yield return new ValidationIssue(row.Name, "Salary paid cannot be negative.", "base_override_negative");
     }
 
     private static PayrollValidationInput ToPayrollInput(SalaryRowVm row, bool includeAdvance)
@@ -820,7 +931,8 @@ public partial class SalarySheetViewModel : ObservableObject
             EffectiveTdsDeduction(row),
             includeAdvance ? row.AdvanceDeductionEntry : 0m,
             row.AdvanceBalance,
-            row.ExistingSalaryAdvanceDeduction);
+            row.ExistingSalaryAdvanceDeduction,
+            row.IsBaseSalaryOverrideEnabled ? row.BaseSalaryOverride : row.DefaultSalaryPaid);
 
     private static decimal EffectiveEsicDeduction(SalaryRowVm row)
         => row.UsesEsicPf ? Math.Max(0, row.EsicDeduction) : 0m;
@@ -832,7 +944,10 @@ public partial class SalarySheetViewModel : ObservableObject
         => row.UsesTds ? Math.Max(0, row.TdsDeduction) : 0m;
 
     private static decimal? EffectiveBaseSalaryOverride(SalaryRowVm row)
-        => row.IsBaseSalaryOverrideEnabled && row.BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
+        => row.IsBaseSalaryOverrideEnabled
+            && row.BaseSalaryOverride is decimal overrideSalary
+            && overrideSalary >= 0m
+            && overrideSalary != row.DefaultSalaryPaid
             ? overrideSalary
             : null;
 
@@ -857,12 +972,5 @@ public partial class SalarySheetViewModel : ObservableObject
         return issues;
     }
 
-    private sealed record SalaryGroupSortOption(int Id, string Name);
     private sealed record AttendanceLoadState(int EmployeeId, decimal? BaseSalaryOverride);
-
-    private static string ResolveSelectedGroupName(MonthlyPayrollRow row, IReadOnlyList<SalaryGroupSortOption> selectedGroups)
-    {
-        var membershipIds = row.Groups.Select(g => g.Id).ToHashSet();
-        return selectedGroups.FirstOrDefault(g => membershipIds.Contains(g.Id))?.Name ?? "Ungrouped";
-    }
 }

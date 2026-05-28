@@ -103,7 +103,7 @@ public class MonthlyPayrollServiceTests
     }
 
     [Fact]
-    public async Task LoadAsync_AppliesBaseSalaryOverridesAndLegacyNetOverrides()
+    public async Task LoadAsync_AppliesSalaryPaidOverridesAndLegacyNetOverrides()
     {
         using var factory = new SqliteDbContextFactory();
         await SeedAsync(factory, db =>
@@ -143,14 +143,15 @@ public class MonthlyPayrollServiceTests
 
         var salaryOverride = snapshot.Rows.Single(r => r.Name == "Base Override");
         Assert.Equal(30000m, salaryOverride.EmployeeBaseSalary);
-        Assert.Equal(20000m, salaryOverride.EffectiveBaseSalary);
+        Assert.Equal(30000m, salaryOverride.EffectiveBaseSalary);
+        Assert.Equal(20000m, salaryOverride.SalaryPaid);
         Assert.Null(salaryOverride.HistoricalNetSalaryOverride);
         Assert.True(salaryOverride.UsesEsicPf);
         Assert.False(salaryOverride.UsesTds);
         Assert.Equal(100m, salaryOverride.EsicDeduction);
         Assert.Equal(200m, salaryOverride.PfDeduction);
         Assert.Equal(0m, salaryOverride.TdsDeduction);
-        Assert.Equal(19054.84m, salaryOverride.NetSalary);
+        Assert.Equal(19700m, salaryOverride.NetSalary);
     }
 
     [Fact]

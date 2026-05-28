@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -20,6 +21,9 @@ public class DialogService
     public virtual bool ConfirmDestructive(string message, string title = "Confirm Delete")
         => MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
+    public virtual bool ConfirmWarning(string message, string title = "Confirm")
+        => MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+
     public virtual void Info(string message, string title = "Information")
         => MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -31,6 +35,9 @@ public class DialogService
 
     public virtual Task<bool> ConfirmDestructiveAsync(string message, string title = "Confirm Delete")
         => ShowChoiceAsync(message, title, "Cancel", "Delete", true);
+
+    public virtual Task<bool> ConfirmWarningAsync(string message, string title = "Confirm", string confirmText = "Continue")
+        => ShowChoiceAsync(message, title, "Cancel", confirmText, false, useWarningFallback: true);
 
     public virtual Task InfoAsync(string message, string title = "Information")
         => ShowNoticeAsync(message, title, "OK", false);
@@ -48,6 +55,71 @@ public class DialogService
     {
         var dlg = new OpenFileDialog { Filter = filter };
         return dlg.ShowDialog() == true ? dlg.FileName : null;
+    }
+
+    public virtual async Task<decimal?> AskNonNegativeDecimalAsync(
+        string title,
+        string label,
+        decimal defaultValue = 0m,
+        string confirmText = "Apply")
+    {
+        if (Application.Current is null)
+            return null;
+
+        decimal? amount = null;
+        var amountBox = new TextBox
+        {
+            Text = defaultValue.ToString("0.##", CultureInfo.CurrentCulture),
+            MinWidth = 240,
+            Margin = new Thickness(0, 4, 0, 8)
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = FindBrush("DangerBrush", Brushes.Firebrick),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+
+        var applyButton = CreateButton(confirmText, true, false);
+        var cancelButton = CreateButton("Cancel", false, false);
+        applyButton.Click += (_, _) =>
+        {
+            if (!decimal.TryParse(amountBox.Text.Trim(), NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed))
+            {
+                errorText.Text = "Enter a valid amount.";
+                errorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            if (parsed < 0m)
+            {
+                errorText.Text = "Amount cannot be negative.";
+                errorText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            amount = parsed;
+            DialogHost.CloseDialogCommand.Execute(true, applyButton);
+        };
+        cancelButton.Click += (_, _) => DialogHost.CloseDialogCommand.Execute(false, cancelButton);
+
+        var content = CreateDialogCard(
+            title,
+            new StackPanel
+            {
+                Children =
+                {
+                    CreateFieldLabel(label),
+                    amountBox,
+                    errorText
+                }
+            },
+            cancelButton,
+            applyButton);
+
+        var result = await ShowDialogHostAsync(content);
+        return result is true ? amount : null;
     }
 
     public virtual IciciExportOptions? AskIciciExportOptions(string? savedDebitAccount)
@@ -204,18 +276,48 @@ public class DialogService
 
     private async Task<bool> ShowContentDialogAsync(FrameworkElement content, Window? owner)
     {
-        if (Application.Current is null)
+        var app = Application.Current;
+        if (app is null)
             return false;
 
-        _ = owner;
-        var result = await ShowDialogHostAsync(CreateSurface(content));
-        return result is true;
+        if (!app.Dispatcher.CheckAccess())
+        {
+            var operation = app.Dispatcher.InvokeAsync(() => ShowContentDialogAsync(content, owner));
+            return await await operation.Task;
+        }
+
+        var dialogOwner = owner ?? app.MainWindow;
+        var window = new Window
+        {
+            Title = ResolveContentDialogTitle(content),
+            Content = CreateSurface(content),
+            Owner = dialogOwner,
+            WindowStartupLocation = dialogOwner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            Background = FindBrush("BackgroundBrush", Brushes.White),
+            UseLayoutRounding = true,
+            SnapsToDevicePixels = true
+        };
+
+        return window.ShowDialog() == true;
     }
 
-    private async Task<bool> ShowChoiceAsync(string message, string title, string cancelText, string confirmText, bool isDestructive)
+    private async Task<bool> ShowChoiceAsync(
+        string message,
+        string title,
+        string cancelText,
+        string confirmText,
+        bool isDestructive,
+        bool useWarningFallback = false)
     {
         if (Application.Current is null)
-            return isDestructive ? ConfirmDestructive(message, title) : Confirm(message, title);
+            return isDestructive
+                ? ConfirmDestructive(message, title)
+                : useWarningFallback
+                    ? ConfirmWarning(message, title)
+                    : Confirm(message, title);
 
         var cancelButton = CreateButton(cancelText, false, false);
         var confirmButton = CreateButton(confirmText, true, isDestructive);
@@ -332,4 +434,12 @@ public class DialogService
 
     private static Brush FindBrush(string key, Brush fallback)
         => Application.Current?.TryFindResource(key) as Brush ?? fallback;
+
+    private static string ResolveContentDialogTitle(FrameworkElement content)
+        => content.DataContext switch
+        {
+            AddEmployeeViewModel employeeVm => employeeVm.WindowTitle,
+            AdvanceEntryEditVm => "Edit advance entry",
+            _ => "Salary Manager"
+        };
 }

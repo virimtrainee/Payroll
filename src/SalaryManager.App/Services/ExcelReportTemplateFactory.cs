@@ -10,11 +10,11 @@ internal static class ExcelReportTemplateFactory
         var ws = wb.AddWorksheet(worksheetName);
 
         ws.Cell(1, 1).Value = "Payroll Summary - {{MonthName}} {{Year}}";
-        ws.Range(1, 1, 1, 9).Merge().Style.Font.SetBold().Font.SetFontSize(14);
+        ws.Range(1, 1, 1, 10).Merge().Style.Font.SetBold().Font.SetFontSize(14);
 
         AddHeaders(ws, 3, new[]
         {
-            "Employee", "Base Salary", "Days Absent", "Deduction", "ESIC", "PF", "TDS", "Advance Deduction", "Net Salary"
+            "Employee", "Base Salary", "Days Absent", "Deduction", "Salary Paid", "ESIC", "PF", "TDS", "Advance Deduction", "Net Salary"
         });
 
         var expressions = new[]
@@ -23,6 +23,7 @@ internal static class ExcelReportTemplateFactory
             "{{item.BaseSalary}}",
             "{{item.DaysAbsent}}",
             "{{item.Deduction}}",
+            "{{item.SalaryPaid}}",
             "{{item.EsicDeduction}}",
             "{{item.PfDeduction}}",
             "{{item.TdsDeduction}}",
@@ -32,14 +33,14 @@ internal static class ExcelReportTemplateFactory
         AddRow(ws, 4, expressions);
 
         ws.Cell(5, 1).Value = "TOTAL";
-        foreach (var column in new[] { 2, 4, 5, 6, 7, 8, 9 })
+        foreach (var column in new[] { 2, 4, 5, 6, 7, 8, 9, 10 })
             ws.Cell(5, column).Value = "<<sum>>";
-        ws.Range(5, 1, 5, 9).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
+        ws.Range(5, 1, 5, 10).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
             .Font.SetFontColor(XLColor.White);
 
         ws.Range(4, 2, 5, 2).Style.NumberFormat.Format = "#,##0.00";
-        ws.Range(4, 4, 5, 9).Style.NumberFormat.Format = "#,##0.00";
-        ws.Range(4, 1, 5, 9).AddToNamed("Rows");
+        ws.Range(4, 4, 5, 10).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(4, 1, 5, 10).AddToNamed("Rows");
 
         return wb;
     }

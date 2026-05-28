@@ -16,8 +16,8 @@ public class ExcelExportServiceTests
         {
             var rows = new[]
             {
-                new MonthlySummaryRow("A", 10000m, 0, 0m, 10m, 20m, 30m, 40m, 9900m),
-                new MonthlySummaryRow("B", 20000m, 2, 500m, 15m, 25m, 35m, 45m, 19380m),
+                new MonthlySummaryRow("A", 10000m, 10000m, 0, 0m, 10m, 20m, 30m, 40m, 9900m),
+                new MonthlySummaryRow("B", 20000m, 19500m, 2, 500m, 15m, 25m, 35m, 45m, 19380m),
             };
 
             new ExcelExportService().ExportMonthlySummary(2026, 5, rows, path);
@@ -32,9 +32,10 @@ public class ExcelExportServiceTests
             Assert.Equal("TOTAL", ws.Cell(6, 1).GetString());
             Assert.Equal(30000m, ws.Cell(6, 2).GetValue<decimal>());
             Assert.Equal(500m, ws.Cell(6, 4).GetValue<decimal>());
-            Assert.Equal(29280m, ws.Cell(6, 9).GetValue<decimal>());
+            Assert.Equal(29500m, ws.Cell(6, 5).GetValue<decimal>());
+            Assert.Equal(29280m, ws.Cell(6, 10).GetValue<decimal>());
             Assert.Equal(28d, ws.Column(1).Width, 2);
-            Assert.Equal(18d, ws.Column(8).Width, 2);
+            Assert.Equal(18d, ws.Column(9).Width, 2);
         }
         finally
         {

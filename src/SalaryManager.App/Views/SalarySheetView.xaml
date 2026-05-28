@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:helpers="clr-namespace:SalaryManager.App.Helpers"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              PreviewKeyDown="UserControl_PreviewKeyDown">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -13,51 +14,165 @@
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="TextAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="LineHeight" Value="18"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style x:Key="CenterCellText" TargetType="TextBlock">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="LineHeight" Value="18"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style x:Key="RightCellText" TargetType="TextBlock">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style x:Key="GroupChipCheckBox" TargetType="CheckBox" BasedOn="{StaticResource MaterialDesignCheckBox}">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="LineHeight" Value="18"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
-        <Style x:Key="AllChipButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+        <Style x:Key="ToolbarIcon" TargetType="{x:Type materialDesign:PackIcon}">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style x:Key="ResizableSalaryColumnHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
-            <Setter Property="Background" Value="#F1F5F9"/>
+        <Style x:Key="SalaryToolbarButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Padding" Value="9,6"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+        <Style x:Key="SalaryToolbarPrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Padding" Value="9,6"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+        <Style x:Key="SalaryToolbarComboBox" TargetType="ComboBox" BasedOn="{StaticResource PayrollModernComboBox}">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="materialDesign:HintAssist.IsFloating" Value="False"/>
+        </Style>
+        <Style x:Key="SalaryMenuItemIcon" TargetType="{x:Type materialDesign:PackIcon}">
+            <Setter Property="Width" Value="17"/>
+            <Setter Property="Height" Value="17"/>
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="7,0"/>
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="Cursor" Value="SizeWE"/>
         </Style>
-        <Style x:Key="SalaryHeaderLeft" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Style x:Key="SfSalaryCell" TargetType="{x:Type syncfusion:GridCell}">
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CurrentCellBorderBrush" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="CurrentCellBorderThickness" Value="1.5"/>
+            <Setter Property="SelectionBorderVisibility" Value="Visible"/>
         </Style>
-        <Style x:Key="SalaryHeaderCenter" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        </Style>
-        <Style x:Key="SalaryHeaderRight" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ResizableSalaryColumnHeader}">
+        <Style TargetType="{x:Type syncfusion:GridTableSummaryCell}" BasedOn="{StaticResource SfSalaryCell}">
             <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="#DBEAFE"/>
+            <Setter Property="BorderBrush" Value="#93C5FD"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
         </Style>
-        <Style x:Key="SalaryReadOnlyCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-            <Setter Property="Background" Value="Transparent"/>
+        <Style TargetType="{x:Type syncfusion:GridHeaderCellControl}">
+            <Setter Property="Background" Value="#EEF2F7"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <Style x:Key="SalaryEditableCell" TargetType="DataGridCell" BasedOn="{StaticResource EditableCell}">
-            <Setter Property="Background" Value="Transparent"/>
+        <Style TargetType="{x:Type syncfusion:GridFilterControl}">
+            <Setter Property="FilterMode" Value="AdvancedFilter"/>
+        </Style>
+        <Style TargetType="{x:Type syncfusion:AdvancedFilterControl}">
+            <Setter Property="CanGenerateUniqueItems" Value="False"/>
+        </Style>
+        <Style x:Key="SfSalaryEditableCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=syncfusion:SfDataGrid}}" Value="True">
+                    <Setter Property="Background" Value="#FFFBEB"/>
+                    <Setter Property="BorderBrush" Value="#FDE68A"/>
+                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfEmployeeCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PaymentMode}" Value="Cash">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ProRataDays, Converter={StaticResource IsPositiveConverter}}" Value="True">
+                    <Setter Property="Background" Value="#ECFEFF"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfSalaryPaidCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryEditableCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasInvalidBaseSalaryOverride}" Value="True">
+                    <Setter Property="Background" Value="#FEE2E2"/>
+                    <Setter Property="Foreground" Value="#B91C1C"/>
+                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfEsicPfCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryEditableCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding UsesEsicPf}" Value="False">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                    <Setter Property="Foreground" Value="#64748B"/>
+                    <Setter Property="Opacity" Value="0.72"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfTdsCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryEditableCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding UsesTds}" Value="False">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                    <Setter Property="Foreground" Value="#64748B"/>
+                    <Setter Property="Opacity" Value="0.72"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfAdvanceBalanceCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding AdvanceBalance, Converter={StaticResource IsPositiveConverter}}" Value="True">
+                    <Setter Property="Background" Value="#FFF7ED"/>
+                    <Setter Property="Foreground" Value="#C2410C"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SfNumericReadOnlyCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        </Style>
+        <Style x:Key="SfNetCell" TargetType="{x:Type syncfusion:GridCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NetSalary, Converter={StaticResource IsNonPositiveConverter}}" Value="True">
+                    <Setter Property="Background" Value="#FEE2E2"/>
+                    <Setter Property="Foreground" Value="#B91C1C"/>
+                    <Setter Property="BorderBrush" Value="#FCA5A5"/>
+                    <Setter Property="BorderThickness" Value="1,0,1,0"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -66,183 +181,156 @@
         <ProgressBar Style="{StaticResource LoadingBar}"
                      Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
 
-        <Grid Margin="18,12,18,8">
+        <Grid Margin="14,8,14,6">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Text="Salary Sheet"
-                       Style="{StaticResource PageTitle}"
-                       FontSize="24"
-                       Margin="0,0,0,8"/>
-
-            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8">
+            <Border Grid.Row="0" Style="{StaticResource Card}" Padding="8" Margin="0,0,0,6">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="210"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="210"/>
-                            <ColumnDefinition Width="14"/>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="14"/>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Month" Style="{StaticResource InlineLabel}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="96"/>
-                                </Grid.ColumnDefinitions>
-                                <ComboBox ItemsSource="{Binding Months}"
-                                          Style="{StaticResource PayrollModernComboBox}"
-                                          materialDesign:HintAssist.Hint="Month"
-                                          SelectedItem="{Binding SelectedMonth}"
-                                          DisplayMemberPath="Name"/>
-                                <ComboBox Grid.Column="2"
-                                          Style="{StaticResource PayrollModernComboBox}"
-                                          materialDesign:HintAssist.Hint="Year"
-                                          ItemsSource="{Binding Years}"
-                                          SelectedItem="{Binding SelectedYear}"/>
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Group" Style="{StaticResource InlineLabel}"/>
-                            <ComboBox ItemsSource="{Binding GroupDropdownOptions}"
-                                      Style="{StaticResource PayrollModernComboBox}"
-                                      materialDesign:HintAssist.Hint="Group"
-                                      SelectedItem="{Binding SelectedGroupDropdownFilter}"
+                    <StackPanel Grid.Column="0" VerticalAlignment="Bottom">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="104"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="82"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox ItemsSource="{Binding Months}"
+                                      Style="{StaticResource SalaryToolbarComboBox}"
+                                      materialDesign:HintAssist.Hint="Month"
+                                      SelectedItem="{Binding SelectedMonth}"
                                       DisplayMemberPath="Name"/>
-                        </StackPanel>
+                            <ComboBox Grid.Column="2"
+                                      Style="{StaticResource SalaryToolbarComboBox}"
+                                      materialDesign:HintAssist.Hint="Year"
+                                      ItemsSource="{Binding Years}"
+                                      SelectedItem="{Binding SelectedYear}"/>
+                        </Grid>
+                    </StackPanel>
 
-                        <StackPanel Grid.Column="4">
-                            <TextBlock Text="Search Employee" Style="{StaticResource InlineLabel}"/>
-                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     Tag="Search by name..."/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="6"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Bottom">
-                            <Button Margin="0,0,6,0"
-                                    Padding="10,7"
-                                    Command="{Binding ToggleEditModeCommand}">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                        <Setter Property="Content" Value="Edit"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsEditMode}" Value="True">
-                                                <Setter Property="Content" Value="Lock"/>
-                                                <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
-                            <Button Style="{StaticResource SecondaryButton}"
-                                    Content="Save"
-                                    IsEnabled="{Binding IsEditMode}"
-                                    Padding="10,7"
-                                    Margin="0,0,6,0"
-                                    Command="{Binding SaveAttendanceCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}"
-                                    Content="Load"
-                                    Padding="10,7"
-                                    Margin="0,0,6,0"
-                                    Command="{Binding LoadCommand}"/>
-                            <Button Style="{StaticResource PrimaryButton}"
-                                    Content="Emp"
-                                    Visibility="Collapsed"
-                                    Padding="10,7"
-                                    Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Group"
-                                   Style="{StaticResource FieldLabel}"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,10,0"/>
-                        <ScrollViewer Grid.Column="1"
-                                      HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Disabled">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="All"
-                                        Command="{Binding ClearGroupFiltersCommand}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource AllChipButton}">
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Bottom">
+                        <Button Click="CommitSalaryGridEdit_Click"
+                                Command="{Binding ToggleEditModeCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SalaryToolbarButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsAllGroupsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="#EFF6FF"/>
-                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                    <Setter Property="BorderBrush" Value="#BFDBFE"/>
+                                                <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </Button.Style>
-                                </Button>
-                                <ItemsControl ItemsSource="{Binding GroupFilterOptions}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <CheckBox Content="{Binding Name}"
-                                                      IsChecked="{Binding IsSelected}"
-                                                      Style="{StaticResource GroupChipCheckBox}"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                    </StackPanel.Style>
+                                    <materialDesign:PackIcon Kind="PencilOutline" Style="{StaticResource ToolbarIcon}"/>
+                                    <TextBlock Text="Edit"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <materialDesign:PackIcon Kind="LockOutline" Style="{StaticResource ToolbarIcon}"/>
+                                    <TextBlock Text="Lock"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                        <Button Style="{StaticResource SalaryToolbarButton}"
+                                IsEnabled="{Binding IsEditMode}"
+                                Click="CommitSalaryGridEdit_Click"
+                                Command="{Binding SaveAttendanceCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ContentSaveOutline" Style="{StaticResource ToolbarIcon}"/>
+                                <TextBlock Text="Save"/>
                             </StackPanel>
-                        </ScrollViewer>
-
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Export"
-                                       Style="{StaticResource FieldLabel}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <Button Style="{StaticResource PrimaryButton}" Content="Add"
-                                    Margin="0,0,6,0" Padding="10,7"
-                                    Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="Cash PDF"
-                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportCashPdfCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="All PDF"
-                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportSummaryPdfCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="ICICI"
-                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportIciciExcelCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="Excel"
-                                    Margin="0,0,6,0" Padding="10,7" Command="{Binding ExportToExcelCommand}"/>
-                            <Button Style="{StaticResource SecondaryButton}" Content="Post Adv"
-                                    Padding="10,7"
-                                    Command="{Binding PostDeductionsCommand}"/>
-                        </StackPanel>
-                    </Grid>
+                        </Button>
+                        <Button Style="{StaticResource SalaryToolbarButton}"
+                                Margin="0,0,10,0"
+                                Command="{Binding ResetTableCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Refresh" Style="{StaticResource ToolbarIcon}"/>
+                                <TextBlock Text="Reset"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SalaryToolbarPrimaryButton}"
+                                Command="{Binding DataContext.EmployeesVm.OpenAddEmployeeCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Plus" Style="{StaticResource ToolbarIcon}"/>
+                                <TextBlock Text="Add"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ExportMenuButton"
+                                Style="{StaticResource SalaryToolbarButton}"
+                                Margin="0"
+                                Click="ExportButton_Click">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="Cash PDF" Command="{Binding ExportCashPdfCommand}">
+                                        <MenuItem.Icon>
+                                            <materialDesign:PackIcon Kind="CashMultiple" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="All PDF" Command="{Binding ExportSummaryPdfCommand}">
+                                        <MenuItem.Icon>
+                                            <materialDesign:PackIcon Kind="FilePdfBox" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="ICICI" Command="{Binding ExportIciciExcelCommand}">
+                                        <MenuItem.Icon>
+                                            <materialDesign:PackIcon Kind="BankOutline" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator/>
+                                    <MenuItem Header="Excel" Command="{Binding ExportToExcelCommand}">
+                                        <MenuItem.Icon>
+                                            <materialDesign:PackIcon Kind="FileExcelBox" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Grid Excel" Click="GridExcelButton_Click">
+                                        <MenuItem.Icon>
+                                            <materialDesign:PackIcon Kind="TableLarge" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ExportVariant" Style="{StaticResource ToolbarIcon}"/>
+                                <TextBlock Text="Export"/>
+                                <materialDesign:PackIcon Kind="MenuDown" Width="16" Height="16" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+            <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0">
                 <Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20,40">
                         <StackPanel.Style>
@@ -261,127 +349,144 @@
                                    Text="Add employees from the Employees page, or pick a different month/group."/>
                     </StackPanel>
 
-                    <DataGrid x:Name="SalaryGrid"
-                              ItemsSource="{Binding RowsView}"
-                              IsReadOnly="{Binding IsGridReadOnly}"
-                              RowHeight="44"
-                              RowBackground="White"
-                              AlternatingRowBackground="#F3F4F6"
-                              AlternationCount="2"
-                              CanUserResizeColumns="True"
-                              CellStyle="{StaticResource SalaryReadOnlyCell}"
-                              ColumnHeaderStyle="{StaticResource ResizableSalaryColumnHeader}"
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              SelectionUnit="Cell"
-                              SelectionMode="Single"
-                              CurrentCellChanged="SalaryGrid_CurrentCellChanged"
-                              PreviewKeyDown="SalaryGrid_PreviewKeyDown">
-                        <DataGrid.Style>
-                            <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+                    <syncfusion:SfDataGrid x:Name="SalaryGrid"
+                                           AutoGenerateColumns="False"
+                                           ItemsSource="{Binding RowsView}"
+                                           IsReadOnly="{Binding IsGridReadOnly}"
+                                           AllowEditing="{Binding IsEditMode}"
+                                           AllowFiltering="True"
+                                           AllowGrouping="True"
+                                           AllowResizingColumns="True"
+                                           AllowSorting="True"
+                                           AutoExpandGroups="True"
+                                           CanUseViewFilter="True"
+                                           ColumnSizer="None"
+                                           FrozenColumnCount="2"
+                                           GridLinesVisibility="Horizontal"
+                                           HeaderRowHeight="38"
+                                           RowHeight="44"
+                                           NavigationMode="Cell"
+                                           ScrollMode="Async"
+                                           SelectionMode="Extended"
+                                           SelectionUnit="Cell"
+                                           ShowGroupDropArea="False"
+                                           ShowRowHeader="False"
+                                           CellStyle="{StaticResource SfSalaryCell}"
+                                           CurrentCellActivated="SalaryGrid_CurrentCellActivated"
+                                           PreviewMouseRightButtonDown="SalaryGrid_PreviewMouseRightButtonDown">
+                        <syncfusion:SfDataGrid.ContextMenu>
+                            <ContextMenu Opened="SalaryGridContextMenu_Opened">
+                                <MenuItem x:Name="ExportSelectionPdfMenuItem" Header="Export Selection to PDF" Click="ExportSelectionPdf_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="FilePdfBox" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator/>
+                                <MenuItem x:Name="FillSalaryPaidBaseMenuItem" Header="Reset Salary Paid to Calculated" Click="FillSalaryPaidBase_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="CurrencyInr" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="ClearSalaryPaidMenuItem" Header="Clear Salary Paid" Click="ClearSalaryPaid_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="BackspaceOutline" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="ZeroDeductionsMenuItem" Header="Zero Deductions" Click="ZeroDeductions_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="Numeric0BoxMultipleOutline" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="SetAdvanceDeductionMenuItem" Header="Set Advance Deduction..." Click="SetAdvanceDeduction_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="CashMinus" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </syncfusion:SfDataGrid.ContextMenu>
+                        <syncfusion:SfDataGrid.Style>
+                            <Style TargetType="syncfusion:SfDataGrid">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Rows.Count}" Value="0">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </DataGrid.Style>
-                        <DataGrid.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.ContainerStyle>
-                                    <Style TargetType="{x:Type GroupItem}">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="{x:Type GroupItem}">
-                                                    <StackPanel>
-                                                        <Border Background="#F8FAFC"
-                                                                BorderBrush="{StaticResource BorderBrush}"
-                                                                BorderThickness="0,0,0,1"
-                                                                Padding="12,9">
-                                                            <Grid>
-                                                                <TextBlock Text="{Binding Name}"
-                                                                           FontWeight="SemiBold"
-                                                                           Foreground="{StaticResource TextBrush}"/>
-                                                                <TextBlock HorizontalAlignment="Right"
-                                                                           Text="{Binding Converter={StaticResource SalaryGroupSummaryConverter}}"
-                                                                           FontSize="12"
-                                                                           Foreground="{StaticResource MutedTextBrush}"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <ItemsPresenter/>
-                                                    </StackPanel>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </GroupStyle.ContainerStyle>
-                            </GroupStyle>
-                        </DataGrid.GroupStyle>
+                        </syncfusion:SfDataGrid.Style>
+                        <syncfusion:SfDataGrid.GroupColumnDescriptions>
+                            <syncfusion:GroupColumnDescription ColumnName="GroupDisplayName"/>
+                        </syncfusion:SfDataGrid.GroupColumnDescriptions>
+                        <syncfusion:SfDataGrid.TableSummaryRows>
+                            <syncfusion:GridTableSummaryRow Position="Bottom" ShowSummaryInRow="False">
+                                <syncfusion:GridTableSummaryRow.SummaryColumns>
+                                    <syncfusion:GridSummaryColumn Name="BaseTotal" MappingName="EmployeeBaseSalary" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="SalaryPaidTotal" MappingName="SalaryPaid" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="EsicTotal" MappingName="EsicDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="PfTotal" MappingName="PfDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="TdsTotal" MappingName="TdsDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="DeductionTotal" MappingName="TotalDeductions" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="AdvanceDeductionTotal" MappingName="AdvanceDeductionEntry" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="AdvanceBalanceTotal" MappingName="AdvanceBalance" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                    <syncfusion:GridSummaryColumn Name="NetTotal" MappingName="NetSalary" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
+                                </syncfusion:GridTableSummaryRow.SummaryColumns>
+                            </syncfusion:GridTableSummaryRow>
+                        </syncfusion:SfDataGrid.TableSummaryRows>
+                        <syncfusion:SfDataGrid.Columns>
+                            <syncfusion:GridTextColumn HeaderText="#"
+                                                       helpers:DataGridColumnKey.Key="serial"
+                                                       MappingName="SerialNumber"
+                                                       IsReadOnly="True"
+                                                       AllowEditing="False"
+                                                       AllowFiltering="False"
+                                                       HorizontalHeaderContentAlignment="Center"
+                                                       TextAlignment="Center"
+                                                       Width="44"
+                                                       MinimumWidth="44"/>
 
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="#"
-                                                helpers:DataGridColumnKey.Key="serial"
-                                                Binding="{Binding SerialNumber}"
-                                                IsReadOnly="True"
-                                                HeaderStyle="{StaticResource SalaryHeaderCenter}"
-                                                Width="44"
-                                                MinWidth="44">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource CenterCellText}">
-                                        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-
-                            <DataGridTemplateColumn Header="Employee" helpers:DataGridColumnKey.Key="employee" Width="*" MinWidth="250" IsReadOnly="True"
-                                                    HeaderStyle="{StaticResource SalaryHeaderLeft}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Employee"
+                                                           helpers:DataGridColumnKey.Key="employee"
+                                                           MappingName="Name"
+                                                           IsReadOnly="True"
+                                                           AllowEditing="False"
+                                                           HorizontalHeaderContentAlignment="Left"
+                                                           CellStyle="{StaticResource SfEmployeeCell}"
+                                                           Width="180"
+                                                           MinimumWidth="150">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="96"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontWeight="SemiBold"
-                                                       Style="{StaticResource LeftCellText}"
-                                                       VerticalAlignment="Center"/>
-                                            <CheckBox Grid.Column="1"
-                                                      Content="Override"
-                                                      IsChecked="{Binding IsBaseSalaryOverrideEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                      IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                      Foreground="{StaticResource MutedTextBrush}"
-                                                      FontSize="12"
-                                                      VerticalAlignment="Center"
-                                                      Margin="10,0,6,0"/>
-                                            <TextBox Grid.Column="2"
-                                                     Text="{Binding BaseSalaryOverride, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
-                                                     IsEnabled="{Binding DataContext.IsEditMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                     ToolTip="{Binding BaseSalaryOverrideValidationMessage}"
-                                                     TextAlignment="Right"
-                                                     VerticalContentAlignment="Center"
-                                                     Height="28"
-                                                     Padding="6,0"
-                                                     Visibility="{Binding IsBaseSalaryOverrideEnabled, Converter={StaticResource BoolToVis}}"/>
-                                        </Grid>
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   Style="{StaticResource LeftCellText}"
+                                                   VerticalAlignment="Center"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTextColumn Header="Group"
-                                                helpers:DataGridColumnKey.Key="group"
-                                                Binding="{Binding GroupDisplayName}"
-                                                IsReadOnly="True"
-                                                HeaderStyle="{StaticResource SalaryHeaderLeft}"
-                                                ElementStyle="{StaticResource LeftCellText}"
-                                                Width="90"
-                                                MinWidth="82"/>
+                            <syncfusion:GridTextColumn HeaderText="Group"
+                                                       helpers:DataGridColumnKey.Key="group"
+                                                       MappingName="GroupDisplayName"
+                                                       IsReadOnly="True"
+                                                       AllowEditing="False"
+                                                       HorizontalHeaderContentAlignment="Left"
+                                                       TextAlignment="Left"
+                                                       Width="90"
+                                                       MinimumWidth="82"/>
 
-                            <DataGridTemplateColumn Header="Pay" helpers:DataGridColumnKey.Key="payment" Width="82" MinWidth="82" IsReadOnly="True"
-                                                    HeaderStyle="{StaticResource SalaryHeaderCenter}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Pay"
+                                                           helpers:DataGridColumnKey.Key="payment"
+                                                           MappingName="PaymentModeLabel"
+                                                           IsReadOnly="True"
+                                                           AllowEditing="False"
+                                                           HorizontalHeaderContentAlignment="Center"
+                                                           Width="82"
+                                                           MinimumWidth="82">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border CornerRadius="6" Padding="12,4" HorizontalAlignment="Center" BorderThickness="1">
+                                        <Border CornerRadius="4"
+                                                MinWidth="54"
+                                                Padding="8,2"
+                                                HorizontalAlignment="Center"
+                                                BorderThickness="1">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="Background" Value="#D1FAE5"/>
@@ -415,177 +520,304 @@
                                             </TextBlock>
                                         </Border>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTextColumn Header="Base (₹)"
-                                                helpers:DataGridColumnKey.Key="baseSalary"
-                                                Binding="{Binding EffectiveBaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
-                                                IsReadOnly="True"
-                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                Width="110"
-                                                MinWidth="104"
-                                                ElementStyle="{StaticResource RightCellText}"/>
+                            <syncfusion:GridTextColumn HeaderText="Base (₹)"
+                                                       helpers:DataGridColumnKey.Key="baseSalary"
+                                                       MappingName="EmployeeBaseSalary"
+                                                       DisplayBinding="{Binding EmployeeBaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                       IsReadOnly="True"
+                                                       AllowEditing="False"
+                                                       CellStyle="{StaticResource SfNumericReadOnlyCell}"
+                                                       HorizontalHeaderContentAlignment="Right"
+                                                       TextAlignment="Right"
+                                                       Width="110"
+                                                       MinimumWidth="104"/>
 
-                            <DataGridTemplateColumn Header="Absent" helpers:DataGridColumnKey.Key="absent" Width="70"
-                                                    MinWidth="64"
-                                                    HeaderStyle="{StaticResource SalaryHeaderCenter}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Absent"
+                                                           helpers:DataGridColumnKey.Key="absent"
+                                                           MappingName="DaysAbsent"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfSalaryEditableCell}"
+                                                           HorizontalHeaderContentAlignment="Center"
+                                                           TextAlignment="Center"
+                                                           Width="70"
+                                                           MinimumWidth="64">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding DaysAbsent}"
                                                    Style="{StaticResource CenterCellText}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
                                     <DataTemplate>
                                         <TextBox Text="{Binding DaysAbsent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 TextAlignment="Center"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="4,0"/>
+                                                  syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  TextAlignment="Center"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="4,0"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="ESIC" helpers:DataGridColumnKey.Key="esic" Width="78"
-                                                    MinWidth="70"
-                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Salary Paid"
+                                                           helpers:DataGridColumnKey.Key="salaryPaid"
+                                                           MappingName="SalaryPaid"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfSalaryPaidCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="112"
+                                                           MinimumWidth="104">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding SalaryPaid, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
+                                    </DataTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding SalaryPaid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                                 ToolTip="{Binding SalaryPaidValidationMessage}"
+                                                  syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
+                                    </DataTemplate>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
+
+                            <syncfusion:GridTemplateColumn HeaderText="ESIC"
+                                                           helpers:DataGridColumnKey.Key="esic"
+                                                           MappingName="EsicDeduction"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfEsicPfCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="78"
+                                                           MinimumWidth="70">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding EsicDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                    Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
                                     <DataTemplate>
                                         <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding UsesEsicPf}"
-                                                 TextAlignment="Right"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="8,0"/>
+                                                 syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  IsEnabled="{Binding UsesEsicPf}"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="PF" helpers:DataGridColumnKey.Key="pf" Width="74"
-                                                    MinWidth="66"
-                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="PF"
+                                                           helpers:DataGridColumnKey.Key="pf"
+                                                           MappingName="PfDeduction"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfEsicPfCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="74"
+                                                           MinimumWidth="66">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding PfDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                    Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
                                     <DataTemplate>
                                         <TextBox Text="{Binding PfDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding UsesEsicPf}"
-                                                 TextAlignment="Right"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="8,0"/>
+                                                 syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  IsEnabled="{Binding UsesEsicPf}"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="TDS" helpers:DataGridColumnKey.Key="tds" Width="78"
-                                                    MinWidth="70"
-                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="TDS"
+                                                           helpers:DataGridColumnKey.Key="tds"
+                                                           MappingName="TdsDeduction"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfTdsCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="78"
+                                                           MinimumWidth="70">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding TdsDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                    Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
                                     <DataTemplate>
                                         <TextBox Text="{Binding TdsDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 IsEnabled="{Binding UsesTds}"
-                                                 TextAlignment="Right"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="8,0"/>
+                                                 syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  IsEnabled="{Binding UsesTds}"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTextColumn Header="Deduct"
-                                                helpers:DataGridColumnKey.Key="deductions"
-                                                Binding="{Binding TotalDeductions, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
-                                                IsReadOnly="True"
-                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                Width="96"
-                                                MinWidth="86"
-                                                ElementStyle="{StaticResource RightCellText}"/>
+                            <syncfusion:GridTextColumn HeaderText="Deduct"
+                                                       helpers:DataGridColumnKey.Key="deductions"
+                                                       MappingName="TotalDeductions"
+                                                       DisplayBinding="{Binding TotalDeductions, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                       IsReadOnly="True"
+                                                       AllowEditing="False"
+                                                       CellStyle="{StaticResource SfNumericReadOnlyCell}"
+                                                       HorizontalHeaderContentAlignment="Right"
+                                                       TextAlignment="Right"
+                                                       Width="96"
+                                                       MinimumWidth="86"/>
 
-                            <DataGridTemplateColumn Header="Adv Ded" helpers:DataGridColumnKey.Key="advanceDeduction" Width="92"
-                                                    MinWidth="86"
-                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryEditableCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Adv Ded"
+                                                           helpers:DataGridColumnKey.Key="advanceDeduction"
+                                                           MappingName="AdvanceDeductionEntry"
+                                                           AllowEditing="True"
+                                                           CellStyle="{StaticResource SfSalaryEditableCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="92"
+                                                           MinimumWidth="86">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding AdvanceDeductionEntry, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                    Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                                <DataGridTemplateColumn.CellEditingTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
                                     <DataTemplate>
                                         <TextBox Text="{Binding AdvanceDeductionEntry, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 TextAlignment="Right"
-                                                 VerticalContentAlignment="Center"
-                                                 BorderThickness="0"
-                                                 Padding="8,0"/>
+                                                  syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellEditingTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTextColumn Header="Adv Bal"
-                                                helpers:DataGridColumnKey.Key="advanceBalance"
-                                                Binding="{Binding AdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
-                                                IsReadOnly="True"
-                                                HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                Width="98"
-                                                MinWidth="86">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource RightCellText}">
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                        <Setter Property="Foreground" Value="#EA580C"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding AdvanceBalance}" Value="0">
-                                                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
+                            <syncfusion:GridTemplateColumn HeaderText="Adv Bal"
+                                                           helpers:DataGridColumnKey.Key="advanceBalance"
+                                                           MappingName="AdvanceBalance"
+                                                           IsReadOnly="True"
+                                                           AllowEditing="False"
+                                                           CellStyle="{StaticResource SfAdvanceBalanceCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="98"
+                                                           MinimumWidth="86">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding AdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource RightCellText}">
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Foreground" Value="#EA580C"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding AdvanceBalance}" Value="0">
+                                                            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                            <DataGridTemplateColumn Header="Net" helpers:DataGridColumnKey.Key="netSalary" Width="106"
-                                                    MinWidth="100"
-                                                    IsReadOnly="True"
-                                                    HeaderStyle="{StaticResource SalaryHeaderRight}"
-                                                    CellStyle="{StaticResource SalaryReadOnlyCell}">
-                                <DataGridTemplateColumn.CellTemplate>
+                            <syncfusion:GridTemplateColumn HeaderText="Net"
+                                                           helpers:DataGridColumnKey.Key="netSalary"
+                                                           MappingName="NetSalary"
+                                                           IsReadOnly="True"
+                                                           AllowEditing="False"
+                                                           CellStyle="{StaticResource SfNetCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="106"
+                                                           MinimumWidth="100">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding NetSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                    Style="{StaticResource RightCellText}"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource PrimaryBrush}"/>
                                     </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                            </syncfusion:GridTemplateColumn>
 
-                        </DataGrid.Columns>
-                    </DataGrid>
+                        </syncfusion:SfDataGrid.Columns>
+                    </syncfusion:SfDataGrid>
+
+                    <Border x:Name="SalarySearchPopup"
+                            Panel.ZIndex="10"
+                            Visibility="Collapsed"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,10,12,0"
+                            Background="White"
+                            BorderBrush="#CBD5E1"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8">
+                        <DockPanel LastChildFill="True">
+                            <materialDesign:PackIcon Kind="Magnify"
+                                                     Width="18"
+                                                     Height="18"
+                                                     Foreground="{StaticResource MutedTextBrush}"
+                                                     VerticalAlignment="Center"
+                                                     Margin="0,0,6,0"/>
+                            <Button DockPanel.Dock="Right"
+                                    Click="CloseSalarySearch_Click"
+                                    Padding="3"
+                                    MinWidth="0"
+                                    Width="24"
+                                    Height="24"
+                                    Margin="8,0,0,0"
+                                    Style="{StaticResource SecondaryButton}">
+                                <materialDesign:PackIcon Kind="Close" Width="14" Height="14"/>
+                            </Button>
+                            <TextBox x:Name="SalarySearchBox"
+                                     Width="220"
+                                     BorderThickness="0"
+                                     materialDesign:HintAssist.Hint="Search"
+                                     TextChanged="SalarySearchBox_TextChanged"
+                                     PreviewKeyDown="SalarySearchBox_PreviewKeyDown"/>
+                        </DockPanel>
+                    </Border>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="3"
-                    Margin="0,12,0,0"
+            <Border Grid.Row="2"
+                    Margin="0,6,0,0"
                     CornerRadius="8"
                     BorderBrush="#BFDBFE"
                     BorderThickness="1"
@@ -603,45 +835,45 @@
                         <ColumnDefinition Width="260"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Margin="14,10">
+                    <StackPanel Margin="10,6">
                         <TextBlock Text="Gross Pay" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalGross, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalGross, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=0}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="14,10">
+                    <StackPanel Grid.Column="1" Margin="10,6">
                         <TextBlock Text="Absent Ded." Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAbsenceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalAbsenceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="14,10">
+                    <StackPanel Grid.Column="2" Margin="10,6">
                         <TextBlock Text="ESIC" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalEsic, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalEsic, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Margin="14,10">
+                    <StackPanel Grid.Column="3" Margin="10,6">
                         <TextBlock Text="PF" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalPf, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalPf, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="4" Margin="14,10">
+                    <StackPanel Grid.Column="4" Margin="10,6">
                         <TextBlock Text="TDS" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalTds, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalTds, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="5" Margin="14,10">
+                    <StackPanel Grid.Column="5" Margin="10,6">
                         <TextBlock Text="Adv. Deducted" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAdvanceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalAdvanceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="6" Margin="14,10">
+                    <StackPanel Grid.Column="6" Margin="10,6">
                         <TextBlock Text="Advance Balance" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalAdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="17" FontWeight="Bold" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding TotalAdvanceBalance, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
                     <Border Grid.Column="7"
                             Background="{StaticResource PrimaryBrush}"
                             CornerRadius="0,8,8,0"
-                            Padding="22,10">
+                            Padding="18,7">
                         <StackPanel>
                             <TextBlock Text="Net Payable" Foreground="#DBEAFE" FontWeight="SemiBold"/>
                             <TextBlock Text="{Binding TotalNet, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}"
                                        Foreground="White"
-                                       FontSize="24"
+                                       FontSize="21"
                                        FontWeight="Bold"
-                                       Margin="0,2,0,0"/>
+                                       Margin="0,1,0,0"/>
                         </StackPanel>
                     </Border>
                 </Grid>

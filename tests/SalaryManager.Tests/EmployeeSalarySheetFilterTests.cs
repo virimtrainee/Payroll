@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using SalaryManager.App.Helpers;
 using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using SalaryManager.Data;
@@ -137,7 +138,7 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
-    public async Task SalarySheetLoad_SelectedGroupsIncludeAnyMembership()
+    public async Task SalarySheetLoad_LoadsAllGroupsForTableFiltering()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -161,50 +162,13 @@ public class EmployeeSalarySheetFilterTests
         var viewModel = NewSalarySheetViewModel(factory, initializer);
         await viewModel.LoadCommand.ExecuteAsync(null);
 
-        viewModel.GroupFilterOptions.Single(g => g.Name == "Factory").IsSelected = true;
-        await viewModel.LoadCommand.ExecuteAsync(null);
-        viewModel.GroupFilterOptions.Single(g => g.Name == "Night").IsSelected = true;
-        await viewModel.LoadCommand.ExecuteAsync(null);
-
-        Assert.Equal(["Both", "Factory Only", "Night Only"], viewModel.Rows.Select(r => r.Name));
+        Assert.Equal(["Both", "Factory Only", "Night Only", "Ungrouped"], viewModel.Rows.Select(r => r.Name));
+        Assert.Equal(["Factory", "Factory", "Night", "Other"], viewModel.Rows.Select(r => r.GroupDisplayName));
+        Assert.Empty(viewModel.RowsView.GroupDescriptions);
     }
 
     [Fact]
-    public async Task SalarySheetLoad_SelectedGroupsAreGroupedSortedAndDeduplicated()
-    {
-        using var factory = new SqliteDbContextFactory();
-        var initializer = await ReadyInitializerAsync(factory);
-        await SeedAsync(factory, db =>
-        {
-            db.EmployeeGroups.AddRange(
-                new EmployeeGroup { Id = 1, Name = "s_factory" },
-                new EmployeeGroup { Id = 2, Name = "s_night" });
-            db.Employees.AddRange(
-                new Employee { Id = 1, Name = "Both", BaseSalary = 20000m, IsActive = true },
-                new Employee { Id = 2, Name = "Factory Only", BaseSalary = 20000m, IsActive = true },
-                new Employee { Id = 3, Name = "Night Only", BaseSalary = 20000m, IsActive = true },
-                new Employee { Id = 4, Name = "Ungrouped", BaseSalary = 20000m, IsActive = true });
-            db.EmployeeGroupMemberships.AddRange(
-                new EmployeeGroupMembership { EmployeeId = 1, EmployeeGroupId = 1 },
-                new EmployeeGroupMembership { EmployeeId = 1, EmployeeGroupId = 2 },
-                new EmployeeGroupMembership { EmployeeId = 2, EmployeeGroupId = 1 },
-                new EmployeeGroupMembership { EmployeeId = 3, EmployeeGroupId = 2 });
-        });
-
-        var viewModel = NewSalarySheetViewModel(factory, initializer);
-        await viewModel.LoadCommand.ExecuteAsync(null);
-
-        viewModel.GroupFilterOptions.Single(g => g.Name == "s_night").IsSelected = true;
-        viewModel.GroupFilterOptions.Single(g => g.Name == "s_factory").IsSelected = true;
-        await viewModel.LoadCommand.ExecuteAsync(null);
-
-        Assert.Equal(["Both", "Factory Only", "Night Only"], viewModel.Rows.Select(r => r.Name));
-        Assert.Equal(["s_factory", "s_factory", "s_night"], viewModel.Rows.Select(r => r.GroupDisplayName));
-        Assert.Single(viewModel.RowsView.GroupDescriptions);
-    }
-
-    [Fact]
-    public async Task SalarySheetSave_BaseSalaryOverridePersistsReloadsAndUpdatesTotals()
+    public async Task SalarySheetSave_SalaryPaidPersistsReloadsAndUpdatesTotals()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -217,11 +181,22 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Rows);
-        row.IsBaseSalaryOverrideEnabled = true;
-        row.BaseSalaryOverride = 12000m;
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(10000m, row.SalaryPaid);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
 
-        Assert.Equal(12000m, row.EffectiveBaseSalary);
+        row.SalaryPaid = 12000m;
+
+        Assert.True(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(12000m, row.BaseSalaryOverride);
+        Assert.Equal(12000m, row.SalaryPaid);
+        Assert.Equal(10000m, row.BaseSalary);
+        Assert.Equal(10000m, row.EmployeeBaseSalary);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
+        Assert.Equal(12000m, row.EffectiveSalaryPaid);
         Assert.Equal(12000m, row.NetSalary);
+        viewModel.FlushPendingTotalRefresh();
         Assert.Equal(12000m, viewModel.TotalGross);
         Assert.Equal(12000m, viewModel.TotalNet);
         Assert.Equal(0m, viewModel.TotalDeduction);
@@ -240,9 +215,187 @@ public class EmployeeSalarySheetFilterTests
         var reloaded = Assert.Single(viewModel.Rows);
         Assert.True(reloaded.IsBaseSalaryOverrideEnabled);
         Assert.Equal(12000m, reloaded.BaseSalaryOverride);
-        Assert.Equal(12000m, reloaded.EffectiveBaseSalary);
+        Assert.Equal(12000m, reloaded.SalaryPaid);
+        Assert.Equal(10000m, reloaded.BaseSalary);
+        Assert.Equal(10000m, reloaded.EmployeeBaseSalary);
+        Assert.Equal(10000m, reloaded.EffectiveBaseSalary);
+        Assert.Equal(12000m, reloaded.EffectiveSalaryPaid);
         Assert.Equal(12000m, reloaded.NetSalary);
         Assert.Equal(12000m, viewModel.TotalNet);
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_BaseSalaryPaidValueDoesNotPersistOverride()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(10000m, row.SalaryPaid);
+
+        row.SalaryPaid = 10000m;
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
+        Assert.Equal(10000m, row.EffectiveSalaryPaid);
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+            Assert.Null(saved.BaseSalaryOverride);
+        }
+
+        row.SalaryPaid = 12000m;
+        row.SalaryPaid = 10000m;
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(10000m, row.SalaryPaid);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
+        Assert.Equal(10000m, row.EffectiveSalaryPaid);
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+            Assert.Null(saved.BaseSalaryOverride);
+        }
+    }
+
+    [Fact]
+    public async Task SalarySheetSalaryPaid_DefaultFollowsAbsenceUntilManualOverride()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(30000m, row.SalaryPaid);
+
+        row.DaysAbsent = 1;
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(29032.26m, row.DefaultSalaryPaid);
+        Assert.Equal(29032.26m, row.SalaryPaid);
+        Assert.Equal(29032.26m, row.EffectiveSalaryPaid);
+        Assert.Equal(29032.26m, row.NetSalary);
+
+        row.SalaryPaid = 28000m;
+        row.DaysAbsent = 2;
+
+        Assert.True(row.IsBaseSalaryOverrideEnabled);
+        Assert.Equal(28064.52m, row.DefaultSalaryPaid);
+        Assert.Equal(28000m, row.SalaryPaid);
+        Assert.Equal(28000m, row.EffectiveSalaryPaid);
+        Assert.Equal(28000m, row.NetSalary);
+
+        row.SalaryPaid = row.DefaultSalaryPaid;
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(28064.52m, row.SalaryPaid);
+    }
+
+    [Fact]
+    public async Task SalarySheetLock_SavesAndLeavesEditModeOnlyOnSuccess()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.IsEditMode = true;
+        var row = Assert.Single(viewModel.Rows);
+        row.SalaryPaid = 12000m;
+
+        await viewModel.ToggleEditModeCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsEditMode);
+        using var verifyDb = factory.CreateDbContext();
+        var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+        Assert.Equal(12000m, saved.BaseSalaryOverride);
+    }
+
+    [Fact]
+    public async Task SalarySheetLock_StaysEditableWhenSaveValidationFails()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var dialogs = NewDialogService();
+        var viewModel = NewSalarySheetViewModel(factory, initializer, dialogs);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        viewModel.IsEditMode = true;
+        var row = Assert.Single(viewModel.Rows);
+        row.IsBaseSalaryOverrideEnabled = true;
+        row.BaseSalaryOverride = null;
+
+        await viewModel.ToggleEditModeCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsEditMode);
+        await dialogs.Received().ErrorAsync(
+            Arg.Is<string>(message => message.Contains("Salary paid is required.")),
+            Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task SalarySheetReset_WarnsAndOnlyReloadsWhenConfirmed()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var dialogs = NewDialogService();
+        dialogs.ConfirmWarningAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        var viewModel = NewSalarySheetViewModel(factory, initializer, dialogs);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        row.SalaryPaid = 12000m;
+
+        await viewModel.ResetTableCommand.ExecuteAsync(null);
+
+        Assert.Equal(12000m, row.SalaryPaid);
+
+        dialogs.ConfirmWarningAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+        await viewModel.ResetTableCommand.ExecuteAsync(null);
+
+        var reloaded = Assert.Single(viewModel.Rows);
+        Assert.Equal(10000m, reloaded.SalaryPaid);
+        await dialogs.Received(2).ConfirmWarningAsync(
+            Arg.Is<string>(message => message.Contains("Unsaved changes")),
+            Arg.Any<string>(),
+            Arg.Is<string>(text => text == "Reset"));
     }
 
     [Fact]
@@ -262,6 +415,7 @@ public class EmployeeSalarySheetFilterTests
         row.DaysAbsent = 1;
         row.TdsDeduction = 100m;
         row.AdvanceDeductionEntry = 50m;
+        viewModel.FlushPendingTotalRefresh();
 
         Assert.Equal(1, viewModel.TotalDaysAbsent);
         Assert.Equal(100m, viewModel.TotalTds);
@@ -269,15 +423,146 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(967.74m, viewModel.TotalAbsenceDeduction);
         Assert.Equal(28882.26m, viewModel.TotalNet);
 
-        row.IsBaseSalaryOverrideEnabled = true;
-        row.BaseSalaryOverride = 20000m;
+        row.SalaryPaid = 20000m;
 
         Assert.True(row.UsesEsicPf);
         Assert.False(row.UsesTds);
         Assert.Equal(0m, row.TdsDeduction);
+        viewModel.FlushPendingTotalRefresh();
         Assert.Equal(20000m, viewModel.TotalGross);
-        Assert.Equal(19304.84m, viewModel.TotalNet);
-        Assert.Equal(695.16m, viewModel.TotalDeduction);
+        Assert.Equal(19950m, viewModel.TotalNet);
+        Assert.Equal(50m, viewModel.TotalDeduction);
+    }
+
+    [Fact]
+    public async Task SalarySheetTotals_DebouncesAggregateRefreshAndCanFlush()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(30000m, viewModel.TotalNet);
+
+        row.DaysAbsent = 1;
+
+        Assert.Equal(30000m, viewModel.TotalNet);
+
+        await Task.Delay(SalarySheetViewModel.TotalRefreshDebounceDelay + TimeSpan.FromMilliseconds(80));
+
+        Assert.Equal(29032.26m, viewModel.TotalNet);
+
+        row.DaysAbsent = 2;
+        viewModel.FlushPendingTotalRefresh();
+
+        Assert.Equal(28064.52m, viewModel.TotalNet);
+    }
+
+    [Fact]
+    public async Task SalarySheetBulkActions_UpdateSalaryPaidAndDeductions()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.IsEditMode = true;
+
+        var row = Assert.Single(viewModel.Rows);
+        row.SalaryPaid = 20000m;
+        row.TdsDeduction = 125m;
+        row.AdvanceDeductionEntry = 75m;
+        viewModel.FlushPendingTotalRefresh();
+
+        viewModel.ResetSalaryPaidToCalculated([row]);
+        viewModel.FlushPendingTotalRefresh();
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(30000m, row.SalaryPaid);
+        Assert.Equal(30000m, viewModel.TotalGross);
+
+        viewModel.ZeroDeductions([row], ["tds"]);
+        viewModel.FlushPendingTotalRefresh();
+
+        Assert.Equal(0m, row.TdsDeduction);
+        Assert.Equal(75m, row.AdvanceDeductionEntry);
+        Assert.Equal(75m, viewModel.TotalAdvanceDeduction);
+
+        viewModel.ZeroDeductions([row], []);
+        viewModel.FlushPendingTotalRefresh();
+
+        Assert.Equal(0m, row.EsicDeduction);
+        Assert.Equal(0m, row.PfDeduction);
+        Assert.Equal(0m, row.TdsDeduction);
+        Assert.Equal(0m, row.AdvanceDeductionEntry);
+        Assert.Equal(0m, viewModel.TotalAdvanceDeduction);
+    }
+
+    [Fact]
+    public async Task SalarySheetBulkAdvanceDeduction_RejectsNegativeAndUpdatesTotals()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.IsEditMode = true;
+
+        var row = Assert.Single(viewModel.Rows);
+
+        Assert.False(viewModel.ApplyAdvanceDeduction([row], -1m));
+        Assert.Equal(0m, row.AdvanceDeductionEntry);
+
+        Assert.True(viewModel.ApplyAdvanceDeduction([row], 250m));
+        viewModel.FlushPendingTotalRefresh();
+
+        Assert.Equal(250m, row.AdvanceDeductionEntry);
+        Assert.Equal(250m, viewModel.TotalAdvanceDeduction);
+        Assert.Equal(9750m, viewModel.TotalNet);
+    }
+
+    [Fact]
+    public void SalarySheetSelectionSnapshot_OrdersSelectedRowsAndVisibleColumns()
+    {
+        var rowA = new SalaryRowVm { Name = "A", EmployeeBaseSalary = 10000m };
+        var rowB = new SalaryRowVm { Name = "B", EmployeeBaseSalary = 10000m };
+        var rowC = new SalaryRowVm { Name = "C", EmployeeBaseSalary = 10000m };
+        var columns = new[]
+        {
+            new SalarySheetColumnSelection("employee", "Name", "Employee"),
+            new SalarySheetColumnSelection("absent", "DaysAbsent", "Absent"),
+            new SalarySheetColumnSelection("salaryPaid", "SalaryPaid", "Salary Paid"),
+            new SalarySheetColumnSelection("tds", "TdsDeduction", "TDS"),
+        };
+        var cells = new[]
+        {
+            new SalarySheetCellSelection(rowC, "tds", 3),
+            new SalarySheetCellSelection(rowA, "salaryPaid", 1),
+            new SalarySheetCellSelection(rowC, "absent", 3),
+        };
+
+        var snapshot = SalarySheetGridSelection.FromCellSelections(columns, cells);
+
+        Assert.Equal(["A", "C"], snapshot.Rows.Select(row => row.Name));
+        Assert.Equal(["absent", "salaryPaid", "tds"], snapshot.ColumnKeys);
+        Assert.Equal(["DaysAbsent", "SalaryPaid", "TdsDeduction"], snapshot.MappingNames);
+        Assert.True(snapshot.Contains(rowC, "TdsDeduction"));
+        Assert.False(snapshot.Contains(rowB, "TdsDeduction"));
     }
 
     [Fact]
@@ -301,14 +586,14 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
 
         await dialogs.Received().ErrorAsync(
-            Arg.Is<string>(message => message.Contains("Override base salary is required.")),
+            Arg.Is<string>(message => message.Contains("Salary paid is required.")),
             Arg.Any<string>());
 
-        row.BaseSalaryOverride = -1m;
+        row.SalaryPaid = -1m;
         await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
 
         await dialogs.Received().ErrorAsync(
-            Arg.Is<string>(message => message.Contains("Override base salary cannot be negative.")),
+            Arg.Is<string>(message => message.Contains("Salary paid cannot be negative.")),
             Arg.Any<string>());
 
         using var verifyDb = factory.CreateDbContext();
@@ -316,7 +601,7 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
-    public async Task SalarySheetSave_UncheckedBaseOverrideClearsOverrideAndLegacyNetOverride()
+    public async Task SalarySheetSave_ClearingSalaryPaidClearsOverrideAndLegacyNetOverride()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -338,10 +623,19 @@ public class EmployeeSalarySheetFilterTests
 
         var row = Assert.Single(viewModel.Rows);
         Assert.True(row.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(12000m, row.EffectiveBaseSalary);
+        Assert.Equal(12000m, row.SalaryPaid);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
+        Assert.Equal(12000m, row.EffectiveSalaryPaid);
         Assert.Equal(12000m, row.NetSalary);
 
-        row.IsBaseSalaryOverrideEnabled = false;
+        row.SalaryPaid = null;
+
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(10000m, row.SalaryPaid);
+        Assert.Equal(10000m, row.EffectiveBaseSalary);
+        Assert.Equal(10000m, row.EffectiveSalaryPaid);
+
         await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
 
         using var verifyDb = factory.CreateDbContext();
@@ -441,7 +735,7 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
-    public async Task SalarySheetLoad_BaseOverrideEqualToEmployeeSalaryStillShowsEnabled()
+    public async Task SalarySheetLoad_BaseOverrideEqualToEmployeeSalaryUsesDefaultSalaryPaid()
     {
         using var factory = new SqliteDbContextFactory();
         var initializer = await ReadyInitializerAsync(factory);
@@ -461,8 +755,59 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Rows);
-        Assert.True(row.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(10000m, row.BaseSalaryOverride);
+        Assert.False(row.IsBaseSalaryOverrideEnabled);
+        Assert.Null(row.BaseSalaryOverride);
+        Assert.Equal(10000m, row.SalaryPaid);
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using var verifyDb = factory.CreateDbContext();
+        var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+        Assert.Null(saved.BaseSalaryOverride);
+    }
+
+    [Fact]
+    public void SalarySheetGridNavigation_MovesAcrossEditableCellsBeforeNextRow()
+    {
+        var esicPfRow = new SalaryRowVm
+        {
+            Name = "ESIC PF",
+            EmployeeBaseSalary = 20000m,
+            Year = 2026,
+            Month = 5
+        };
+        esicPfRow.InitializeEditableValues(false, null, 0, 0m, 0m, 0m, 0m);
+
+        var tdsRow = new SalaryRowVm
+        {
+            Name = "TDS",
+            EmployeeBaseSalary = 30000m,
+            Year = 2026,
+            Month = 5
+        };
+        tdsRow.InitializeEditableValues(false, null, 0, 0m, 0m, 0m, 0m);
+
+        Assert.Equal(
+            ["absent", "salaryPaid", "esic", "pf", "advanceDeduction"],
+            SalarySheetGridNavigation.GetEditableColumnKeys(esicPfRow));
+        Assert.Equal(
+            ["absent", "salaryPaid", "tds", "advanceDeduction"],
+            SalarySheetGridNavigation.GetEditableColumnKeys(tdsRow));
+
+        var rows = new[] { esicPfRow, tdsRow };
+        Assert.Equal((0, "salaryPaid"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "absent"));
+        Assert.Equal((0, "esic"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "salaryPaid"));
+        Assert.Equal((0, "pf"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "esic"));
+        Assert.Equal((0, "advanceDeduction"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "pf"));
+        Assert.Equal((1, "absent"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "advanceDeduction"));
+        Assert.Equal((1, "tds"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 1, "salaryPaid"));
+        Assert.Equal(
+            (0, "salaryPaid"),
+            SalarySheetGridNavigation.FindNextEditableColumnKey(
+                rows,
+                0,
+                "absent",
+                new HashSet<string> { "salaryPaid", "absent", "advanceDeduction" }));
     }
 
     [Fact]
@@ -489,7 +834,8 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Rows);
-        Assert.Equal(20000m, row.BaseSalary);
+        Assert.Equal(30000m, row.BaseSalary);
+        Assert.Equal(20000m, row.EffectiveSalaryPaid);
         Assert.True(row.UsesEsicPf);
         Assert.False(row.UsesTds);
         Assert.Equal(100m, row.EsicDeduction);
@@ -728,6 +1074,9 @@ public class EmployeeSalarySheetFilterTests
         dialogs.InfoAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.CompletedTask);
         dialogs.ConfirmAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
         dialogs.ConfirmDestructiveAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
+        dialogs.ConfirmWarningAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
+        dialogs.AskNonNegativeDecimalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>())
+            .Returns(Task.FromResult<decimal?>(null));
         return dialogs;
     }
 

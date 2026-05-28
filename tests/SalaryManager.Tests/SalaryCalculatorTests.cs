@@ -21,7 +21,31 @@ public class SalaryCalculatorTests
         var r = SalaryCalculator.Compute(30000m, 2025, 6, daysAbsent: 3);
         Assert.Equal(1000m, r.PerDayRate);
         Assert.Equal(3000m, r.Deduction);
+        Assert.Equal(27000m, r.SalaryPaid);
         Assert.Equal(27000m, r.NetSalary);
+    }
+
+    [Fact]
+    public void ComputeFromSalaryPaid_DoesNotApplyAbsenceTwice()
+    {
+        var r = SalaryCalculator.ComputeFromSalaryPaid(30000m, 28000m, 2025, 6, daysAbsent: 3,
+            tdsDeduction: 100m);
+
+        Assert.Equal(3000m, r.Deduction);
+        Assert.Equal(28000m, r.SalaryPaid);
+        Assert.Equal(27900m, r.NetSalary);
+    }
+
+    [Fact]
+    public void ComputeFromSalaryPaid_UsesSalaryPaidForStatutoryThreshold()
+    {
+        var r = SalaryCalculator.ComputeFromSalaryPaid(30000m, 24000m, 2025, 6, daysAbsent: 3,
+            esicDeduction: 100m, pfDeduction: 200m, tdsDeduction: 300m);
+
+        Assert.Equal(100m, r.EsicDeduction);
+        Assert.Equal(200m, r.PfDeduction);
+        Assert.Equal(0m, r.TdsDeduction);
+        Assert.Equal(23700m, r.NetSalary);
     }
 
     [Fact]

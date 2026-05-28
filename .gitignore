@@ -78,6 +78,9 @@ TestSheet_extracted/
 graphify-out/
 .graphify*
 
+# Local secrets compiled into private builds
+src/SalaryManager.App/Services/SyncfusionLicenseKey.local.cs
+
 # OS junk
 Thumbs.db
 ehthumbs.db

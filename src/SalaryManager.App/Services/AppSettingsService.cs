@@ -81,6 +81,9 @@ public class AppSettingsService
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
             ?? new Dictionary<string, double>();
 
-        return settings with { SalarySheetColumnWidths = widths };
+        return settings with
+        {
+            SalarySheetColumnWidths = widths
+        };
     }
 }

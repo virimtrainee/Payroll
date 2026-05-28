@@ -109,9 +109,9 @@ public partial class DashboardViewModel : ObservableObject
             TotalEmployees = await db.Employees.CountAsync();
             var activeEmployeeIds = payroll.Rows.Select(r => r.EmployeeId).ToList();
             ActiveEmployees = payroll.Rows.Count;
-            GrossPayroll = payroll.Rows.Sum(r => Math.Max(0m, r.EffectiveBaseSalary));
+            GrossPayroll = payroll.Rows.Sum(r => Math.Max(0m, r.SalaryPaid));
             PayablePayroll = payroll.Rows
-                .Where(r => r.EffectiveBaseSalary >= 0m && r.Breakdown is not null)
+                .Where(r => r.SalaryPaid >= 0m && r.Breakdown is not null)
                 .Sum(r => Math.Max(0m, r.NetSalary));
             var balancesByEmployee = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
             OutstandingAdvances = balancesByEmployee.Values.Sum();

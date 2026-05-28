@@ -132,7 +132,7 @@ public partial class ReportsViewModel : ObservableObject
         {
             var snapshot = await LoadCurrentPayrollSnapshotAsync();
             var rows = BuildValidatedSummaryRows(snapshot);
-            var gross = rows.Sum(r => r.BaseSalary);
+            var gross = rows.Sum(r => r.SalaryPaid);
             var net = rows.Sum(r => r.NetSalary);
             var ded = gross - net;
             var active = snapshot.Rows.Count;
@@ -443,10 +443,11 @@ public partial class ReportsViewModel : ObservableObject
             .SumOutstandingAsync();
 
         var daysAbsent = attendance?.DaysAbsent ?? 0;
-        var effectiveBaseSalary = EffectiveBaseSalary(employee, attendance);
-        var esic = UsesEsicPf(employee, effectiveBaseSalary) ? attendance?.EsicDeduction ?? 0m : 0m;
-        var pf = UsesEsicPf(employee, effectiveBaseSalary) ? attendance?.PfDeduction ?? 0m : 0m;
-        var tds = UsesTds(employee, effectiveBaseSalary) ? attendance?.TdsDeduction ?? 0m : 0m;
+        var effectiveBaseSalary = employee.BaseSalary;
+        var salaryPaid = EffectiveSalaryPaid(employee, attendance, daysAbsent, SelectedYear, SelectedMonth.Number);
+        var esic = UsesEsicPf(employee, salaryPaid) ? attendance?.EsicDeduction ?? 0m : 0m;
+        var pf = UsesEsicPf(employee, salaryPaid) ? attendance?.PfDeduction ?? 0m : 0m;
+        var tds = UsesTds(employee, salaryPaid) ? attendance?.TdsDeduction ?? 0m : 0m;
 
         var validation = PayrollValidator.Validate(new PayrollValidationInput(
             employee.Name,
@@ -459,7 +460,8 @@ public partial class ReportsViewModel : ObservableObject
             tds,
             advanceDeduction,
             advanceBalance,
-            advanceDeduction));
+            advanceDeduction,
+            salaryPaid));
         var issues = validation.Issues.ToList();
         var slipNetOverride = EffectiveHistoricalNetSalaryOverride(attendance);
         if (slipNetOverride < 0)
@@ -467,7 +469,15 @@ public partial class ReportsViewModel : ObservableObject
         if (issues.Count > 0)
             throw new InvalidOperationException(new ValidationResult(issues).ToMessage());
 
-        var breakdown = SalaryCalculator.Compute(effectiveBaseSalary, SelectedYear, SelectedMonth.Number, daysAbsent, esic, pf, tds);
+        var breakdown = SalaryCalculator.ComputeFromSalaryPaid(
+            effectiveBaseSalary,
+            salaryPaid,
+            SelectedYear,
+            SelectedMonth.Number,
+            daysAbsent,
+            esic,
+            pf,
+            tds);
         return new SalarySlipData(
             employee,
             SelectedYear,
@@ -513,17 +523,18 @@ public partial class ReportsViewModel : ObservableObject
         catch { OpenFile(path); }
     }
 
-    private static decimal EffectiveBaseSalary(Employee employee, AttendanceRecord? attendance)
-        => attendance?.BaseSalaryOverride ?? employee.BaseSalary;
+    private static decimal EffectiveSalaryPaid(Employee employee, AttendanceRecord? attendance, int daysAbsent, int year, int month)
+        => attendance?.BaseSalaryOverride
+        ?? SalaryCalculator.CalculateDefaultSalaryPaid(employee.BaseSalary, year, month, daysAbsent);
 
     private static decimal? EffectiveHistoricalNetSalaryOverride(AttendanceRecord? attendance)
         => attendance?.BaseSalaryOverride is null ? attendance?.NetSalaryOverride : null;
 
-    private static bool UsesEsicPf(Employee employee, decimal baseSalary)
-        => !HasCashDeductionsDisabled(employee) && baseSalary <= 25000m;
+    private static bool UsesEsicPf(Employee employee, decimal salaryPaid)
+        => !HasCashDeductionsDisabled(employee) && salaryPaid <= 25000m;
 
-    private static bool UsesTds(Employee employee, decimal baseSalary)
-        => !HasCashDeductionsDisabled(employee) && baseSalary > 25000m;
+    private static bool UsesTds(Employee employee, decimal salaryPaid)
+        => !HasCashDeductionsDisabled(employee) && salaryPaid > 25000m;
 
     private static bool HasCashDeductionsDisabled(Employee employee)
         => employee.PaymentMode == PaymentMode.Cash

@@ -16,6 +16,8 @@
         <conv:EmployeeGroupsTextConverter x:Key="EmployeeGroupsTextConverter"/>
         <conv:InitialsConverter x:Key="InitialsConverter"/>
         <conv:IndianCurrencyConverter x:Key="IndianCurrencyConverter"/>
+        <conv:IsPositiveConverter x:Key="IsPositiveConverter"/>
+        <conv:IsNonPositiveConverter x:Key="IsNonPositiveConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <!-- Brand palette -->

@@ -22,6 +22,7 @@ public record SalarySlipData(
 public record MonthlySummaryRow(
     string EmployeeName,
     decimal BaseSalary,
+    decimal SalaryPaid,
     int DaysAbsent,
     decimal Deduction,
     decimal EsicDeduction,
@@ -90,7 +91,7 @@ public class PdfSlipService
             p.Size(PageSizes.A5);
             p.Margin(28);
             p.PageColor(Colors.White);
-            p.DefaultTextStyle(t => t.FontSize(10).FontColor("#0F172A"));
+            p.DefaultTextStyle(t => t.FontFamily("Segoe UI").FontSize(10).FontColor("#0F172A"));
 
             p.Header().Column(col =>
             {
@@ -126,6 +127,7 @@ public class PdfSlipService
                     DetailRow(box, "Days present", d.Breakdown.DaysPresent.ToString());
                     DetailRow(box, "Per-day rate", d.Breakdown.PerDayRate.ToString("N2"));
                     DetailRow(box, "Absence deduction", $"- {d.Breakdown.Deduction:N2}");
+                    DetailRow(box, "Salary paid", d.Breakdown.SalaryPaid.ToString("N2"));
                     if (d.Breakdown.EsicDeduction > 0)
                         DetailRow(box, "ESIC deduction", $"- {d.Breakdown.EsicDeduction:N2}");
                     if (d.Breakdown.PfDeduction > 0)
@@ -182,7 +184,7 @@ public class PdfSlipService
         {
             p.Size(PageSizes.A4.Landscape());
             p.Margin(30);
-            p.DefaultTextStyle(t => t.FontSize(10).FontColor("#0F172A"));
+            p.DefaultTextStyle(t => t.FontFamily("Segoe UI").FontSize(10).FontColor("#0F172A"));
 
             p.Header().Column(col =>
             {
@@ -204,6 +206,7 @@ public class PdfSlipService
                     cd.RelativeColumn(2);
                     cd.RelativeColumn(2);
                     cd.RelativeColumn(2);
+                    cd.RelativeColumn(2);
                 });
 
                 t.Header(h =>
@@ -212,6 +215,7 @@ public class PdfSlipService
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Base Salary").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Absent").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Deduction").Bold();
+                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Salary Paid").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("ESIC").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("PF").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("TDS").Bold();
@@ -219,19 +223,21 @@ public class PdfSlipService
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Net Salary").Bold();
                 });
 
-                decimal totalBase = 0, totalDed = 0, totalEsic = 0, totalPf = 0, totalTds = 0, totalAdvance = 0, totalNet = 0;
+                decimal totalBase = 0, totalSalaryPaid = 0, totalDed = 0, totalEsic = 0, totalPf = 0, totalTds = 0, totalAdvance = 0, totalNet = 0;
                 foreach (var r in rows)
                 {
                     t.Cell().Padding(6).Text(r.EmployeeName);
                     t.Cell().Padding(6).AlignRight().Text(r.BaseSalary.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.DaysAbsent.ToString());
                     t.Cell().Padding(6).AlignRight().Text(r.Deduction.ToString("N2"));
+                    t.Cell().Padding(6).AlignRight().Text(r.SalaryPaid.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.PfDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.TdsDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
                     totalBase += r.BaseSalary;
+                    totalSalaryPaid += r.SalaryPaid;
                     totalDed += r.Deduction;
                     totalEsic += r.EsicDeduction;
                     totalPf += r.PfDeduction;
@@ -244,6 +250,7 @@ public class PdfSlipService
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text("").FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalSalaryPaid.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor(Colors.White);
@@ -267,7 +274,7 @@ public class PdfSlipService
         {
             p.Size(PageSizes.A4);
             p.Margin(30);
-            p.DefaultTextStyle(t => t.FontSize(10));
+            p.DefaultTextStyle(t => t.FontFamily("Segoe UI").FontSize(10));
 
             p.Header().Column(col =>
             {
@@ -329,7 +336,7 @@ public class PdfSlipService
         {
             p.Size(PageSizes.A4);
             p.Margin(30);
-            p.DefaultTextStyle(t => t.FontSize(10).FontColor("#0F172A"));
+            p.DefaultTextStyle(t => t.FontFamily("Segoe UI").FontSize(10).FontColor("#0F172A"));
 
             p.Header().Column(col =>
             {

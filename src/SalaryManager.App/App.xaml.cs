@@ -12,6 +12,7 @@ using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using SalaryManager.App.Views;
 using SalaryManager.Data;
+using Syncfusion.Licensing;
 
 namespace SalaryManager.App;
 
@@ -21,7 +22,15 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+        QuestPDF.Settings.UseEnvironmentFonts = true;
+        var syncfusionLicenseKey =
+            SyncfusionLicenseKey.Value
+            ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+            ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.User)
+            ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.Machine);
+        if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+            SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
 
         // Enter key moves focus to next control — but NOT inside DataGrid cells
         EventManager.RegisterClassHandler(typeof(TextBox), UIElement.KeyDownEvent,
@@ -95,7 +104,7 @@ public partial class App : Application
         var parent = VisualTreeHelper.GetParent(element);
         while (parent != null)
         {
-            if (parent is DataGrid) return true;
+            if (parent is DataGrid or Syncfusion.UI.Xaml.Grid.SfDataGrid) return true;
             parent = VisualTreeHelper.GetParent(parent);
         }
         return false;

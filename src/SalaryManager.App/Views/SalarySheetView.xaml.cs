@@ -1,15 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using SalaryManager.App.Helpers;
 using SalaryManager.App.ViewModels;
+using Syncfusion.UI.Xaml.Grid.Converter;
+using Syncfusion.UI.Xaml.Grid;
+using Syncfusion.UI.Xaml.Grid.Helpers;
+using Syncfusion.XlsIO;
 
 namespace SalaryManager.App.Views;
 
@@ -26,6 +31,7 @@ public partial class SalarySheetView : UserControl
     public SalarySheetView()
     {
         InitializeComponent();
+        SalaryGrid.SelectionController = new SalarySheetGridSelectionController(SalaryGrid);
         _columnSaveTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(600)
@@ -33,7 +39,7 @@ public partial class SalarySheetView : UserControl
         _columnSaveTimer.Tick += (_, _) =>
         {
             _columnSaveTimer.Stop();
-            SaveSalaryColumnWidths();
+            SaveSalaryColumnPreferences();
         };
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -43,6 +49,7 @@ public partial class SalarySheetView : UserControl
     {
         if (DataContext is not SalarySheetViewModel vm) return;
 
+        SalaryGrid.SearchHelper.AllowFiltering = false;
         AttachColumnWidthHandlers();
         ScheduleApplySavedColumnWidths(vm);
 
@@ -56,7 +63,7 @@ public partial class SalarySheetView : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _columnSaveTimer.Stop();
-        SaveSalaryColumnWidths();
+        SaveSalaryColumnPreferences();
     }
 
     private void AttachColumnWidthHandlers()
@@ -64,12 +71,14 @@ public partial class SalarySheetView : UserControl
         if (_columnWidthHandlersAttached) return;
 
         var descriptor = DependencyPropertyDescriptor.FromProperty(
-            DataGridColumn.WidthProperty,
-            typeof(DataGridColumn));
+            GridColumn.WidthProperty,
+            typeof(GridColumn));
         if (descriptor is null) return;
 
         foreach (var column in SalaryGrid.Columns)
+        {
             descriptor.AddValueChanged(column, OnSalaryColumnWidthChanged);
+        }
 
         _columnWidthHandlersAttached = true;
     }
@@ -77,8 +86,9 @@ public partial class SalarySheetView : UserControl
     private void OnSalaryColumnWidthChanged(object? sender, EventArgs e)
     {
         if (!_columnPreferencesReady || _applyingColumnWidths) return;
-        if (sender is not DataGridColumn { Width.IsAbsolute: true } column) return;
+        if (sender is not GridColumn column) return;
         if (string.IsNullOrWhiteSpace(DataGridColumnKey.GetKey(column))) return;
+        if (!double.IsFinite(column.Width) || column.Width < 40) return;
 
         _columnWidthsDirty = true;
         _columnSaveTimer.Stop();
@@ -95,37 +105,41 @@ public partial class SalarySheetView : UserControl
 
         Dispatcher.BeginInvoke(() =>
         {
-            ApplySavedColumnWidths(vm);
+            ApplySavedColumnPreferences(vm);
             _columnWidthsApplied = true;
             _columnPreferencesReady = true;
         }, DispatcherPriority.Background);
     }
 
-    private void ApplySavedColumnWidths(SalarySheetViewModel vm)
+    private void ApplySavedColumnPreferences(SalarySheetViewModel vm)
     {
         var widths = vm.LoadColumnWidths();
         if (widths.Count == 0) return;
 
         _applyingColumnWidths = true;
+        SalaryGrid.Columns.Suspend();
         try
         {
             foreach (var column in SalaryGrid.Columns)
             {
                 var key = DataGridColumnKey.GetKey(column);
                 if (string.IsNullOrWhiteSpace(key)) continue;
-                if (!widths.TryGetValue(key, out var width)) continue;
-                if (!double.IsFinite(width) || width < 40) continue;
-                var minimumWidth = Math.Max(column.MinWidth, 40);
-                column.Width = new DataGridLength(Math.Max(width, minimumWidth));
+                if (widths.TryGetValue(key, out var width) && double.IsFinite(width) && width >= 40)
+                {
+                    var minimumWidth = Math.Max(column.MinimumWidth, 40);
+                    column.Width = Math.Max(width, minimumWidth);
+                }
             }
         }
         finally
         {
+            SalaryGrid.Columns.Resume();
+            SalaryGrid.RefreshColumns();
             _applyingColumnWidths = false;
         }
     }
 
-    private void SaveSalaryColumnWidths()
+    private void SaveSalaryColumnPreferences()
     {
         if (!_columnWidthsDirty) return;
         if (!_columnPreferencesReady) return;
@@ -136,9 +150,8 @@ public partial class SalarySheetView : UserControl
         {
             var key = DataGridColumnKey.GetKey(column);
             if (string.IsNullOrWhiteSpace(key)) continue;
-            if (!column.Width.IsAbsolute) continue;
-            if (!double.IsFinite(column.Width.Value) || column.Width.Value < 40) continue;
-            widths[key] = column.Width.Value;
+            if (!double.IsFinite(column.Width) || column.Width < 40) continue;
+            widths[key] = column.Width;
         }
 
         vm.SaveColumnWidths(widths);
@@ -148,135 +161,476 @@ public partial class SalarySheetView : UserControl
     // Ctrl+S saves from anywhere inside the view, including while a cell is being edited
     private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
+        {
+            ShowSalarySearch();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && SalarySearchPopup.Visibility == Visibility.Visible)
+        {
+            HideSalarySearch(clearSearch: true);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.S && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
         {
             if (DataContext is SalarySheetViewModel vm)
             {
-                SalaryGrid.CommitEdit(DataGridEditingUnit.Cell, exitEditingMode: true);
+                SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+                vm.FlushPendingTotalRefresh();
                 vm.SaveAttendanceCommand.Execute(null);
             }
             e.Handled = true;
         }
     }
 
-    // Auto-enter edit mode when a cell becomes current (only in edit mode)
-    private void SalaryGrid_CurrentCellChanged(object sender, EventArgs e)
+    private void ShowSalarySearch()
     {
-        if (sender is not DataGrid dg || dg.IsReadOnly) return;
+        SalarySearchPopup.Visibility = Visibility.Visible;
+        SalarySearchBox.Focus();
+        SalarySearchBox.SelectAll();
+    }
+
+    private void HideSalarySearch(bool clearSearch)
+    {
+        if (clearSearch)
+        {
+            SalarySearchBox.Text = string.Empty;
+            SalaryGrid.SearchHelper.Search(string.Empty);
+        }
+
+        SalarySearchPopup.Visibility = Visibility.Collapsed;
+        SalaryGrid.Focus();
+    }
+
+    private void SalarySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        SalaryGrid.SearchHelper.Search(SalarySearchBox.Text ?? string.Empty);
+    }
+
+    private void SalarySearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            HideSalarySearch(clearSearch: true);
+            e.Handled = true;
+        }
+    }
+
+    private void CloseSalarySearch_Click(object sender, RoutedEventArgs e)
+        => HideSalarySearch(clearSearch: true);
+
+    // Auto-enter edit mode when a cell becomes current (only in edit mode)
+    private void SalaryGrid_CurrentCellActivated(object sender, CurrentCellActivatedEventArgs e)
+    {
+        if (sender is not SfDataGrid dg || dg.IsReadOnly) return;
         Application.Current.Dispatcher.InvokeAsync(
             () => BeginEditAndFocus(dg),
             DispatcherPriority.Input);
     }
 
-    // Enter moves focus through editable columns left-to-right, then wraps to next row
-    private void SalaryGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    private static void BeginEditAndFocus(SfDataGrid dg)
     {
-        if (e.Key != Key.Enter) return;
-        if (sender is not DataGrid dg || dg.IsReadOnly) return;
+        if (!IsEditableCell(dg.CurrentItem, dg.CurrentColumn)) return;
 
-        var editableHeaders = new[] { "Absent", "ESIC", "PF", "TDS", "Adv Ded" };
-        var editableCols = dg.Columns
-            .Where(c => editableHeaders.Contains(c.Header?.ToString()))
-            .OrderBy(c => c.DisplayIndex)
-            .ToList();
-
-        if (editableCols.Count == 0) return;
-
-        dg.CommitEdit(DataGridEditingUnit.Cell, exitEditingMode: true);
-
-        var curRowIdx = Math.Max(0, dg.Items.IndexOf(dg.CurrentItem));
-        var colIdx = Math.Max(-1, editableCols.IndexOf(dg.CurrentColumn));
-        var (nextRowIdx, nextCol) = FindNextEditableCell(dg, editableCols, curRowIdx, colIdx);
-
-        e.Handled = true;
-
-        Application.Current.Dispatcher.InvokeAsync(() =>
-        {
-            dg.CurrentCell = new DataGridCellInfo(dg.Items[nextRowIdx], nextCol);
-            dg.ScrollIntoView(dg.Items[nextRowIdx], nextCol);
-            BeginEditAndFocus(dg);
-        }, DispatcherPriority.Input);
+        dg.SelectionController.CurrentCellManager.BeginEdit();
     }
 
-    private static void BeginEditAndFocus(DataGrid dg)
-    {
-        if (!IsEditableCell(dg.CurrentCell.Item, dg.CurrentCell.Column)) return;
-
-        dg.BeginEdit();
-
-        // Find the TextBox inside the editing template and focus it
-        if (GetCurrentCell(dg) is { } cell)
-        {
-            var tb = FindChild<TextBox>(cell);
-            if (tb != null)
-            {
-                tb.Focus();
-                tb.SelectAll();
-            }
-        }
-    }
-
-    private static (int RowIndex, DataGridColumn Column) FindNextEditableCell(
-        DataGrid dg,
-        System.Collections.Generic.IReadOnlyList<DataGridColumn> editableCols,
-        int rowIndex,
-        int colIndex)
-    {
-        var itemCount = dg.Items.Count;
-        for (var step = 1; step <= itemCount * editableCols.Count; step++)
-        {
-            var flat = rowIndex * editableCols.Count + colIndex + step;
-            var nextRow = (flat / editableCols.Count) % itemCount;
-            var nextCol = editableCols[flat % editableCols.Count];
-            var item = dg.Items[nextRow];
-            if (IsEditableCell(item, nextCol))
-                return (nextRow, nextCol);
-        }
-
-        return (rowIndex, editableCols[0]);
-    }
-
-    private static bool IsEditableCell(object? item, DataGridColumn? column)
+    private static bool IsEditableCell(object? item, GridColumn? column)
     {
         if (item is not SalaryRowVm row || column is null) return false;
-        return column.Header?.ToString() switch
+        return SalarySheetGridNavigation.IsEditableColumnKey(row, DataGridColumnKey.GetKey(column));
+    }
+
+    private void CommitSalaryGridEdit_Click(object sender, RoutedEventArgs e)
+    {
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+    }
+
+    private void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+            return;
+
+        menu.PlacementTarget = button;
+        menu.IsOpen = true;
+    }
+
+    private void GridExcelButton_Click(object sender, RoutedEventArgs e)
+    {
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+        if (DataContext is SalarySheetViewModel vm)
+            vm.FlushPendingTotalRefresh();
+
+        var selectedColumns = SelectGridExportColumns();
+        if (selectedColumns is null)
+            return;
+
+        var defaultName = $"Salary-Grid-{DateTime.Now:yyyyMMdd-HHmm}.xlsx";
+        var dialog = new SaveFileDialog
         {
-            "Absent" => true,
-            "ESIC" => row.UsesEsicPf,
-            "PF" => row.UsesEsicPf,
-            "TDS" => row.UsesTds,
-            "Adv Ded" => true,
-            _ => false
+            Filter = "Excel Workbook (*.xlsx)|*.xlsx",
+            FileName = defaultName
         };
-    }
+        if (dialog.ShowDialog() != true)
+            return;
 
-    private static DataGridCell? GetCurrentCell(DataGrid dg)
-    {
-        if (dg.CurrentCell.Item is null) return null;
-        if (dg.ItemContainerGenerator.ContainerFromItem(dg.CurrentCell.Item)
-            is not DataGridRow row) return null;
-
-        var presenter = FindChild<DataGridCellsPresenter>(row);
-        if (presenter is null) return null;
-
-        for (int i = 0; i < dg.Columns.Count; i++)
+        try
         {
-            if (presenter.ItemContainerGenerator.ContainerFromIndex(i) is DataGridCell cell
-                && cell.Column == dg.CurrentCell.Column)
-                return cell;
+            ExportSalaryGrid(dialog.FileName, selectedColumns);
+            OpenFile(dialog.FileName);
         }
-        return null;
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Grid export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
-    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
+    private IReadOnlyList<string>? SelectGridExportColumns()
     {
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        var columns = SalaryGrid.Columns
+            .Select(column => new GridExportColumn(
+                column.MappingName,
+                string.IsNullOrWhiteSpace(column.HeaderText) ? column.MappingName : column.HeaderText))
+            .Where(column => !string.IsNullOrWhiteSpace(column.MappingName))
+            .ToList();
+
+        if (columns.Count == 0)
         {
-            var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T match) return match;
-            var result = FindChild<T>(child);
-            if (result != null) return result;
+            MessageBox.Show(
+                Window.GetWindow(this),
+                "There are no grid columns available to export.",
+                "Grid export",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return null;
         }
-        return null;
+
+        var checkBoxes = new List<CheckBox>(columns.Count);
+        var owner = Window.GetWindow(this);
+        var window = new Window
+        {
+            Title = "Export Grid Columns",
+            Owner = owner,
+            WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            MinWidth = 320,
+            MaxHeight = 560
+        };
+
+        var root = new DockPanel { Margin = new Thickness(18), LastChildFill = true };
+        window.Content = root;
+
+        var title = new TextBlock
+        {
+            Text = "Select columns to export",
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+        DockPanel.SetDock(title, Dock.Top);
+        root.Children.Add(title);
+
+        var actionBar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 14, 0, 0)
+        };
+        DockPanel.SetDock(actionBar, Dock.Bottom);
+        root.Children.Add(actionBar);
+
+        var selectBar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        DockPanel.SetDock(selectBar, Dock.Top);
+        root.Children.Add(selectBar);
+
+        var selectAllButton = new Button
+        {
+            Content = "All",
+            MinWidth = 70,
+            Padding = new Thickness(10, 5, 10, 5),
+            Margin = new Thickness(0, 0, 8, 0),
+            Style = TryFindResource("SecondaryButton") as Style
+        };
+        selectAllButton.Click += (_, _) =>
+        {
+            foreach (var checkBox in checkBoxes)
+                checkBox.IsChecked = true;
+        };
+        selectBar.Children.Add(selectAllButton);
+
+        var selectNoneButton = new Button
+        {
+            Content = "None",
+            MinWidth = 70,
+            Padding = new Thickness(10, 5, 10, 5),
+            Style = TryFindResource("SecondaryButton") as Style
+        };
+        selectNoneButton.Click += (_, _) =>
+        {
+            foreach (var checkBox in checkBoxes)
+                checkBox.IsChecked = false;
+        };
+        selectBar.Children.Add(selectNoneButton);
+
+        var columnPanel = new StackPanel();
+        foreach (var column in columns)
+        {
+            var checkBox = new CheckBox
+            {
+                Content = column.Header,
+                Tag = column.MappingName,
+                IsChecked = true,
+                Margin = new Thickness(0, 0, 0, 8),
+                FontSize = 13
+            };
+            checkBoxes.Add(checkBox);
+            columnPanel.Children.Add(checkBox);
+        }
+
+        var scroller = new ScrollViewer
+        {
+            Content = columnPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            MaxHeight = 360
+        };
+        root.Children.Add(scroller);
+
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            IsCancel = true,
+            MinWidth = 82,
+            Padding = new Thickness(12, 6, 12, 6),
+            Margin = new Thickness(0, 0, 8, 0),
+            Style = TryFindResource("SecondaryButton") as Style
+        };
+        actionBar.Children.Add(cancelButton);
+
+        var exportButton = new Button
+        {
+            Content = "Export",
+            IsDefault = true,
+            MinWidth = 82,
+            Padding = new Thickness(12, 6, 12, 6),
+            Style = TryFindResource("PrimaryButton") as Style
+        };
+        exportButton.Click += (_, _) =>
+        {
+            if (checkBoxes.All(checkBox => checkBox.IsChecked != true))
+            {
+                MessageBox.Show(
+                    window,
+                    "Select at least one column to export.",
+                    "Grid export",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            window.DialogResult = true;
+        };
+        actionBar.Children.Add(exportButton);
+
+        if (window.ShowDialog() != true)
+            return null;
+
+        return checkBoxes
+            .Where(checkBox => checkBox.IsChecked == true)
+            .Select(checkBox => checkBox.Tag as string)
+            .Where(mappingName => !string.IsNullOrWhiteSpace(mappingName))
+            .Cast<string>()
+            .ToList();
     }
+
+    private void ExportSalaryGrid(string path, IEnumerable<string> columnMappings)
+    {
+        var options = new ExcelExportingOptions
+        {
+            AllowOutlining = true,
+            ExportMode = ExportMode.Text,
+            ExportStackedHeaders = false,
+            ExcelVersion = ExcelVersion.Xlsx
+        };
+        options.Columns.AddRange(columnMappings);
+
+        using var engine = SalaryGrid.ExportToExcel(SalaryGrid.View, options);
+        engine.Excel.Workbooks[0].SaveAs(path);
+    }
+
+    private void SalaryGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!TryResolveSalaryGridCell(e, out var row, out var column))
+            return;
+
+        var snapshot = SalarySheetGridSelection.FromGrid(SalaryGrid);
+        if (snapshot.Contains(row, column.MappingName))
+            return;
+
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+        SalaryGrid.ClearSelections(false);
+        SalaryGrid.CurrentItem = row;
+        SalaryGrid.CurrentColumn = column;
+        SalaryGrid.SelectCells(row, column, row, column, false);
+    }
+
+    private bool TryResolveSalaryGridCell(MouseButtonEventArgs e, out SalaryRowVm row, out GridColumn column)
+    {
+        row = null!;
+        column = null!;
+
+        var visualContainer = SalaryGrid.GetVisualContainer();
+        var rowColumnIndex = visualContainer.PointToCellRowColumnIndex(e.GetPosition(visualContainer), true);
+        if (rowColumnIndex.RowIndex < 0 || rowColumnIndex.ColumnIndex < 0)
+            return false;
+
+        if (SelectionHelper.GetRecordAtRowIndex(SalaryGrid, rowColumnIndex.RowIndex) is not SalaryRowVm salaryRow)
+            return false;
+
+        var columnIndex = SalaryGrid.ResolveToGridVisibleColumnIndex(rowColumnIndex.ColumnIndex);
+        if (columnIndex < 0 || columnIndex >= SalaryGrid.Columns.Count)
+            return false;
+
+        if (SalaryGrid.Columns[columnIndex] is not GridColumn gridColumn
+            || string.IsNullOrWhiteSpace(gridColumn.MappingName))
+            return false;
+
+        row = salaryRow;
+        column = gridColumn;
+        return true;
+    }
+
+    private void SalaryGridContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var snapshot = SalarySheetGridSelection.FromGrid(SalaryGrid);
+        var hasSelection = snapshot.HasSelection;
+        var canBulkEdit = hasSelection
+                          && DataContext is SalarySheetViewModel { IsEditMode: true };
+
+        ExportSelectionPdfMenuItem.IsEnabled = hasSelection;
+        FillSalaryPaidBaseMenuItem.IsEnabled = canBulkEdit;
+        ClearSalaryPaidMenuItem.IsEnabled = canBulkEdit;
+        ZeroDeductionsMenuItem.IsEnabled = canBulkEdit;
+        SetAdvanceDeductionMenuItem.IsEnabled = canBulkEdit;
+    }
+
+    private void ExportSelectionPdf_Click(object sender, RoutedEventArgs e)
+    {
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+        if (DataContext is SalarySheetViewModel vm)
+            vm.FlushPendingTotalRefresh();
+
+        var snapshot = SalarySheetGridSelection.FromGrid(SalaryGrid);
+        if (!snapshot.HasSelection)
+        {
+            MessageBox.Show(
+                Window.GetWindow(this),
+                "Select at least one salary-grid cell to export.",
+                "Export Selection",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Filter = "PDF (*.pdf)|*.pdf",
+            FileName = $"Salary-Selection-{DateTime.Now:yyyyMMdd-HHmm}.pdf"
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            ExportSalaryGridSelectionPdf(dialog.FileName, snapshot);
+            OpenFile(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Selected PDF export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ExportSalaryGridSelectionPdf(string path, SalarySheetSelectionSnapshot snapshot)
+    {
+        var selectedMappings = snapshot.MappingNames.ToHashSet(StringComparer.Ordinal);
+        var options = new PdfExportingOptions
+        {
+            AutoColumnWidth = true,
+            RepeatHeaders = true,
+            FitAllColumnsInOnePage = true,
+            ExportTableSummary = false,
+            ExportGroupSummary = false,
+            ExportStackedHeaders = false
+        };
+
+        foreach (var mappingName in SalaryGrid.Columns
+                     .Select(column => column.MappingName)
+                     .Where(mappingName => !string.IsNullOrWhiteSpace(mappingName))
+                     .Where(mappingName => !selectedMappings.Contains(mappingName)))
+        {
+            options.ExcludeColumns.Add(mappingName);
+        }
+
+        var selectedItems = new ObservableCollection<object>(snapshot.Rows.Cast<object>());
+        var document = SalaryGrid.ExportToPdf(selectedItems, options);
+        document.Save(path);
+        document.Close(true);
+    }
+
+    private void FillSalaryPaidBase_Click(object sender, RoutedEventArgs e)
+        => ApplySelectionBulkEdit((vm, snapshot) => vm.ResetSalaryPaidToCalculated(snapshot.Rows));
+
+    private void ClearSalaryPaid_Click(object sender, RoutedEventArgs e)
+        => ApplySelectionBulkEdit((vm, snapshot) => vm.ClearSalaryPaid(snapshot.Rows));
+
+    private void ZeroDeductions_Click(object sender, RoutedEventArgs e)
+        => ApplySelectionBulkEdit((vm, snapshot) => vm.ZeroDeductions(snapshot.Rows, snapshot.ColumnKeys));
+
+    private async void SetAdvanceDeduction_Click(object sender, RoutedEventArgs e)
+    {
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+        if (DataContext is not SalarySheetViewModel vm || !vm.IsEditMode)
+            return;
+
+        var snapshot = SalarySheetGridSelection.FromGrid(SalaryGrid);
+        if (!snapshot.HasSelection)
+            return;
+
+        await vm.PromptAndApplyAdvanceDeductionAsync(snapshot.Rows);
+    }
+
+    private void ApplySelectionBulkEdit(Action<SalarySheetViewModel, SalarySheetSelectionSnapshot> action)
+    {
+        SalaryGrid.SelectionController.CurrentCellManager.EndEdit(true);
+        if (DataContext is not SalarySheetViewModel vm || !vm.IsEditMode)
+            return;
+
+        var snapshot = SalarySheetGridSelection.FromGrid(SalaryGrid);
+        if (!snapshot.HasSelection)
+            return;
+
+        action(vm, snapshot);
+    }
+
+    private static void OpenFile(string path)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed record GridExportColumn(string MappingName, string Header);
 }

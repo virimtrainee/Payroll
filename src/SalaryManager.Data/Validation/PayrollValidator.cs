@@ -14,7 +14,8 @@ public sealed record PayrollValidationInput(
     decimal TdsDeduction,
     decimal AdvanceDeduction,
     decimal AdvanceBalance,
-    decimal ExistingSalaryAdvanceDeduction = 0);
+    decimal ExistingSalaryAdvanceDeduction = 0,
+    decimal? SalaryPaid = null);
 
 public static class PayrollValidator
 {
@@ -37,8 +38,9 @@ public static class PayrollValidator
         if (issues.Count > 0)
             return new ValidationResult(issues);
 
-        var breakdown = SalaryManager.Data.Services.SalaryCalculator.Compute(
+        var breakdown = SalaryManager.Data.Services.SalaryCalculator.ComputeFromSalaryPaid(
             input.BaseSalary,
+            EffectiveSalaryPaid(input),
             input.Year,
             input.Month,
             input.DaysAbsent,
@@ -70,6 +72,8 @@ public static class PayrollValidator
                 {
                     if (input.BaseSalary < 0)
                         validation.AddIssue(input, "Base salary cannot be negative.", "salary_negative");
+                    if (input.SalaryPaid < 0)
+                        validation.AddIssue(input, "Salary paid cannot be negative.", "salary_paid_negative");
 
                     if (input.Month is < 1 or > 12)
                         validation.AddIssue(input, "Month must be between 1 and 12.", "month_invalid");
@@ -101,13 +105,28 @@ public static class PayrollValidator
                     if (input.AdvanceDeduction < 0)
                         validation.AddIssue(input, "Advance deduction cannot be negative.", "advance_negative");
 
-                    var usesTds = input.BaseSalary > 25000m;
+                    var usesTds = EffectiveSalaryPaid(input) > 25000m;
                     if (usesTds && (input.EsicDeduction > 0 || input.PfDeduction > 0))
                         validation.AddIssue(input, "ESIC/PF deductions are only allowed for salaries up to 25000.", "esic_pf_not_allowed");
                     if (!usesTds && input.TdsDeduction > 0)
                         validation.AddIssue(input, "TDS deduction is only allowed for salaries above 25000.", "tds_not_allowed");
                 });
         }
+    }
+
+    private static decimal EffectiveSalaryPaid(PayrollValidationInput input)
+    {
+        if (input.SalaryPaid is decimal salaryPaid)
+            return salaryPaid;
+
+        if (input.BaseSalary < 0 || input.Month is < 1 or > 12 || input.DaysAbsent < 0)
+            return input.BaseSalary;
+
+        return SalaryManager.Data.Services.SalaryCalculator.CalculateDefaultSalaryPaid(
+            input.BaseSalary,
+            input.Year,
+            input.Month,
+            input.DaysAbsent);
     }
 
     private static ValidationIssue ToIssue(ValidationFailure failure)

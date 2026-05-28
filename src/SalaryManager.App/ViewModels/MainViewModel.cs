@@ -4,6 +4,7 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
+using SalaryManager.App.Helpers;
 
 namespace SalaryManager.App.ViewModels;
 
@@ -16,7 +17,9 @@ public partial class MainViewModel : ObservableObject
     private const int ReportsPageIndex = 3;
     private const int EmployeesPageIndex = 4;
     private readonly bool[] _payrollPageDirty = new bool[EmployeesPageIndex];
+    private readonly bool[] _payrollPageReloadScheduled = new bool[EmployeesPageIndex];
     private bool _employeesDirty = true;
+    private bool _employeeReloadScheduled;
 
     [ObservableProperty] private int selectedPageIndex;
     [ObservableProperty]
@@ -53,22 +56,22 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ShowReports()
     {
-        SelectedPageIndex = ReportsPageIndex;
-        ReloadDirtyPayrollView(ReportsPageIndex);
+        SelectPayrollPage(ReportsPageIndex);
     }
 
     [RelayCommand]
     private void ShowAdvances()
     {
-        SelectedPageIndex = AdvancesPageIndex;
-        ReloadDirtyPayrollView(AdvancesPageIndex);
+        SelectPayrollPage(AdvancesPageIndex);
     }
 
     [RelayCommand]
     private void ShowEmployees()
     {
-        SelectedPageIndex = EmployeesPageIndex;
-        LoadEmployeesIfNeeded();
+        if (SelectedPageIndex == EmployeesPageIndex)
+            LoadEmployeesIfNeeded();
+        else
+            SelectedPageIndex = EmployeesPageIndex;
     }
 
     [RelayCommand]
@@ -78,9 +81,8 @@ public partial class MainViewModel : ObservableObject
     private void OpenEmployees()
     {
         var win = _sp.GetRequiredService<EmployeesWindow>();
-        win.Owner = Application.Current.MainWindow;
-        if (win.DataContext is EmployeesViewModel employeesVm)
-            ExecuteIfPossible(employeesVm.LoadCommand);
+        if (Application.Current?.MainWindow is { } owner)
+            win.Owner = owner;
 
         win.ShowDialog();
         _employeesDirty = true;
@@ -110,25 +112,49 @@ public partial class MainViewModel : ObservableObject
 
     private void ReloadDirtyPayrollView(int pageIndex)
     {
-        if (!IsPayrollPageIndex(pageIndex) || !_payrollPageDirty[pageIndex])
+        if (!IsPayrollPageIndex(pageIndex) || !_payrollPageDirty[pageIndex] || _payrollPageReloadScheduled[pageIndex])
             return;
 
         var command = LoadCommandFor(pageIndex);
-        if (!ExecuteIfPossible(command))
-            return;
-
-        _payrollPageDirty[pageIndex] = false;
+        _payrollPageReloadScheduled[pageIndex] = true;
+        if (!UiCommandScheduler.ExecuteDeferredIfPossible(
+                command,
+                onExecuted: () =>
+                {
+                    _payrollPageDirty[pageIndex] = false;
+                    _payrollPageReloadScheduled[pageIndex] = false;
+                },
+                onSkipped: () => _payrollPageReloadScheduled[pageIndex] = false))
+        {
+            _payrollPageReloadScheduled[pageIndex] = false;
+        }
     }
 
     private void LoadEmployeesIfNeeded()
     {
-        if (!_employeesDirty)
+        if (!_employeesDirty || _employeeReloadScheduled)
             return;
 
-        if (!ExecuteIfPossible(EmployeesVm.LoadCommand))
-            return;
+        _employeeReloadScheduled = true;
+        if (!UiCommandScheduler.ExecuteDeferredIfPossible(
+                EmployeesVm.LoadCommand,
+                onExecuted: () =>
+                {
+                    _employeesDirty = false;
+                    _employeeReloadScheduled = false;
+                },
+                onSkipped: () => _employeeReloadScheduled = false))
+        {
+            _employeeReloadScheduled = false;
+        }
+    }
 
-        _employeesDirty = false;
+    private void SelectPayrollPage(int pageIndex)
+    {
+        if (SelectedPageIndex == pageIndex)
+            ReloadDirtyPayrollView(pageIndex);
+        else
+            SelectedPageIndex = pageIndex;
     }
 
     private ICommand LoadCommandFor(int pageIndex) => pageIndex switch
@@ -142,13 +168,4 @@ public partial class MainViewModel : ObservableObject
 
     private static bool IsPayrollPageIndex(int pageIndex)
         => pageIndex is >= DashboardPageIndex and < EmployeesPageIndex;
-
-    private static bool ExecuteIfPossible(ICommand command)
-    {
-        if (!command.CanExecute(null))
-            return false;
-
-        command.Execute(null);
-        return true;
-    }
 }

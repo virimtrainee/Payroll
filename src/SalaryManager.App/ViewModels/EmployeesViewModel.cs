@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -60,6 +61,9 @@ public partial class EmployeesViewModel : ObservableObject
     private int _loadVersion;
     private int _groupAssignmentLoadVersion;
     private bool _updatingGroupFilter;
+    private bool _updatingSelectedGroupFromLoad;
+    private bool _groupsLoaded;
+    private IReadOnlyList<EmployeeGroup> _groupOptionSnapshot = [];
 
     public event EventHandler<EmployeeDeletedEventArgs>? EmployeePermanentlyDeleted;
     public event EventHandler? EmployeeDataChanged;
@@ -99,7 +103,8 @@ public partial class EmployeesViewModel : ObservableObject
     partial void OnSelectedGroupChanged(EmployeeGroup? value)
     {
         SelectedGroupName = value?.Name ?? string.Empty;
-        LoadGroupAssignmentsCommand.Execute(null);
+        if (!_updatingSelectedGroupFromLoad)
+            LoadGroupAssignmentsCommand.Execute(null);
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -139,6 +144,8 @@ public partial class EmployeesViewModel : ObservableObject
                 .ToDictionaryAsync(g => g.GroupId, g => g.Count);
 
             if (version != _loadVersion) return;
+            _groupOptionSnapshot = groups;
+            _groupsLoaded = true;
             var selectedFilterId = SelectedGroupFilter?.Id;
             Employees.ReplaceAll(list);
             Groups.ReplaceAll(groups);
@@ -158,9 +165,18 @@ public partial class EmployeesViewModel : ObservableObject
                 _updatingGroupFilter = false;
             }
 
-            SelectedGroup = SelectedGroup is null
-                ? Groups.FirstOrDefault()
-                : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
+            _updatingSelectedGroupFromLoad = true;
+            try
+            {
+                SelectedGroup = SelectedGroup is null
+                    ? Groups.FirstOrDefault()
+                    : Groups.FirstOrDefault(g => g.Id == SelectedGroup.Id) ?? Groups.FirstOrDefault();
+            }
+            finally
+            {
+                _updatingSelectedGroupFromLoad = false;
+            }
+
             await LoadGroupAssignmentsAsync();
         }
         catch (Exception ex)
@@ -234,13 +250,19 @@ public partial class EmployeesViewModel : ObservableObject
     private async Task OpenAddEmployeeAsync()
     {
         var vm = new AddEmployeeViewModel();
-        using (var loadDb = await _dbf.CreateDbContextAsync())
-            await PopulateGroupOptionsAsync(loadDb, vm);
+        var groupLoadTask = TryPopulateGroupOptionsFromLoaded(vm)
+            ? Task.CompletedTask
+            : PopulateGroupOptionsFromDatabaseAsync(vm);
 
-        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current.MainWindow)) return;
+        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current?.MainWindow))
+        {
+            _ = ObserveFaultAsync(groupLoadTask);
+            return;
+        }
 
         try
         {
+            await groupLoadTask;
             using var db = await _dbf.CreateDbContextAsync();
             var validation = await ValidateEmployeeAsync(db, vm, null);
             if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
@@ -292,7 +314,7 @@ public partial class EmployeesViewModel : ObservableObject
         };
         await PopulateGroupOptionsAsync(db, vm, tracked.GroupMemberships.Select(m => m.EmployeeGroupId).ToHashSet());
 
-        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current.MainWindow)) return;
+        if (!await _dialogs.ShowEmployeeDialogAsync(vm, OwnerWindow ?? Application.Current?.MainWindow)) return;
 
         var validation = await ValidateEmployeeAsync(db, vm, tracked.Id);
         if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return; }
@@ -600,6 +622,44 @@ public partial class EmployeesViewModel : ObservableObject
     {
         selectedIds ??= new HashSet<int>();
         var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+        PopulateGroupOptions(vm, groups, selectedIds);
+    }
+
+    private bool TryPopulateGroupOptionsFromLoaded(AddEmployeeViewModel vm, HashSet<int>? selectedIds = null)
+    {
+        if (!_groupsLoaded)
+            return false;
+
+        PopulateGroupOptions(vm, _groupOptionSnapshot, selectedIds);
+        return true;
+    }
+
+    private async Task PopulateGroupOptionsFromDatabaseAsync(AddEmployeeViewModel vm, HashSet<int>? selectedIds = null)
+    {
+        var groups = await QueryGroupOptionsAsync();
+        _groupOptionSnapshot = groups;
+        _groupsLoaded = true;
+        PopulateGroupOptions(vm, groups, selectedIds);
+    }
+
+    private async Task<IReadOnlyList<EmployeeGroup>> QueryGroupOptionsAsync()
+    {
+        if (Application.Current is null)
+            return await QueryGroupOptionsCoreAsync();
+
+        return await Task.Run(QueryGroupOptionsCoreAsync);
+    }
+
+    private async Task<IReadOnlyList<EmployeeGroup>> QueryGroupOptionsCoreAsync()
+    {
+        await _dbInit.ReadyTask;
+        using var db = await _dbf.CreateDbContextAsync();
+        return await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+    }
+
+    private static void PopulateGroupOptions(AddEmployeeViewModel vm, IEnumerable<EmployeeGroup> groups, HashSet<int>? selectedIds = null)
+    {
+        selectedIds ??= new HashSet<int>();
         vm.Groups.Clear();
         foreach (var group in groups)
         {
@@ -609,6 +669,18 @@ public partial class EmployeesViewModel : ObservableObject
                 Name = group.Name,
                 IsSelected = selectedIds.Contains(group.Id)
             });
+        }
+    }
+
+    private static async Task ObserveFaultAsync(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch
+        {
+            // The dialog was cancelled; the deferred group option load is no longer user-visible.
         }
     }
 

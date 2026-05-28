@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using SalaryManager.App.Helpers;
 using SalaryManager.App.ViewModels;
 
 namespace SalaryManager.App.Views;
@@ -19,6 +20,6 @@ public partial class ReportsView : UserControl
         if (_initialized) return;
         if (DataContext is not ReportsViewModel vm) return;
         _initialized = true;
-        vm.LoadCommand.Execute(null);
+        UiCommandScheduler.ExecuteDeferredOnceIfPossible(vm.LoadCommand, dispatcherSource: this);
     }
 }

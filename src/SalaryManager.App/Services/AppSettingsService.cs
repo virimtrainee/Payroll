@@ -15,6 +15,8 @@ public class AppSettingsService
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string _settingsPath;
     private readonly string _dataDirectory;
+    private readonly object _gate = new();
+    private AppSettings? _cached;
 
     public AppSettingsService(string? settingsPath = null)
     {
@@ -23,6 +25,33 @@ public class AppSettingsService
     }
 
     public AppSettings Load()
+    {
+        lock (_gate)
+        {
+            if (_cached is not null)
+                return _cached;
+        }
+
+        var settings = LoadFromDisk();
+        lock (_gate)
+            _cached = settings;
+
+        return settings;
+    }
+
+    public void Save(AppSettings settings)
+    {
+        var normalized = Normalize(settings);
+        Directory.CreateDirectory(_dataDirectory);
+        var tempPath = _settingsPath + ".tmp";
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(normalized, JsonOptions));
+        File.Move(tempPath, _settingsPath, overwrite: true);
+
+        lock (_gate)
+            _cached = normalized;
+    }
+
+    private AppSettings LoadFromDisk()
     {
         if (!File.Exists(_settingsPath))
             return Empty();
@@ -36,14 +65,6 @@ public class AppSettingsService
         {
             return Empty();
         }
-    }
-
-    public void Save(AppSettings settings)
-    {
-        Directory.CreateDirectory(_dataDirectory);
-        var tempPath = _settingsPath + ".tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(Normalize(settings), JsonOptions));
-        File.Move(tempPath, _settingsPath, overwrite: true);
     }
 
     private static AppSettings Empty() => new(null, new Dictionary<string, double>());

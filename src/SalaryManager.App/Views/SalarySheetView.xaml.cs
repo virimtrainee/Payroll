@@ -19,6 +19,8 @@ public partial class SalarySheetView : UserControl
     private bool _columnPreferencesReady;
     private bool _columnWidthHandlersAttached;
     private bool _applyingColumnWidths;
+    private bool _columnWidthsDirty;
+    private bool _columnWidthsApplied;
     private readonly DispatcherTimer _columnSaveTimer;
 
     public SalarySheetView()
@@ -42,13 +44,12 @@ public partial class SalarySheetView : UserControl
         if (DataContext is not SalarySheetViewModel vm) return;
 
         AttachColumnWidthHandlers();
-        ApplySavedColumnWidths(vm);
-        _columnPreferencesReady = true;
+        ScheduleApplySavedColumnWidths(vm);
 
         if (!_initialized)
         {
             _initialized = true;
-            vm.LoadCommand.Execute(null);
+            UiCommandScheduler.ExecuteDeferredOnceIfPossible(vm.LoadCommand, dispatcherSource: this);
         }
     }
 
@@ -79,8 +80,25 @@ public partial class SalarySheetView : UserControl
         if (sender is not DataGridColumn { Width.IsAbsolute: true } column) return;
         if (string.IsNullOrWhiteSpace(DataGridColumnKey.GetKey(column))) return;
 
+        _columnWidthsDirty = true;
         _columnSaveTimer.Stop();
         _columnSaveTimer.Start();
+    }
+
+    private void ScheduleApplySavedColumnWidths(SalarySheetViewModel vm)
+    {
+        if (_columnWidthsApplied)
+        {
+            _columnPreferencesReady = true;
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            ApplySavedColumnWidths(vm);
+            _columnWidthsApplied = true;
+            _columnPreferencesReady = true;
+        }, DispatcherPriority.Background);
     }
 
     private void ApplySavedColumnWidths(SalarySheetViewModel vm)
@@ -109,6 +127,7 @@ public partial class SalarySheetView : UserControl
 
     private void SaveSalaryColumnWidths()
     {
+        if (!_columnWidthsDirty) return;
         if (!_columnPreferencesReady) return;
         if (DataContext is not SalarySheetViewModel vm) return;
 
@@ -123,6 +142,7 @@ public partial class SalarySheetView : UserControl
         }
 
         vm.SaveColumnWidths(widths);
+        _columnWidthsDirty = false;
     }
 
     // Ctrl+S saves from anywhere inside the view, including while a cell is being edited

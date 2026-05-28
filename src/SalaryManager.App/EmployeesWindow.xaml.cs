@@ -1,4 +1,5 @@
 using System.Windows;
+using SalaryManager.App.Helpers;
 using SalaryManager.App.ViewModels;
 
 namespace SalaryManager.App;
@@ -9,6 +10,10 @@ public partial class EmployeesWindow : Window
     {
         InitializeComponent();
         DataContext = vm;
-        Loaded += (_, _) => vm.OwnerWindow = this;
+        Loaded += (_, _) =>
+        {
+            vm.OwnerWindow = this;
+            UiCommandScheduler.ExecuteDeferredIfPossible(vm.LoadCommand, dispatcherSource: this);
+        };
     }
 }

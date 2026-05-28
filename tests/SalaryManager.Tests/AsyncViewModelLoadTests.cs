@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -25,6 +26,33 @@ public class AsyncViewModelLoadTests
         await Task.Delay(100);
 
         Assert.Equal(0, factory.AsyncCreateCount);
+    }
+
+    [Fact]
+    public async Task OpenAddEmployee_ShowsDialogBeforeGroupOptionsFinishLoading()
+    {
+        using var factory = new SequencedDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        var groupLoadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseGroupLoad = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogs = new CapturingEmployeeDialogService();
+        var viewModel = new EmployeesViewModel(factory, initializer, dialogs, new ExcelImportService());
+
+        factory.EnqueueAsync(async ct =>
+        {
+            groupLoadStarted.SetResult();
+            await releaseGroupLoad.Task.WaitAsync(ct);
+            return factory.CreateDbContext();
+        });
+
+        var addTask = viewModel.OpenAddEmployeeCommand.ExecuteAsync(null);
+
+        await dialogs.EmployeeDialogShown.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(groupLoadStarted.Task.IsCompleted);
+        Assert.False(releaseGroupLoad.Task.IsCompleted);
+
+        releaseGroupLoad.SetResult();
+        await addTask.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -82,6 +110,17 @@ public class AsyncViewModelLoadTests
         var dialogs = Substitute.For<DialogService>();
         dialogs.ErrorAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(Task.CompletedTask);
         return dialogs;
+    }
+
+    private sealed class CapturingEmployeeDialogService : DialogService
+    {
+        public TaskCompletionSource EmployeeDialogShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override Task<bool> ShowEmployeeDialogAsync(AddEmployeeViewModel vm, Window? owner = null)
+        {
+            EmployeeDialogShown.SetResult();
+            return Task.FromResult(false);
+        }
     }
 
     private static async Task<DatabaseInitializer> ReadyInitializerAsync(IDbContextFactory<AppDbContext> factory)

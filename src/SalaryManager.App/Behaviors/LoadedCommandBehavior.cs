@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Xaml.Behaviors;
+using SalaryManager.App.Helpers;
 
 namespace SalaryManager.App.Behaviors;
 
@@ -65,6 +66,11 @@ public sealed class LoadedCommandBehavior : Behavior<FrameworkElement>
         if (Command is not { } command || !command.CanExecute(CommandParameter)) return;
 
         _hasExecuted = true;
-        command.Execute(CommandParameter);
+        var scheduled = ExecuteOnce
+            ? UiCommandScheduler.ExecuteDeferredOnceIfPossible(command, CommandParameter, AssociatedObject)
+            : UiCommandScheduler.ExecuteDeferredIfPossible(command, CommandParameter, AssociatedObject);
+
+        if (!scheduled)
+            _hasExecuted = false;
     }
 }

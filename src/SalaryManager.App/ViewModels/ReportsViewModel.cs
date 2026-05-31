@@ -103,7 +103,14 @@ public partial class ReportsViewModel : ObservableObject
             if (SelectedGroupFilter?.Id is int groupId)
                 query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-            var list = await query.OrderBy(e => e.Name).ToListAsync();
+            var list = await query
+                .OrderBy(e => e.Name)
+                .Select(e => new Employee
+                {
+                    Id = e.Id,
+                    Name = e.Name
+                })
+                .ToListAsync();
             if (version != _employeeLoadVersion) return;
             Employees.ReplaceAll(list);
             SelectedEmployee = Employees.FirstOrDefault();
@@ -495,7 +502,7 @@ public partial class ReportsViewModel : ObservableObject
     private async Task<List<SalaryRevisionReportRow>> BuildRevisionRowsAsync()
     {
         using var db = await _dbf.CreateDbContextAsync();
-        IQueryable<SalaryRevision> query = db.SalaryRevisions.AsNoTracking().Include(r => r.Employee);
+        IQueryable<SalaryRevision> query = db.SalaryRevisions.AsNoTracking();
         if (SelectedGroupFilter?.Id is int groupId)
             query = query.Where(r => r.Employee.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 

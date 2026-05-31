@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -45,7 +44,7 @@ public partial class AdvancesViewModel : ObservableObject
     private readonly DatabaseInitializer _dbInit;
     private readonly DialogService _dialogs;
 
-    public ObservableCollection<Employee> Employees { get; } = new();
+    public RangeObservableCollection<Employee> Employees { get; } = new();
     public RangeObservableCollection<EmployeeWithBalanceVm> EmployeeRail { get; } = new();
     public ICollectionView EmployeeRailView { get; }
     public RangeObservableCollection<LedgerRow> Ledger { get; } = new();
@@ -68,6 +67,7 @@ public partial class AdvancesViewModel : ObservableObject
     private bool _updatingGroupFilter;
     private int _loadVersion;
     private int _ledgerVersion;
+    private IReadOnlyDictionary<int, Employee> _employeesById = new Dictionary<int, Employee>();
     private readonly object _filterRefreshLock = new();
     private CancellationTokenSource? _filterRefreshCts;
     private readonly object _loadCancellationLock = new();
@@ -111,7 +111,7 @@ public partial class AdvancesViewModel : ObservableObject
     partial void OnSelectedRailItemChanged(EmployeeWithBalanceVm? value)
     {
         if (value is null) return;
-        SelectedEmployee = Employees.FirstOrDefault(e => e.Id == value.Id);
+        SelectedEmployee = _employeesById.GetValueOrDefault(value.Id);
     }
 
     partial void OnSelectedEmployeeChanged(Employee? value)
@@ -148,11 +148,10 @@ public partial class AdvancesViewModel : ObservableObject
                 .SumBalancesByEmployeeAsync(ct);
 
             if (ct.IsCancellationRequested || version != _loadVersion) return;
-            Employees.Clear();
+            _employeesById = list.ToDictionary(e => e.Id);
             var rail = new List<EmployeeWithBalanceVm>(list.Count);
             foreach (var e in list)
             {
-                Employees.Add(e);
                 rail.Add(new EmployeeWithBalanceVm
                 {
                     Id = e.Id,
@@ -162,6 +161,7 @@ public partial class AdvancesViewModel : ObservableObject
                     Balance = balances.GetValueOrDefault(e.Id, 0m),
                 });
             }
+            Employees.ReplaceAll(list);
             EmployeeRail.ReplaceAll(rail);
 
             CancelPendingFilterRefresh();

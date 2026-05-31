@@ -146,10 +146,15 @@ public partial class AttendanceViewModel : ObservableObject
                 employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
             var employees = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
+            var employeeIds = employees.Select(e => e.Id).ToList();
 
-            var existing = await db.AttendanceRecords.AsNoTracking()
-                .Where(a => a.Year == SelectedYear && a.Month == SelectedMonth.Number)
-                .ToDictionaryAsync(a => a.EmployeeId, a => a);
+            var existing = employeeIds.Count == 0
+                ? new Dictionary<int, AttendanceRecord>()
+                : await db.AttendanceRecords.AsNoTracking()
+                    .Where(a => employeeIds.Contains(a.EmployeeId)
+                             && a.Year == SelectedYear
+                             && a.Month == SelectedMonth.Number)
+                    .ToDictionaryAsync(a => a.EmployeeId, a => a);
 
             var newRows = new List<AttendanceRow>(employees.Count);
             foreach (var e in employees)

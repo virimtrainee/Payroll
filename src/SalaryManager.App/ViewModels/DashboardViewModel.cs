@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -94,6 +95,10 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private async Task LoadAsync()
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        TimeSpan payrollElapsed = TimeSpan.Zero;
+        TimeSpan databaseElapsed = TimeSpan.Zero;
+        var payrollRowCount = 0;
         IsLoading = true;
         try
         {
@@ -103,9 +108,13 @@ public partial class DashboardViewModel : ObservableObject
             CurrentPeriod = now.ToString("MMMM yyyy");
             var currentMonthStart = new DateTime(now.Year, now.Month, 1);
             var nextMonthStart = currentMonthStart.AddMonths(1);
+            var stepStopwatch = Stopwatch.StartNew();
             var payroll = await _monthlyPayroll.LoadAsync(new MonthlyPayrollRequest(now.Year, now.Month));
+            payrollElapsed = stepStopwatch.Elapsed;
+            payrollRowCount = payroll.Rows.Count;
             using var db = await _dbf.CreateDbContextAsync();
 
+            stepStopwatch.Restart();
             TotalEmployees = await db.Employees.CountAsync();
             var activeEmployeeIds = payroll.Rows.Select(r => r.EmployeeId).ToList();
             ActiveEmployees = payroll.Rows.Count;
@@ -113,9 +122,9 @@ public partial class DashboardViewModel : ObservableObject
             PayablePayroll = payroll.Rows
                 .Where(r => r.SalaryPaid >= 0m && r.Breakdown is not null)
                 .Sum(r => Math.Max(0m, r.NetSalary));
-            var balancesByEmployee = await db.Advances.AsNoTracking().SumBalancesByEmployeeAsync();
-            OutstandingAdvances = balancesByEmployee.Values.Sum();
-            EmployeesWithPendingAdvances = balancesByEmployee.Count(kv => kv.Value != 0m);
+            var advanceSummary = await db.Advances.AsNoTracking().SumBalanceSummaryAsync();
+            OutstandingAdvances = advanceSummary.Outstanding;
+            EmployeesWithPendingAdvances = advanceSummary.EmployeesWithPendingAdvances;
 
             AttendanceSavedThisMonth = await db.AttendanceRecords.AsNoTracking()
                 .Where(a => activeEmployeeIds.Contains(a.EmployeeId)
@@ -150,6 +159,15 @@ public partial class DashboardViewModel : ObservableObject
             RecentRevisions.Clear();
             foreach (var r in recentRev)
                 RecentRevisions.Add(new RevisionVm(r.Employee.Name, r.OldSalary, r.NewSalary, r.ChangedAt));
+            databaseElapsed = stepStopwatch.Elapsed;
+
+            PerformanceTrace.DashboardLoad(
+                now.Year,
+                now.Month,
+                payrollRowCount,
+                totalStopwatch.Elapsed,
+                payrollElapsed,
+                databaseElapsed);
         }
         finally
         {

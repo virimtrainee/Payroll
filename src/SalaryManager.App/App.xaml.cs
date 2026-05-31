@@ -44,7 +44,10 @@ public partial class App : Application
 
         var sc = new ServiceCollection();
 
-        sc.AddDbContextFactory<AppDbContext>(opts => opts.UseSqlite(connStr));
+        sc.AddSingleton<SqlitePragmaConnectionInterceptor>();
+        sc.AddPooledDbContextFactory<AppDbContext>((sp, opts) =>
+            opts.UseSqlite(connStr)
+                .AddInterceptors(sp.GetRequiredService<SqlitePragmaConnectionInterceptor>()));
 
         sc.AddSingleton<DatabaseInitializer>();
         sc.AddSingleton<PdfSlipService>();

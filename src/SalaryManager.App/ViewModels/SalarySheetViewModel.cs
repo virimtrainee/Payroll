@@ -565,6 +565,12 @@ public partial class SalarySheetViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        TimeSpan payrollElapsed = TimeSpan.Zero;
+        TimeSpan attendanceElapsed = TimeSpan.Zero;
+        TimeSpan rowBuildElapsed = TimeSpan.Zero;
+        TimeSpan rowsReplaceElapsed = TimeSpan.Zero;
+        var rowCount = 0;
         var version = Interlocked.Increment(ref _loadVersion);
         var year = SelectedYear;
         var month = SelectedMonth.Number;
@@ -575,20 +581,25 @@ public partial class SalarySheetViewModel : ObservableObject
 
             using var db = await _dbf.CreateDbContextAsync();
 
+            var stepStopwatch = Stopwatch.StartNew();
             var snapshot = await _payroll.LoadAsync(new MonthlyPayrollRequest(year, month));
+            payrollElapsed = stepStopwatch.Elapsed;
             if (version != _loadVersion) return;
 
+            stepStopwatch.Restart();
             var attendanceStates = await LoadAttendanceStatesAsync(
                 db,
                 snapshot.Rows.Select(r => r.EmployeeId).ToList(),
                 year,
                 month);
+            attendanceElapsed = stepStopwatch.Elapsed;
             if (version != _loadVersion) return;
 
             var rowGroups = snapshot.Rows.ToDictionary(
                 r => r.EmployeeId,
                 r => r.PrimaryGroupName);
 
+            stepStopwatch.Restart();
             var payrollRows = snapshot.Rows.OrderBy(r => r.Name).ToList();
 
             var newRows = new List<SalaryRowVm>(payrollRows.Count);
@@ -635,19 +646,32 @@ public partial class SalarySheetViewModel : ObservableObject
 
                 newRows.Add(row);
             }
+            rowBuildElapsed = stepStopwatch.Elapsed;
 
             if (version != _loadVersion) return;
             foreach (var row in Rows)
                 row.PropertyChanged -= OnSalaryRowPropertyChanged;
             foreach (var row in newRows)
                 row.PropertyChanged += OnSalaryRowPropertyChanged;
+            stepStopwatch.Restart();
             using (RowsView.DeferRefresh())
             {
                 Rows.ReplaceAll(newRows);
             }
+            rowsReplaceElapsed = stepStopwatch.Elapsed;
+            rowCount = newRows.Count;
 
             CancelPendingTotalRefresh();
             RefreshTotals();
+            PerformanceTrace.SalarySheetLoad(
+                year,
+                month,
+                rowCount,
+                totalStopwatch.Elapsed,
+                payrollElapsed,
+                attendanceElapsed,
+                rowBuildElapsed,
+                rowsReplaceElapsed);
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@ using SalaryManager.Data;
 using SalaryManager.Data.Entities;
 using SalaryManager.Data.Services;
 using SalaryManager.Data.Validation;
+using System.Diagnostics;
 
 namespace SalaryManager.App.Services;
 
@@ -77,6 +78,11 @@ public class MonthlyPayrollService
         MonthlyPayrollRequest request,
         CancellationToken ct = default)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        TimeSpan employeeQueryElapsed;
+        TimeSpan attendanceQueryElapsed = TimeSpan.Zero;
+        TimeSpan advanceQueryElapsed = TimeSpan.Zero;
+        TimeSpan rowBuildElapsed = TimeSpan.Zero;
         using var db = await _dbf.CreateDbContextAsync(ct);
 
         var selectedGroupIds = request.GroupIds?
@@ -99,32 +105,55 @@ public class MonthlyPayrollService
                 e.GroupMemberships.Any(m => selectedGroupIds.Contains(m.EmployeeGroupId)));
         }
 
+        var stepStopwatch = Stopwatch.StartNew();
         var employees = await employeeQuery
             .OrderBy(e => e.Name)
             .ToListAsync(ct);
+        employeeQueryElapsed = stepStopwatch.Elapsed;
 
         if (employees.Count == 0)
+        {
+            PerformanceTrace.MonthlyPayrollLoad(
+                request.Year,
+                request.Month,
+                0,
+                totalStopwatch.Elapsed,
+                employeeQueryElapsed,
+                attendanceQueryElapsed,
+                advanceQueryElapsed,
+                rowBuildElapsed);
             return new MonthlyPayrollSnapshot(request.Year, request.Month, []);
+        }
 
         var employeeIds = employees.Select(e => e.Id).ToList();
         var sourceKey = AdvanceSourceKeys.Salary(request.Year, request.Month);
 
+        stepStopwatch.Restart();
         var attendance = await db.AttendanceRecords.AsNoTracking()
             .Where(a => employeeIds.Contains(a.EmployeeId)
                      && a.Year == request.Year
                      && a.Month == request.Month)
             .ToDictionaryAsync(a => a.EmployeeId, a => a, ct);
+        attendanceQueryElapsed = stepStopwatch.Elapsed;
 
-        var balances = await db.Advances.AsNoTracking()
+        stepStopwatch.Restart();
+        var advanceSummaries = await db.Advances.AsNoTracking()
             .Where(a => employeeIds.Contains(a.EmployeeId))
-            .SumBalancesByEmployeeAsync(ct);
+            .GroupBy(a => a.EmployeeId)
+            .Select(g => new
+            {
+                EmployeeId = g.Key,
+                Balance = g.Sum(a =>
+                    (a.EntryType == AdvanceEntryType.Given ? 1m : -1m) * a.Amount),
+                SalaryDeduction = g.Sum(a =>
+                    a.SourceKey == sourceKey && a.EntryType == AdvanceEntryType.Deducted
+                        ? a.Amount
+                        : 0m)
+            })
+            .ToDictionaryAsync(a => a.EmployeeId, ct);
+        advanceQueryElapsed = stepStopwatch.Elapsed;
 
-        var salaryAdvanceDeductions = await db.Advances.AsNoTracking()
-            .Where(a => employeeIds.Contains(a.EmployeeId)
-                     && a.SourceKey == sourceKey
-                     && a.EntryType == AdvanceEntryType.Deducted)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a.Amount, ct);
-
+        stepStopwatch.Restart();
         var rows = new List<MonthlyPayrollRow>(employees.Count);
         foreach (var employee in employees)
         {
@@ -159,8 +188,9 @@ public class MonthlyPayrollService
                     ? record?.TdsDeduction ?? SalaryCalculator.CalculateDefaultTds(salaryPaid)
                     : SalaryCalculator.CalculateDefaultTds(salaryPaid)
                 : 0m;
-            var advanceDeduction = salaryAdvanceDeductions.GetValueOrDefault(employee.Id, 0m);
-            var advanceBalance = balances.GetValueOrDefault(employee.Id, 0m);
+            advanceSummaries.TryGetValue(employee.Id, out var advanceSummary);
+            var advanceDeduction = advanceSummary?.SalaryDeduction ?? 0m;
+            var advanceBalance = advanceSummary?.Balance ?? 0m;
             var historicalNetOverride = record?.BaseSalaryOverride is null
                 ? record?.NetSalaryOverride
                 : null;
@@ -220,7 +250,17 @@ public class MonthlyPayrollService
                 breakdown,
                 issues));
         }
+        rowBuildElapsed = stepStopwatch.Elapsed;
 
+        PerformanceTrace.MonthlyPayrollLoad(
+            request.Year,
+            request.Month,
+            rows.Count,
+            totalStopwatch.Elapsed,
+            employeeQueryElapsed,
+            attendanceQueryElapsed,
+            advanceQueryElapsed,
+            rowBuildElapsed);
         return new MonthlyPayrollSnapshot(request.Year, request.Month, rows);
     }
 }

@@ -65,4 +65,26 @@ public class AdvanceQueryExtensionsTests
 
         Assert.Equal(0m, total);
     }
+
+    [Fact]
+    public async Task SumBalanceSummary_TotalsOutstandingAndCountsNonZeroEmployees()
+    {
+        using var db = NewInMemoryContext();
+        db.Employees.AddRange(
+            new Employee { Id = 1, Name = "A" },
+            new Employee { Id = 2, Name = "B" },
+            new Employee { Id = 3, Name = "C" });
+        db.Advances.AddRange(
+            new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today },
+            new Advance { EmployeeId = 1, Amount = 500m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today },
+            new Advance { EmployeeId = 2, Amount = 100m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today },
+            new Advance { EmployeeId = 2, Amount = 100m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today },
+            new Advance { EmployeeId = 3, Amount = 300m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today });
+        await db.SaveChangesAsync();
+
+        var summary = await db.Advances.AsNoTracking().SumBalanceSummaryAsync();
+
+        Assert.Equal(1800m, summary.Outstanding);
+        Assert.Equal(2, summary.EmployeesWithPendingAdvances);
+    }
 }

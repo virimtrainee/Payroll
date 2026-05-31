@@ -19,6 +19,27 @@ public class AppRuntimeStorageTests
     }
 
     [Fact]
+    public void AppPaths_DatabasePathCanBeOverriddenForMockRuns()
+    {
+        var original = Environment.GetEnvironmentVariable(AppPaths.DatabasePathEnvironmentVariable);
+        var overridePath = Path.Combine(Path.GetTempPath(), "SalaryManagerTests", Guid.NewGuid().ToString("N"), "mock.db");
+
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DatabasePathEnvironmentVariable, overridePath);
+
+            Assert.Equal(Path.GetFullPath(overridePath), AppPaths.DatabasePath);
+            Assert.Equal(Path.GetDirectoryName(Path.GetFullPath(overridePath)), AppPaths.DatabaseDirectory);
+            Assert.StartsWith(AppPaths.DataDirectory, AppPaths.SettingsPath, StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith(AppPaths.DataDirectory, AppPaths.SlipsDirectory, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DatabasePathEnvironmentVariable, original);
+        }
+    }
+
+    [Fact]
     public void DesignTimeFactory_CreatesContextWithoutRuntimeDatabasePath()
     {
         using var db = new AppDbContextDesignTimeFactory().CreateDbContext([]);

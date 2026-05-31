@@ -5,6 +5,8 @@ namespace SalaryManager.App.Services;
 
 public static class AppPaths
 {
+    public const string DatabasePathEnvironmentVariable = "SALARYMANAGER_DB_PATH";
+
     public static string ApplicationDirectory
     {
         get
@@ -24,7 +26,20 @@ public static class AppPaths
 
     public static string DataDirectory => ApplicationDirectory;
 
-    public static string DatabasePath => Path.Combine(DataDirectory, "salary.db");
+    public static string DatabasePath
+    {
+        get
+        {
+            var overridePath = Environment.GetEnvironmentVariable(DatabasePathEnvironmentVariable);
+            if (!string.IsNullOrWhiteSpace(overridePath))
+                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(overridePath));
+
+            return Path.Combine(DataDirectory, "salary.db");
+        }
+    }
+
+    public static string DatabaseDirectory
+        => Path.GetDirectoryName(DatabasePath) ?? DataDirectory;
 
     public static string SettingsPath => Path.Combine(DataDirectory, "settings.json");
 

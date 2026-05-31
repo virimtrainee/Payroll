@@ -66,6 +66,50 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public async Task EmployeesLoad_SearchEscapesSqlLikeWildcards()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "A_100", BaseSalary = 1000m, IsActive = true },
+                new Employee { Id = 2, Name = "A%200", BaseSalary = 1000m, IsActive = true },
+                new Employee { Id = 3, Name = "AX100", BaseSalary = 1000m, IsActive = true });
+        });
+
+        var viewModel = NewEmployeesViewModel(factory, initializer);
+        viewModel.SearchText = "_";
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(["A_100"], viewModel.Employees.Select(e => e.Name));
+    }
+
+    [Fact]
+    public async Task EmployeesSave_DetectsDuplicateNamesFromPrecomputedLookup()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "Alice", BaseSalary = 1000m, IsActive = true },
+                new Employee { Id = 2, Name = "Bob", BaseSalary = 1000m, IsActive = true });
+        });
+        var dialogs = NewDialogService();
+        var viewModel = new EmployeesViewModel(factory, initializer, dialogs, new ExcelImportService());
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        viewModel.Employees.Single(e => e.Name == "Bob").Name = "Alice";
+
+        await viewModel.SaveChangesCommand.ExecuteAsync(null);
+
+        _ = dialogs.Received(1).ErrorAsync(
+            Arg.Is<string>(message => message.Contains("An employee with this name already exists.")),
+            Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task EmployeesDelete_PermanentlyDeletesRelatedRecordsAndPreservesGroups()
     {
         using var factory = new SqliteDbContextFactory();
@@ -921,6 +965,36 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public async Task AttendanceLoad_GroupFilterLimitsRowsAndAttendanceLookup()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.EmployeeGroups.AddRange(
+                new EmployeeGroup { Id = 1, Name = "Factory" },
+                new EmployeeGroup { Id = 2, Name = "Night" });
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "Factory Worker", BaseSalary = 10000m, IsActive = true },
+                new Employee { Id = 2, Name = "Night Worker", BaseSalary = 10000m, IsActive = true });
+            db.EmployeeGroupMemberships.AddRange(
+                new EmployeeGroupMembership { EmployeeId = 1, EmployeeGroupId = 1 },
+                new EmployeeGroupMembership { EmployeeId = 2, EmployeeGroupId = 2 });
+            db.AttendanceRecords.AddRange(
+                new AttendanceRecord { EmployeeId = 1, Year = 2026, Month = 5, DaysAbsent = 2 },
+                new AttendanceRecord { EmployeeId = 2, Year = 2026, Month = 5, DaysAbsent = 7 });
+        });
+
+        var viewModel = NewAttendanceViewModel(factory, initializer);
+        viewModel.SelectedGroupFilter = new GroupFilterOptionVm(1, "Factory");
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal("Factory Worker", row.Name);
+        Assert.Equal(2, row.DaysAbsent);
+    }
+
+    [Fact]
     public async Task ReportsKpis_UseBaseOverrideAndHistoricalNetOverrideFallback()
     {
         using var factory = new SqliteDbContextFactory();
@@ -964,6 +1038,32 @@ public class EmployeeSalarySheetFilterTests
 
         Assert.Equal(30000m, viewModel.GrossPayroll);
         Assert.Equal(27777m, viewModel.PayablePayroll);
+    }
+
+    [Fact]
+    public async Task DashboardAdvances_UsesOutstandingBalanceSummary()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.AddRange(
+                new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true },
+                new Employee { Id = 2, Name = "B", BaseSalary = 10000m, IsActive = true },
+                new Employee { Id = 3, Name = "C", BaseSalary = 10000m, IsActive = true });
+            db.Advances.AddRange(
+                new Advance { EmployeeId = 1, Amount = 2000m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today },
+                new Advance { EmployeeId = 1, Amount = 500m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today },
+                new Advance { EmployeeId = 2, Amount = 100m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today },
+                new Advance { EmployeeId = 2, Amount = 100m, EntryType = AdvanceEntryType.Deducted, Date = DateTime.Today },
+                new Advance { EmployeeId = 3, Amount = 300m, EntryType = AdvanceEntryType.Given, Date = DateTime.Today });
+        });
+
+        var viewModel = NewDashboardViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(1800m, viewModel.OutstandingAdvances);
+        Assert.Equal(2, viewModel.EmployeesWithPendingAdvances);
     }
 
     [Fact]

@@ -32,6 +32,7 @@ public sealed class EmployeeDeletedEventArgs(int employeeId) : EventArgs
 public partial class EmployeesViewModel : ObservableObject
 {
     public static TimeSpan SearchReloadDebounceDelay { get; } = TimeSpan.FromMilliseconds(200);
+    private const string LikeEscape = "\\";
 
     private readonly IDbContextFactory<AppDbContext> _dbf;
     private readonly DatabaseInitializer _dbInit;
@@ -127,8 +128,7 @@ public partial class EmployeesViewModel : ObservableObject
             using var db = await _dbf.CreateDbContextAsync(ct);
             IQueryable<Employee> query = db.Employees.AsNoTracking()
                 .Include(e => e.GroupMemberships)
-                    .ThenInclude(m => m.EmployeeGroup)
-                .OrderBy(e => e.Name);
+                    .ThenInclude(m => m.EmployeeGroup);
             query = SelectedStatusFilter switch
             {
                 EmployeeStatusFilter.Inactive => query.Where(e => !e.IsActive),
@@ -138,14 +138,14 @@ public partial class EmployeesViewModel : ObservableObject
             if (SelectedGroupFilter?.Id is int groupId)
                 query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-            var list = await query.ToListAsync(ct);
             var search = SearchText.Trim();
             if (!string.IsNullOrWhiteSpace(search))
             {
-                list = list
-                    .Where(e => e.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var pattern = BuildContainsLikePattern(search);
+                query = query.Where(e => EF.Functions.Like(e.Name, pattern, LikeEscape));
             }
+
+            var list = await query.OrderBy(e => e.Name).ToListAsync(ct);
             var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync(ct);
             var groupCounts = await db.EmployeeGroupMemberships.AsNoTracking()
                 .GroupBy(m => m.EmployeeGroupId)
@@ -391,17 +391,19 @@ public partial class EmployeesViewModel : ObservableObject
         var allEmployees = await db.Employees.AsNoTracking()
             .Select(e => new { e.Id, e.Name })
             .ToListAsync();
+        var duplicateNames = BuildDuplicateNameLookup(
+            allEmployees.ToDictionary(e => e.Id, e => e.Name),
+            Employees);
         var issues = new List<ValidationIssue>();
 
         foreach (var e in Employees)
         {
             if (!tracked.TryGetValue(e.Id, out var t)) continue;
 
-            var duplicateNames = allEmployees
-                .Where(existing => existing.Id != e.Id)
-                .Select(existing => existing.Name)
-                .Concat(Employees.Where(existing => existing.Id != e.Id).Select(existing => existing.Name));
-            var validation = EmployeeValidator.Validate(ToEmployeeValidationInput(e), duplicateNames);
+            var matchingDuplicateNames = HasDuplicateName(e, duplicateNames)
+                ? new[] { e.Name }
+                : Array.Empty<string>();
+            var validation = EmployeeValidator.Validate(ToEmployeeValidationInput(e), matchingDuplicateNames);
             issues.AddRange(validation.Issues.Select(i => i with { Field = $"{e.Name} - {i.Field}" }));
         }
 
@@ -775,8 +777,58 @@ public partial class EmployeesViewModel : ObservableObject
             employee.InsuranceNumber,
             employee.PhoneNumber);
 
+    private static string BuildContainsLikePattern(string value)
+        => $"%{EscapeLike(value)}%";
+
+    private static string EscapeLike(string value)
+        => value
+            .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
+            .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
+            .Replace("_", LikeEscape + "_", StringComparison.Ordinal);
+
+    private static DuplicateNameLookup BuildDuplicateNameLookup(
+        IReadOnlyDictionary<int, string> databaseNamesById,
+        IEnumerable<Employee> editedEmployees)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in databaseNamesById.Values)
+            IncrementNameCount(counts, name);
+        foreach (var employee in editedEmployees)
+            IncrementNameCount(counts, employee.Name);
+
+        return new DuplicateNameLookup(counts, databaseNamesById);
+    }
+
+    private static bool HasDuplicateName(Employee employee, DuplicateNameLookup lookup)
+    {
+        var name = NormalizeEmployeeName(employee.Name);
+        var matchingCount = lookup.Counts.GetValueOrDefault(name);
+        if (lookup.DatabaseNamesById.TryGetValue(employee.Id, out var databaseName)
+            && string.Equals(NormalizeEmployeeName(databaseName), name, StringComparison.OrdinalIgnoreCase))
+        {
+            matchingCount--;
+        }
+
+        matchingCount--;
+        return matchingCount > 0;
+    }
+
+    private static void IncrementNameCount(IDictionary<string, int> counts, string? name)
+    {
+        var normalized = NormalizeEmployeeName(name);
+        counts.TryGetValue(normalized, out var count);
+        counts[normalized] = count + 1;
+    }
+
+    private static string NormalizeEmployeeName(string? name)
+        => name?.Trim() ?? string.Empty;
+
     private static string? OptionalText(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record DuplicateNameLookup(
+        IReadOnlyDictionary<string, int> Counts,
+        IReadOnlyDictionary<int, string> DatabaseNamesById);
 
     private static string FormatImportIssues(IReadOnlyList<ValidationIssue> issues)
         => ValidationResult.FromErrors(issues).ToDisplayString();

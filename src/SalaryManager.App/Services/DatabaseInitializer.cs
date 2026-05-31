@@ -35,6 +35,7 @@ public class DatabaseInitializer
     public static void PrepareRuntimeData()
     {
         Directory.CreateDirectory(AppPaths.DataDirectory);
+        Directory.CreateDirectory(AppPaths.DatabaseDirectory);
         Directory.CreateDirectory(AppPaths.SlipsDirectory);
     }
 

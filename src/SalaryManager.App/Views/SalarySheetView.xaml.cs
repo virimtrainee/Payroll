@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -9,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using SalaryManager.App.Helpers;
+using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.UI.Xaml.Grid.Converter;
@@ -30,6 +32,10 @@ public partial class SalarySheetView : UserControl
     private string _pendingSalarySearchText = string.Empty;
     private bool _suppressSalarySearchTextChanged;
     private SalaryGridContextCell? _pendingSalaryContextCell;
+    private SalarySheetViewModel? _measuredViewModel;
+    private Stopwatch? _gridRenderStopwatch;
+    private int _gridRenderRowCount;
+    private long _gridRenderSequence;
 
     public SalarySheetView()
     {
@@ -63,6 +69,7 @@ public partial class SalarySheetView : UserControl
 
         SalaryGrid.SearchHelper.AllowFiltering = false;
         AttachColumnWidthHandlers();
+        AttachGridRenderMeasurement(vm);
         ScheduleApplySavedColumnWidths(vm);
 
         if (!_initialized)
@@ -76,7 +83,50 @@ public partial class SalarySheetView : UserControl
     {
         _columnSaveTimer.Stop();
         _salarySearchTimer.Stop();
+        DetachGridRenderMeasurement();
         SaveSalaryColumnPreferences();
+    }
+
+    private void AttachGridRenderMeasurement(SalarySheetViewModel vm)
+    {
+        if (ReferenceEquals(_measuredViewModel, vm))
+            return;
+
+        DetachGridRenderMeasurement();
+        _measuredViewModel = vm;
+        vm.Rows.CollectionChanged += SalaryRows_CollectionChanged;
+    }
+
+    private void DetachGridRenderMeasurement()
+    {
+        if (_measuredViewModel is null)
+            return;
+
+        _measuredViewModel.Rows.CollectionChanged -= SalaryRows_CollectionChanged;
+        _measuredViewModel = null;
+    }
+
+    private void SalaryRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action != NotifyCollectionChangedAction.Reset || _measuredViewModel is null)
+            return;
+
+        _gridRenderRowCount = _measuredViewModel.Rows.Count;
+        _gridRenderStopwatch = Stopwatch.StartNew();
+        var sequence = ++_gridRenderSequence;
+        Dispatcher.BeginInvoke(
+            () => LogSalaryGridRenderIdle(sequence),
+            DispatcherPriority.ContextIdle);
+    }
+
+    private void LogSalaryGridRenderIdle(long sequence)
+    {
+        if (sequence != _gridRenderSequence || _gridRenderStopwatch is null)
+            return;
+
+        _gridRenderStopwatch.Stop();
+        PerformanceTrace.SalaryGridRenderIdle(_gridRenderRowCount, _gridRenderStopwatch.Elapsed);
+        _gridRenderStopwatch = null;
     }
 
     private void AttachColumnWidthHandlers()

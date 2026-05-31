@@ -31,13 +31,14 @@ public sealed record MonthlyPayrollRow(
     decimal EsicDeduction,
     decimal PfDeduction,
     decimal TdsDeduction,
+    bool IsTdsManualOverride,
     decimal AdvanceDeduction,
     decimal AdvanceBalance,
     decimal? HistoricalNetSalaryOverride,
     SalaryBreakdown? Breakdown,
     IReadOnlyList<ValidationIssue> ValidationIssues)
 {
-    public bool UsesTds => !IsCashDeductionsDisabled && SalaryPaid > 25000m;
+    public bool UsesTds => !IsCashDeductionsDisabled && SalaryPaid > SalaryCalculator.TdsThreshold;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
     public decimal NetSalaryBeforeAdvance => Breakdown?.NetSalary ?? 0m;
     public decimal NetSalary => HistoricalNetSalaryOverride ?? NetSalaryBeforeAdvance - AdvanceDeduction;
@@ -142,15 +143,22 @@ public class MonthlyPayrollService
                 request.Year,
                 request.Month,
                 daysAbsent);
-            var salaryPaid = record?.BaseSalaryOverride ?? defaultSalaryPaid;
+            var salaryPaid = record?.BaseSalaryOverride is decimal salaryOverride
+                ? SalaryCalculator.RoundSalaryPaid(salaryOverride)
+                : defaultSalaryPaid;
             var isCashDeductionsDisabled =
                 employee.PaymentMode == PaymentMode.Cash
                 || groups.Any(g => GroupNameNormalizer.Normalize(g.Name) == CashGroupNormalizedName);
-            var usesTds = !isCashDeductionsDisabled && salaryPaid > 25000m;
+            var usesTds = !isCashDeductionsDisabled && salaryPaid > SalaryCalculator.TdsThreshold;
             var usesEsicPf = !isCashDeductionsDisabled && !usesTds;
             var esic = usesEsicPf ? record?.EsicDeduction ?? 0m : 0m;
             var pf = usesEsicPf ? record?.PfDeduction ?? 0m : 0m;
-            var tds = usesTds ? record?.TdsDeduction ?? 0m : 0m;
+            var isTdsManualOverride = usesTds && record?.IsTdsManualOverride == true;
+            var tds = usesTds
+                ? isTdsManualOverride
+                    ? record?.TdsDeduction ?? SalaryCalculator.CalculateDefaultTds(salaryPaid)
+                    : SalaryCalculator.CalculateDefaultTds(salaryPaid)
+                : 0m;
             var advanceDeduction = salaryAdvanceDeductions.GetValueOrDefault(employee.Id, 0m);
             var advanceBalance = balances.GetValueOrDefault(employee.Id, 0m);
             var historicalNetOverride = record?.BaseSalaryOverride is null
@@ -205,6 +213,7 @@ public class MonthlyPayrollService
                 esic,
                 pf,
                 tds,
+                isTdsManualOverride,
                 advanceDeduction,
                 advanceBalance,
                 historicalNetOverride,

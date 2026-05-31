@@ -22,7 +22,7 @@ public class PdfSlipServiceTests
             var rows = new[]
             {
                 new MonthlySummaryRow("A", 10000m, 10000m, 0, 0m, 0m, 0m, 0m, 0m, 10000m),
-                new MonthlySummaryRow("B", 30000m, 29032.26m, 1, 967.74m, 0m, 0m, 100m, 50m, 28882.26m),
+                new MonthlySummaryRow("B", 30000m, 29032m, 1, 967.74m, 0m, 0m, 100m, 50m, 28882m),
             };
 
             new PdfSlipService().GenerateMonthlySummary(2026, 5, rows, path);

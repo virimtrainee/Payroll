@@ -17,6 +17,9 @@ public record SalaryBreakdown(
 
 public static class SalaryCalculator
 {
+    public const decimal TdsThreshold = 25000m;
+    public const decimal DefaultTdsRate = 0.10m;
+
     public static SalaryBreakdown Compute(
         decimal baseSalary, int year, int month, int daysAbsent,
         decimal esicDeduction = 0, decimal pfDeduction = 0, decimal tdsDeduction = 0)
@@ -47,11 +50,13 @@ public static class SalaryCalculator
         if (month is < 1 or > 12)
             throw new ArgumentOutOfRangeException(nameof(month), "Month must be 1-12.");
 
+        salaryPaid = RoundSalaryPaid(salaryPaid);
+
         var (daysInMonth, normalizedDaysAbsent, perDay, deduction) =
             CalculateAbsence(baseSalary, year, month, daysAbsent);
         daysAbsent = normalizedDaysAbsent;
 
-        if (salaryPaid > 25000m)
+        if (salaryPaid > TdsThreshold)
         {
             esicDeduction = 0;
             pfDeduction = 0;
@@ -83,8 +88,14 @@ public static class SalaryCalculator
     public static decimal CalculateDefaultSalaryPaid(decimal baseSalary, int year, int month, int daysAbsent)
     {
         var (_, _, _, deduction) = CalculateAbsence(baseSalary, year, month, daysAbsent);
-        return decimal.Round(baseSalary - deduction, 2, MidpointRounding.AwayFromZero);
+        return RoundSalaryPaid(baseSalary - deduction);
     }
+
+    public static decimal RoundSalaryPaid(decimal salaryPaid)
+        => decimal.Round(salaryPaid, 0, MidpointRounding.AwayFromZero);
+
+    public static decimal CalculateDefaultTds(decimal salaryPaid)
+        => decimal.Round(RoundSalaryPaid(salaryPaid) * DefaultTdsRate, 2, MidpointRounding.AwayFromZero);
 
     private static (int DaysInMonth, int DaysAbsent, decimal PerDay, decimal Deduction) CalculateAbsence(
         decimal baseSalary,

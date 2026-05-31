@@ -11,7 +11,11 @@ public sealed record ImportedEmployeeRow(
     decimal BaseSalary,
     string? AccountNumber,
     string? IfscCode,
-    PaymentMode PaymentMode);
+    PaymentMode PaymentMode,
+    string? AadharNumber = null,
+    string? UanNumber = null,
+    string? InsuranceNumber = null,
+    string? PhoneNumber = null);
 
 public sealed record EmployeeImportReadResult(
     IReadOnlyList<ImportedEmployeeRow> Rows,
@@ -37,6 +41,10 @@ public class ExcelImportService
     private static readonly string[] AccountAliases = ["BENE_ACC_NO", "ACCOUNT_NO", "ACCOUNT", "ACC_NO", "ACCOUNT_NUMBER"];
     private static readonly string[] IfscAliases = ["BENE_IFSC", "IFSC", "IFSC_CODE"];
     private static readonly string[] ModeAliases = ["PYMT_MODE", "PAYMENT_MODE", "MODE", "BANK_TYPE"];
+    private static readonly string[] AadharAliases = ["AADHAR_NUMBER", "AADHAAR_NUMBER", "AADHAR", "AADHAAR"];
+    private static readonly string[] UanAliases = ["UAN_NUMBER", "UAN"];
+    private static readonly string[] InsuranceAliases = ["INSURANCE_NUMBER", "INSURANCE_NO", "INSURANCE"];
+    private static readonly string[] PhoneAliases = ["PHONE_NUMBER", "PHONE", "MOBILE_NUMBER", "MOBILE"];
 
     public EmployeeImportReadResult ReadEmployees(string path)
     {
@@ -78,6 +86,10 @@ public class ExcelImportService
         var accountCol = Find(headers, AccountAliases);
         var ifscCol = Find(headers, IfscAliases);
         var modeCol = Find(headers, ModeAliases);
+        var aadharCol = Find(headers, AadharAliases);
+        var uanCol = Find(headers, UanAliases);
+        var insuranceCol = Find(headers, InsuranceAliases);
+        var phoneCol = Find(headers, PhoneAliases);
 
         if (nameCol is null)
             return EmployeeImportReadResult.Failed("Could not find an employee name column. " +
@@ -93,7 +105,8 @@ public class ExcelImportService
 
         foreach (var row in ws.RowsUsed().Where(row => row.RowNumber() > headerRow.RowNumber()))
         {
-            if (!HasRelevantValue(row, nameCol, salaryCol, accountCol, ifscCol, modeCol))
+            if (!HasRelevantValue(row, nameCol, salaryCol, accountCol, ifscCol, modeCol,
+                    aadharCol, uanCol, insuranceCol, phoneCol))
                 continue;
 
             var rowNumber = row.RowNumber();
@@ -131,9 +144,14 @@ public class ExcelImportService
             var account = Cell(row, accountCol);
             var ifsc = Cell(row, ifscCol);
             var mode = ParsePaymentMode(Cell(row, modeCol), account, ifsc);
+            var aadhar = Cell(row, aadharCol);
+            var uan = Cell(row, uanCol);
+            var insurance = Cell(row, insuranceCol);
+            var phone = Cell(row, phoneCol);
 
             rowErrors.AddRange(EmployeeValidator.Validate(
-                new EmployeeValidationInput(name, salary, mode, account, ifsc),
+                new EmployeeValidationInput(name, salary, mode, account, ifsc, null,
+                    aadhar, uan, insurance, phone),
                 rowNumber: rowNumber).Errors);
 
             if (rowErrors.Count != errorsBefore)
@@ -144,7 +162,11 @@ public class ExcelImportService
                 BaseSalary: salary,
                 AccountNumber: string.IsNullOrWhiteSpace(account) ? null : account.Trim(),
                 IfscCode: string.IsNullOrWhiteSpace(ifsc) ? null : ifsc.Trim().ToUpperInvariant(),
-                PaymentMode: mode));
+                PaymentMode: mode,
+                AadharNumber: NullIfWhiteSpace(aadhar),
+                UanNumber: NullIfWhiteSpace(uan),
+                InsuranceNumber: NullIfWhiteSpace(insurance),
+                PhoneNumber: NullIfWhiteSpace(phone)));
         }
 
         return new EmployeeImportReadResult(rows, rowErrors, null);
@@ -210,6 +232,9 @@ public class ExcelImportService
             _ when ifsc?.Trim().StartsWith("ICIC0", StringComparison.OrdinalIgnoreCase) == true => PaymentMode.IciciBank,
             _ => PaymentMode.OtherBank
         };
+
+    private static string? NullIfWhiteSpace(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 file static class StringExtensions

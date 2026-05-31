@@ -11,7 +11,11 @@ public sealed record EmployeeValidationInput(
     PaymentMode PaymentMode,
     string? AccountNumber,
     string? IfscCode,
-    DateTime? JoiningDate = null)
+    DateTime? JoiningDate = null,
+    string? AadharNumber = null,
+    string? UanNumber = null,
+    string? InsuranceNumber = null,
+    string? PhoneNumber = null)
 {
     public EmployeeValidationInput(
         string? name,
@@ -19,8 +23,13 @@ public sealed record EmployeeValidationInput(
         string? accountNumber,
         string? ifscCode,
         PaymentMode paymentMode,
-        DateTime? joiningDate = null)
-        : this(name, baseSalary, paymentMode, accountNumber, ifscCode, joiningDate)
+        DateTime? joiningDate = null,
+        string? aadharNumber = null,
+        string? uanNumber = null,
+        string? insuranceNumber = null,
+        string? phoneNumber = null)
+        : this(name, baseSalary, paymentMode, accountNumber, ifscCode, joiningDate,
+            aadharNumber, uanNumber, insuranceNumber, phoneNumber)
     {
     }
 }
@@ -72,6 +81,11 @@ public static partial class EmployeeValidator
                     if (input.JoiningDate?.Date > DateTime.Today)
                         validation.AddIssue("Joining date", "Joining date cannot be in the future.", "joining_date_future", rowNumber);
 
+                    ValidateOptionalLength(validation, "Aadhar number", input.AadharNumber, 20, "aadhar_too_long", rowNumber);
+                    ValidateOptionalLength(validation, "UAN number", input.UanNumber, 20, "uan_too_long", rowNumber);
+                    ValidateOptionalLength(validation, "Insurance number", input.InsuranceNumber, 50, "insurance_too_long", rowNumber);
+                    ValidateOptionalLength(validation, "Phone number", input.PhoneNumber, 30, "phone_too_long", rowNumber);
+
                     if (input.PaymentMode == PaymentMode.Cash)
                         return;
 
@@ -85,6 +99,18 @@ public static partial class EmployeeValidator
                         validation.AddIssue("IFSC", "IFSC must match the format ABCD0XXXXXX.", "ifsc_invalid", rowNumber);
                 });
         }
+    }
+
+    private static void ValidateOptionalLength(
+        ValidationContext<EmployeeValidationContext> validation,
+        string field,
+        string? value,
+        int maxLength,
+        string code,
+        int? rowNumber)
+    {
+        if ((value?.Trim().Length ?? 0) > maxLength)
+            validation.AddIssue(field, $"{field} cannot exceed {maxLength} characters.", code, rowNumber);
     }
 
     private static ValidationIssue ToIssue(ValidationFailure failure)

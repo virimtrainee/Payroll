@@ -35,14 +35,18 @@ public partial class AttendanceRow : ObservableObject
             return SalaryCalculator.CalculateDefaultSalaryPaid(EmployeeBaseSalary, Year, Month, Math.Max(0, DaysAbsent));
         }
     }
-    public decimal EffectiveSalaryPaid => BaseSalaryOverride ?? DefaultSalaryPaid;
-    public bool UsesTds => EffectiveSalaryPaid > 25000m;
+    public decimal EffectiveSalaryPaid => BaseSalaryOverride is decimal salaryOverride
+        ? SalaryCalculator.RoundSalaryPaid(salaryOverride)
+        : DefaultSalaryPaid;
+    public bool UsesTds => EffectiveSalaryPaid > SalaryCalculator.TdsThreshold;
     public bool UsesEsicPf => !UsesTds;
+    private bool _updatingAutomaticTds;
 
     [ObservableProperty] private int daysAbsent;
     [ObservableProperty] private decimal esicDeduction;
     [ObservableProperty] private decimal pfDeduction;
     [ObservableProperty] private decimal tdsDeduction;
+    [ObservableProperty] private bool isTdsManualOverride;
 
     partial void OnDaysAbsentChanged(int value)
     {
@@ -50,6 +54,43 @@ public partial class AttendanceRow : ObservableObject
         OnPropertyChanged(nameof(EffectiveSalaryPaid));
         OnPropertyChanged(nameof(UsesTds));
         OnPropertyChanged(nameof(UsesEsicPf));
+        RefreshTdsEligibility();
+    }
+
+    partial void OnTdsDeductionChanged(decimal value)
+    {
+        if (!_updatingAutomaticTds)
+        {
+            IsTdsManualOverride = UsesTds
+                && value != SalaryCalculator.CalculateDefaultTds(EffectiveSalaryPaid);
+        }
+    }
+
+    private void RefreshTdsEligibility()
+    {
+        if (UsesTds)
+        {
+            if (!IsTdsManualOverride)
+                SetAutomaticTds(SalaryCalculator.CalculateDefaultTds(EffectiveSalaryPaid));
+        }
+        else
+        {
+            IsTdsManualOverride = false;
+            SetAutomaticTds(0m);
+        }
+    }
+
+    private void SetAutomaticTds(decimal value)
+    {
+        _updatingAutomaticTds = true;
+        try
+        {
+            TdsDeduction = value;
+        }
+        finally
+        {
+            _updatingAutomaticTds = false;
+        }
     }
 }
 
@@ -114,9 +155,11 @@ public partial class AttendanceViewModel : ObservableObject
             foreach (var e in employees)
             {
                 var rec = existing.GetValueOrDefault(e.Id);
-                var salaryPaid = rec?.BaseSalaryOverride
-                    ?? SalaryCalculator.CalculateDefaultSalaryPaid(e.BaseSalary, SelectedYear, SelectedMonth.Number, rec?.DaysAbsent ?? 0);
-                var usesTds = salaryPaid > 25000m;
+                var salaryPaid = rec?.BaseSalaryOverride is decimal salaryOverride
+                    ? SalaryCalculator.RoundSalaryPaid(salaryOverride)
+                    : SalaryCalculator.CalculateDefaultSalaryPaid(e.BaseSalary, SelectedYear, SelectedMonth.Number, rec?.DaysAbsent ?? 0);
+                var usesTds = salaryPaid > SalaryCalculator.TdsThreshold;
+                var isTdsManualOverride = usesTds && rec?.IsTdsManualOverride == true;
                 newRows.Add(new AttendanceRow
                 {
                     EmployeeId = e.Id,
@@ -128,7 +171,12 @@ public partial class AttendanceViewModel : ObservableObject
                     DaysAbsent = rec?.DaysAbsent ?? 0,
                     EsicDeduction = !usesTds ? rec?.EsicDeduction ?? 0m : 0m,
                     PfDeduction = !usesTds ? rec?.PfDeduction ?? 0m : 0m,
-                    TdsDeduction = usesTds ? rec?.TdsDeduction ?? 0m : 0m,
+                    IsTdsManualOverride = isTdsManualOverride,
+                    TdsDeduction = usesTds
+                        ? isTdsManualOverride
+                            ? rec?.TdsDeduction ?? SalaryCalculator.CalculateDefaultTds(salaryPaid)
+                            : SalaryCalculator.CalculateDefaultTds(salaryPaid)
+                        : 0m,
                 });
             }
 
@@ -164,6 +212,7 @@ public partial class AttendanceViewModel : ObservableObject
                 rec.EsicDeduction = r.UsesEsicPf ? r.EsicDeduction : 0m;
                 rec.PfDeduction = r.UsesEsicPf ? r.PfDeduction : 0m;
                 rec.TdsDeduction = r.UsesTds ? r.TdsDeduction : 0m;
+                rec.IsTdsManualOverride = r.UsesTds && r.IsTdsManualOverride;
             }
             else
             {
@@ -176,6 +225,7 @@ public partial class AttendanceViewModel : ObservableObject
                     EsicDeduction = r.UsesEsicPf ? r.EsicDeduction : 0m,
                     PfDeduction = r.UsesEsicPf ? r.PfDeduction : 0m,
                     TdsDeduction = r.UsesTds ? r.TdsDeduction : 0m,
+                    IsTdsManualOverride = r.UsesTds && r.IsTdsManualOverride,
                 });
             }
         }

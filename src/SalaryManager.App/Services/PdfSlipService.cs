@@ -149,11 +149,11 @@ public class PdfSlipService
                     DetailRow(box, "Days present", d.Breakdown.DaysPresent.ToString());
                     DetailRow(box, "Per-day rate", d.Breakdown.PerDayRate.ToString("N2"));
                     DetailRow(box, "Absence deduction", $"- {d.Breakdown.Deduction:N2}");
-                    DetailRow(box, "Salary paid", d.Breakdown.SalaryPaid.ToString("N2"));
-                    if (d.Breakdown.EsicDeduction > 0)
-                        DetailRow(box, "ESIC deduction", $"- {d.Breakdown.EsicDeduction:N2}");
+                    DetailRow(box, "Salary paid", d.Breakdown.SalaryPaid.ToString("N0"));
                     if (d.Breakdown.PfDeduction > 0)
                         DetailRow(box, "PF deduction", $"- {d.Breakdown.PfDeduction:N2}");
+                    if (d.Breakdown.EsicDeduction > 0)
+                        DetailRow(box, "ESIC deduction", $"- {d.Breakdown.EsicDeduction:N2}");
                     if (d.Breakdown.TdsDeduction > 0)
                         DetailRow(box, "TDS deduction", $"- {d.Breakdown.TdsDeduction:N2}");
                     if (d.SalaryAdvanceDeduction > 0)
@@ -238,8 +238,8 @@ public class PdfSlipService
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Absent").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Deduction").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Salary Paid").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("ESIC").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("PF").Bold();
+                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("ESIC").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("TDS").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Adv. Ded").Bold();
                     h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Net Salary").Bold();
@@ -252,9 +252,9 @@ public class PdfSlipService
                     t.Cell().Padding(6).AlignRight().Text(r.BaseSalary.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.DaysAbsent.ToString());
                     t.Cell().Padding(6).AlignRight().Text(r.Deduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.SalaryPaid.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
+                    t.Cell().Padding(6).AlignRight().Text(r.SalaryPaid.ToString("N0"));
                     t.Cell().Padding(6).AlignRight().Text(r.PfDeduction.ToString("N2"));
+                    t.Cell().Padding(6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.TdsDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
                     t.Cell().Padding(6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
@@ -272,9 +272,9 @@ public class PdfSlipService
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text("").FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalSalaryPaid.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalSalaryPaid.ToString("N0")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor(Colors.White);
+                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor(Colors.White);
                 t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor(Colors.White);

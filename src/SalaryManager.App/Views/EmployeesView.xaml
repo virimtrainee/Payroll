@@ -353,6 +353,10 @@
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="Account No." Binding="{Binding AccountNumber}" Width="170"/>
                                             <DataGridTextColumn Header="IFSC" Binding="{Binding IfscCode}" Width="140"/>
+                                            <DataGridTextColumn Header="Aadhar No." Binding="{Binding AadharNumber}" Width="140"/>
+                                            <DataGridTextColumn Header="UAN No." Binding="{Binding UanNumber}" Width="130"/>
+                                            <DataGridTextColumn Header="Insurance No." Binding="{Binding InsuranceNumber}" Width="150"/>
+                                            <DataGridTextColumn Header="Phone No." Binding="{Binding PhoneNumber}" Width="130"/>
                                             <DataGridTemplateColumn Header="Group" Width="150" IsReadOnly="True">
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>

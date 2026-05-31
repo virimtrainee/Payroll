@@ -84,6 +84,42 @@
             <TextBlock Text="JOINING DATE" Style="{StaticResource FieldLabel}"/>
             <DatePicker SelectedDate="{Binding JoiningDate, Mode=TwoWay}"
                         TabIndex="2"/>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="AADHAR NUMBER" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding AadharNumber, UpdateSourceTrigger=PropertyChanged}"
+                             TabIndex="3"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="UAN NUMBER" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding UanNumber, UpdateSourceTrigger=PropertyChanged}"
+                             TabIndex="4"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="INSURANCE NUMBER" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding InsuranceNumber, UpdateSourceTrigger=PropertyChanged}"
+                             TabIndex="5"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="PHONE NUMBER" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                             TabIndex="6"/>
+                </StackPanel>
+            </Grid>
         </StackPanel>
 
         <!-- Active + Payment Mode label -->
@@ -101,15 +137,15 @@
             <RadioButton Style="{StaticResource SegmentRadio}"
                          Content="Cash"
                          IsChecked="{Binding IsCash, Mode=TwoWay}"
-                         TabIndex="3"/>
+                         TabIndex="7"/>
             <RadioButton Style="{StaticResource SegmentRadio}"
                          Content="ICICI Bank"
                          IsChecked="{Binding IsIcici, Mode=TwoWay}"
-                         Margin="8,0,0,0" TabIndex="4"/>
+                         Margin="8,0,0,0" TabIndex="8"/>
             <RadioButton Style="{StaticResource SegmentRadio}"
                          Content="Other Bank"
                          IsChecked="{Binding IsOther, Mode=TwoWay}"
-                         Margin="8,0,0,0" TabIndex="5"/>
+                         Margin="8,0,0,0" TabIndex="9"/>
         </StackPanel>
 
         <!-- Bank fields — hidden when Cash is selected -->
@@ -124,12 +160,12 @@
             <StackPanel Grid.Column="0">
                 <TextBlock Text="ACCOUNT NO" Style="{StaticResource FieldLabel}"/>
                 <TextBox Text="{Binding AccountNumber, UpdateSourceTrigger=PropertyChanged}"
-                         TabIndex="6"/>
+                         TabIndex="10"/>
             </StackPanel>
             <StackPanel Grid.Column="2">
                 <TextBlock Text="IFSC CODE" Style="{StaticResource FieldLabel}"/>
                 <TextBox Text="{Binding IfscCode, UpdateSourceTrigger=PropertyChanged}"
-                         TabIndex="7"/>
+                         TabIndex="11"/>
             </StackPanel>
         </Grid>
 
@@ -183,10 +219,10 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0" Style="{StaticResource SecondaryButton}"
-                        Content="Cancel" Click="Cancel_Click" TabIndex="9"/>
+                        Content="Cancel" Click="Cancel_Click" TabIndex="13"/>
                 <Button Grid.Column="2" Style="{StaticResource PrimaryButton}"
                         Content="{Binding SaveButtonText}" Click="Add_Click"
-                        IsDefault="True" TabIndex="8"/>
+                        IsDefault="True" TabIndex="12"/>
             </Grid>
         </StackPanel>
     </Grid>

@@ -15,6 +15,10 @@ public partial class AddEmployeeViewModel : ObservableObject
     [ObservableProperty] private decimal baseSalary;
     [ObservableProperty] private string accountNumber = string.Empty;
     [ObservableProperty] private string ifscCode = string.Empty;
+    [ObservableProperty] private string aadharNumber = string.Empty;
+    [ObservableProperty] private string uanNumber = string.Empty;
+    [ObservableProperty] private string insuranceNumber = string.Empty;
+    [ObservableProperty] private string phoneNumber = string.Empty;
     [ObservableProperty] private DateTime? joiningDate;
     [ObservableProperty] private bool isActive = true;
 
@@ -48,7 +52,8 @@ public partial class AddEmployeeViewModel : ObservableObject
     public bool ShowBankFields => PaymentMode != PaymentMode.Cash;
 
     public EmployeeValidationInput ToValidationInput()
-        => new(Name, BaseSalary, PaymentMode, AccountNumber, IfscCode, JoiningDate);
+        => new(Name, BaseSalary, PaymentMode, AccountNumber, IfscCode, JoiningDate,
+            AadharNumber, UanNumber, InsuranceNumber, PhoneNumber);
 
     public ValidationResult Validate()
         => EmployeeValidator.Validate(ToValidationInput());

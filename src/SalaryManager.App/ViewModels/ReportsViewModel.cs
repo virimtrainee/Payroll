@@ -447,7 +447,11 @@ public partial class ReportsViewModel : ObservableObject
         var salaryPaid = EffectiveSalaryPaid(employee, attendance, daysAbsent, SelectedYear, SelectedMonth.Number);
         var esic = UsesEsicPf(employee, salaryPaid) ? attendance?.EsicDeduction ?? 0m : 0m;
         var pf = UsesEsicPf(employee, salaryPaid) ? attendance?.PfDeduction ?? 0m : 0m;
-        var tds = UsesTds(employee, salaryPaid) ? attendance?.TdsDeduction ?? 0m : 0m;
+        var tds = UsesTds(employee, salaryPaid)
+            ? attendance?.IsTdsManualOverride == true
+                ? attendance.TdsDeduction
+                : SalaryCalculator.CalculateDefaultTds(salaryPaid)
+            : 0m;
 
         var validation = PayrollValidator.Validate(new PayrollValidationInput(
             employee.Name,
@@ -524,17 +528,18 @@ public partial class ReportsViewModel : ObservableObject
     }
 
     private static decimal EffectiveSalaryPaid(Employee employee, AttendanceRecord? attendance, int daysAbsent, int year, int month)
-        => attendance?.BaseSalaryOverride
-        ?? SalaryCalculator.CalculateDefaultSalaryPaid(employee.BaseSalary, year, month, daysAbsent);
+        => attendance?.BaseSalaryOverride is decimal salaryOverride
+            ? SalaryCalculator.RoundSalaryPaid(salaryOverride)
+            : SalaryCalculator.CalculateDefaultSalaryPaid(employee.BaseSalary, year, month, daysAbsent);
 
     private static decimal? EffectiveHistoricalNetSalaryOverride(AttendanceRecord? attendance)
         => attendance?.BaseSalaryOverride is null ? attendance?.NetSalaryOverride : null;
 
     private static bool UsesEsicPf(Employee employee, decimal salaryPaid)
-        => !HasCashDeductionsDisabled(employee) && salaryPaid <= 25000m;
+        => !HasCashDeductionsDisabled(employee) && salaryPaid <= SalaryCalculator.TdsThreshold;
 
     private static bool UsesTds(Employee employee, decimal salaryPaid)
-        => !HasCashDeductionsDisabled(employee) && salaryPaid > 25000m;
+        => !HasCashDeductionsDisabled(employee) && salaryPaid > SalaryCalculator.TdsThreshold;
 
     private static bool HasCashDeductionsDisabled(Employee employee)
         => employee.PaymentMode == PaymentMode.Cash

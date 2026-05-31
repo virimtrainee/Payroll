@@ -21,6 +21,18 @@ public class Employee
     [MaxLength(15)]
     public string? IfscCode { get; set; }
 
+    [MaxLength(20)]
+    public string? AadharNumber { get; set; }
+
+    [MaxLength(20)]
+    public string? UanNumber { get; set; }
+
+    [MaxLength(50)]
+    public string? InsuranceNumber { get; set; }
+
+    [MaxLength(30)]
+    public string? PhoneNumber { get; set; }
+
     public PaymentMode PaymentMode { get; set; } = PaymentMode.OtherBank;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

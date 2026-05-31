@@ -14,7 +14,7 @@ internal static class ExcelReportTemplateFactory
 
         AddHeaders(ws, 3, new[]
         {
-            "Employee", "Base Salary", "Days Absent", "Deduction", "Salary Paid", "ESIC", "PF", "TDS", "Advance Deduction", "Net Salary"
+            "Employee", "Base Salary", "Days Absent", "Deduction", "Salary Paid", "PF", "ESIC", "TDS", "Advance Deduction", "Net Salary"
         });
 
         var expressions = new[]
@@ -24,8 +24,8 @@ internal static class ExcelReportTemplateFactory
             "{{item.DaysAbsent}}",
             "{{item.Deduction}}",
             "{{item.SalaryPaid}}",
-            "{{item.EsicDeduction}}",
             "{{item.PfDeduction}}",
+            "{{item.EsicDeduction}}",
             "{{item.TdsDeduction}}",
             "{{item.AdvanceDeduction}}",
             "{{item.NetSalary}}"
@@ -39,7 +39,9 @@ internal static class ExcelReportTemplateFactory
             .Font.SetFontColor(XLColor.White);
 
         ws.Range(4, 2, 5, 2).Style.NumberFormat.Format = "#,##0.00";
-        ws.Range(4, 4, 5, 10).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(4, 4, 5, 4).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(4, 5, 5, 5).Style.NumberFormat.Format = "#,##0";
+        ws.Range(4, 6, 5, 10).Style.NumberFormat.Format = "#,##0.00";
         ws.Range(4, 1, 5, 10).AddToNamed("Rows");
 
         return wb;

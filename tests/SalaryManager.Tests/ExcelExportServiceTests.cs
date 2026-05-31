@@ -26,6 +26,8 @@ public class ExcelExportServiceTests
             var ws = workbook.Worksheet("May 2026");
             Assert.Equal("Payroll Summary - May 2026", ws.Cell(1, 1).GetString());
             Assert.Equal("Employee", ws.Cell(3, 1).GetString());
+            Assert.Equal("PF", ws.Cell(3, 6).GetString());
+            Assert.Equal("ESIC", ws.Cell(3, 7).GetString());
             Assert.Equal("A", ws.Cell(4, 1).GetString());
             Assert.Equal(10000m, ws.Cell(4, 2).GetValue<decimal>());
             Assert.Equal("B", ws.Cell(5, 1).GetString());
@@ -33,6 +35,8 @@ public class ExcelExportServiceTests
             Assert.Equal(30000m, ws.Cell(6, 2).GetValue<decimal>());
             Assert.Equal(500m, ws.Cell(6, 4).GetValue<decimal>());
             Assert.Equal(29500m, ws.Cell(6, 5).GetValue<decimal>());
+            Assert.Equal(45m, ws.Cell(6, 6).GetValue<decimal>());
+            Assert.Equal(25m, ws.Cell(6, 7).GetValue<decimal>());
             Assert.Equal(29280m, ws.Cell(6, 10).GetValue<decimal>());
             Assert.Equal(28d, ws.Column(1).Width, 2);
             Assert.Equal(18d, ws.Column(9).Width, 2);

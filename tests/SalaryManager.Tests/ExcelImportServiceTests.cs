@@ -40,6 +40,35 @@ public class ExcelImportServiceTests
     }
 
     [Fact]
+    public void ReadEmployees_ParsesOptionalEmployeeFields()
+    {
+        using var workbook = new XLWorkbook();
+        var ws = workbook.AddWorksheet("Employees");
+        ws.Cell(1, 1).Value = "NAME";
+        ws.Cell(1, 2).Value = "SALARY";
+        ws.Cell(1, 3).Value = "AADHAAR_NUMBER";
+        ws.Cell(1, 4).Value = "UAN_NUMBER";
+        ws.Cell(1, 5).Value = "INSURANCE_NUMBER";
+        ws.Cell(1, 6).Value = "MOBILE_NUMBER";
+        ws.Cell(2, 1).Value = "A";
+        ws.Cell(2, 2).Value = 1234.50m;
+        ws.Cell(2, 3).Value = "1234 5678 9012";
+        ws.Cell(2, 4).Value = "100200300400";
+        ws.Cell(2, 5).Value = "INS-42";
+        ws.Cell(2, 6).Value = "9876543210";
+
+        var result = Read(workbook);
+
+        Assert.Null(result.Error);
+        Assert.Empty(result.Issues);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("1234 5678 9012", row.AadharNumber);
+        Assert.Equal("100200300400", row.UanNumber);
+        Assert.Equal("INS-42", row.InsuranceNumber);
+        Assert.Equal("9876543210", row.PhoneNumber);
+    }
+
+    [Fact]
     public void ReadEmployees_ReturnsRowErrorForInvalidSalary()
     {
         using var workbook = new XLWorkbook();

@@ -92,7 +92,8 @@ public class MonthlyPayrollServiceTests
         Assert.Equal(0m, cashGroup.TdsDeduction);
 
         var bankHigh = snapshot.Rows.Single(r => r.Name == "Bank High");
-        Assert.Equal(400m, bankHigh.TdsDeduction);
+        Assert.False(bankHigh.IsTdsManualOverride);
+        Assert.Equal(3000m, bankHigh.TdsDeduction);
         Assert.Equal(0m, bankHigh.EsicDeduction);
         Assert.Equal(0m, bankHigh.PfDeduction);
 
@@ -100,6 +101,25 @@ public class MonthlyPayrollServiceTests
         Assert.Equal(50m, bankLow.EsicDeduction);
         Assert.Equal(60m, bankLow.PfDeduction);
         Assert.Equal(0m, bankLow.TdsDeduction);
+    }
+
+    [Fact]
+    public async Task LoadAsync_PreservesManualTdsOverride()
+    {
+        using var factory = new SqliteDbContextFactory();
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "Bank High", BaseSalary = 30000m, PaymentMode = PaymentMode.OtherBank });
+            db.AttendanceRecords.Add(Attendance(1, esic: 0m, pf: 0m, tds: 400m, isTdsManualOverride: true));
+        });
+
+        var snapshot = await new MonthlyPayrollService(factory)
+            .LoadAsync(new MonthlyPayrollRequest(2026, 5));
+
+        var row = Assert.Single(snapshot.Rows);
+        Assert.True(row.IsTdsManualOverride);
+        Assert.Equal(400m, row.TdsDeduction);
+        Assert.Equal(29600m, row.NetSalary);
     }
 
     [Fact]
@@ -198,7 +218,7 @@ public class MonthlyPayrollServiceTests
         Assert.Empty(snapshot.Rows);
     }
 
-    private static AttendanceRecord Attendance(int employeeId, decimal esic, decimal pf, decimal tds)
+    private static AttendanceRecord Attendance(int employeeId, decimal esic, decimal pf, decimal tds, bool isTdsManualOverride = false)
         => new()
         {
             EmployeeId = employeeId,
@@ -207,7 +227,8 @@ public class MonthlyPayrollServiceTests
             DaysAbsent = 0,
             EsicDeduction = esic,
             PfDeduction = pf,
-            TdsDeduction = tds
+            TdsDeduction = tds,
+            IsTdsManualOverride = isTdsManualOverride
         };
 
     private static async Task SeedAsync(SqliteDbContextFactory factory, Action<AppDbContext> seed)

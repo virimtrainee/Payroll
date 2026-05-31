@@ -8,7 +8,7 @@ namespace SalaryManager.App.Helpers;
 public static class SalarySheetGridNavigation
 {
     private static readonly string[] EditableColumnKeys =
-        { "absent", "salaryPaid", "esic", "pf", "tds", "advanceDeduction" };
+        { "absent", "salaryPaid", "pf", "esic", "tds", "advanceDeduction" };
 
     public static IReadOnlyList<string> EditableColumnKeyOrder => EditableColumnKeys;
 

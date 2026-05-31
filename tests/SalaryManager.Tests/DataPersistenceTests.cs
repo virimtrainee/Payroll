@@ -79,13 +79,37 @@ public class DataPersistenceTests
             Year = 2026,
             Month = 5,
             DaysAbsent = 0,
-            TdsDeduction = 750m
+            TdsDeduction = 750m,
+            IsTdsManualOverride = true
         });
         await db.SaveChangesAsync();
 
         var saved = await db.AttendanceRecords.AsNoTracking().SingleAsync();
 
         Assert.Equal(750m, saved.TdsDeduction);
+        Assert.True(saved.IsTdsManualOverride);
+    }
+
+    [Fact]
+    public async Task Employee_PersistsOptionalIdentityFields()
+    {
+        using var db = NewSqliteContext();
+        db.Employees.Add(new Employee
+        {
+            Name = "A",
+            AadharNumber = "1234 5678 9012",
+            UanNumber = "100200300400",
+            InsuranceNumber = "INS-42",
+            PhoneNumber = "9876543210"
+        });
+        await db.SaveChangesAsync();
+
+        var saved = await db.Employees.AsNoTracking().SingleAsync();
+
+        Assert.Equal("1234 5678 9012", saved.AadharNumber);
+        Assert.Equal("100200300400", saved.UanNumber);
+        Assert.Equal("INS-42", saved.InsuranceNumber);
+        Assert.Equal("9876543210", saved.PhoneNumber);
     }
 
     [Fact]

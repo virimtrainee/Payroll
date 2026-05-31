@@ -179,8 +179,8 @@ public class ExcelExportService
         ws.Cell(totalRow, 2).Value = rows.Sum(row => row.BaseSalary);
         ws.Cell(totalRow, 4).Value = rows.Sum(row => row.Deduction);
         ws.Cell(totalRow, 5).Value = rows.Sum(row => row.SalaryPaid);
-        ws.Cell(totalRow, 6).Value = rows.Sum(row => row.EsicDeduction);
-        ws.Cell(totalRow, 7).Value = rows.Sum(row => row.PfDeduction);
+        ws.Cell(totalRow, 6).Value = rows.Sum(row => row.PfDeduction);
+        ws.Cell(totalRow, 7).Value = rows.Sum(row => row.EsicDeduction);
         ws.Cell(totalRow, 8).Value = rows.Sum(row => row.TdsDeduction);
         ws.Cell(totalRow, 9).Value = rows.Sum(row => row.AdvanceDeduction);
         ws.Cell(totalRow, 10).Value = rows.Sum(row => row.NetSalary);

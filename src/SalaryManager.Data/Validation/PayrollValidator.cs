@@ -105,7 +105,7 @@ public static class PayrollValidator
                     if (input.AdvanceDeduction < 0)
                         validation.AddIssue(input, "Advance deduction cannot be negative.", "advance_negative");
 
-                    var usesTds = EffectiveSalaryPaid(input) > 25000m;
+                    var usesTds = EffectiveSalaryPaid(input) > SalaryManager.Data.Services.SalaryCalculator.TdsThreshold;
                     if (usesTds && (input.EsicDeduction > 0 || input.PfDeduction > 0))
                         validation.AddIssue(input, "ESIC/PF deductions are only allowed for salaries up to 25000.", "esic_pf_not_allowed");
                     if (!usesTds && input.TdsDeduction > 0)
@@ -117,7 +117,9 @@ public static class PayrollValidator
     private static decimal EffectiveSalaryPaid(PayrollValidationInput input)
     {
         if (input.SalaryPaid is decimal salaryPaid)
-            return salaryPaid;
+            return salaryPaid < 0m
+                ? salaryPaid
+                : SalaryManager.Data.Services.SalaryCalculator.RoundSalaryPaid(salaryPaid);
 
         if (input.BaseSalary < 0 || input.Month is < 1 or > 12 || input.DaysAbsent < 0)
             return input.BaseSalary;

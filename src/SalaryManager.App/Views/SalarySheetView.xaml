@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:helpers="clr-namespace:SalaryManager.App.Helpers"
+             xmlns:sys="clr-namespace:System;assembly=System.Private.CoreLib"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              PreviewKeyDown="UserControl_PreviewKeyDown">
     <UserControl.Resources>
@@ -87,6 +88,22 @@
             <Setter Property="BorderBrush" Value="#93C5FD"/>
             <Setter Property="BorderThickness" Value="0,1,0,0"/>
         </Style>
+        <Style x:Key="SalaryGroupSummaryRow" TargetType="{x:Type syncfusion:GroupSummaryRowControl}">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,1,0,1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="SalaryGroupSummaryCell" TargetType="{x:Type syncfusion:GridGroupSummaryCell}" BasedOn="{StaticResource SfSalaryCell}">
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,1,0,1"/>
+        </Style>
         <Style TargetType="{x:Type syncfusion:GridHeaderCellControl}">
             <Setter Property="Background" Value="#EEF2F7"/>
             <Setter Property="Foreground" Value="#334155"/>
@@ -99,6 +116,19 @@
         </Style>
         <Style TargetType="{x:Type syncfusion:GridFilterControl}">
             <Setter Property="FilterMode" Value="AdvancedFilter"/>
+        </Style>
+        <Style x:Key="SalaryTextFilterPopup" TargetType="{x:Type syncfusion:GridFilterControl}">
+            <Setter Property="FilterMode" Value="AdvancedFilter"/>
+            <Setter Property="FilterPopupWidth" Value="260"/>
+        </Style>
+        <Style x:Key="SalaryNumberFilterPopup" TargetType="{x:Type syncfusion:GridFilterControl}">
+            <Setter Property="FilterMode" Value="AdvancedFilter"/>
+            <Setter Property="FilterPopupWidth" Value="260"/>
+        </Style>
+        <Style x:Key="SalaryChoiceFilterPopup" TargetType="{x:Type syncfusion:GridFilterControl}">
+            <Setter Property="FilterMode" Value="CheckboxFilter"/>
+            <Setter Property="ImmediateUpdateColumnFilter" Value="True"/>
+            <Setter Property="FilterPopupWidth" Value="240"/>
         </Style>
         <Style TargetType="{x:Type syncfusion:AdvancedFilterControl}">
             <Setter Property="CanGenerateUniqueItems" Value="False"/>
@@ -354,7 +384,7 @@
                                            ItemsSource="{Binding RowsView}"
                                            IsReadOnly="{Binding IsGridReadOnly}"
                                            AllowEditing="{Binding IsEditMode}"
-                                           AllowFiltering="False"
+                                           AllowFiltering="True"
                                            AllowGrouping="False"
                                            AllowResizingColumns="True"
                                            AllowSorting="True"
@@ -363,6 +393,8 @@
                                            ColumnSizer="None"
                                            FrozenColumnCount="2"
                                            GroupCaptionTextFormat="{}{Key}"
+                                           GroupSummaryCellStyle="{StaticResource SalaryGroupSummaryCell}"
+                                           GroupSummaryRowStyle="{StaticResource SalaryGroupSummaryRow}"
                                            GridLinesVisibility="Horizontal"
                                            HeaderRowHeight="38"
                                            RowHeight="44"
@@ -424,6 +456,56 @@
                         <syncfusion:SfDataGrid.GroupColumnDescriptions>
                             <syncfusion:GroupColumnDescription ColumnName="GroupDisplayName"/>
                         </syncfusion:SfDataGrid.GroupColumnDescriptions>
+                        <syncfusion:SfDataGrid.GroupSummaryRows>
+                            <syncfusion:GridSummaryRow ShowSummaryInRow="False">
+                                <syncfusion:GridSummaryRow.SummaryColumns>
+                                    <syncfusion:GridSummaryColumn Name="GroupEmployeeCount"
+                                                                  MappingName="Name"
+                                                                  SummaryType="CountAggregate"
+                                                                  Format="'Total ({Count:d})'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupBaseSalary"
+                                                                  MappingName="EmployeeBaseSalary"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupDaysAbsent"
+                                                                  MappingName="DaysAbsent"
+                                                                  SummaryType="Int32Aggregate"
+                                                                  Format="'{Sum:N0}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupSalaryPaid"
+                                                                  MappingName="SalaryPaid"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N0}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupPf"
+                                                                  MappingName="PfDeduction"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupEsic"
+                                                                  MappingName="EsicDeduction"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupTds"
+                                                                  MappingName="TdsDeduction"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupDeductions"
+                                                                  MappingName="TotalDeductions"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupAdvanceDeduction"
+                                                                  MappingName="AdvanceDeductionEntry"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupAdvanceBalance"
+                                                                  MappingName="AdvanceBalance"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                    <syncfusion:GridSummaryColumn Name="GroupNetSalary"
+                                                                  MappingName="NetSalary"
+                                                                  SummaryType="DoubleAggregate"
+                                                                  Format="'{Sum:N2}'"/>
+                                </syncfusion:GridSummaryRow.SummaryColumns>
+                            </syncfusion:GridSummaryRow>
+                        </syncfusion:SfDataGrid.GroupSummaryRows>
                         <syncfusion:SfDataGrid.Columns>
                             <syncfusion:GridTextColumn HeaderText="#"
                                                        helpers:DataGridColumnKey.Key="serial"
@@ -439,8 +521,10 @@
                             <syncfusion:GridTemplateColumn HeaderText="Employee"
                                                            helpers:DataGridColumnKey.Key="employee"
                                                            MappingName="Name"
+                                                           ColumnMemberType="{x:Type sys:String}"
                                                            IsReadOnly="True"
                                                            AllowEditing="False"
+                                                           FilterPopupStyle="{StaticResource SalaryTextFilterPopup}"
                                                            HorizontalHeaderContentAlignment="Left"
                                                            CellStyle="{StaticResource SfEmployeeCell}"
                                                            Width="180"
@@ -457,19 +541,23 @@
 
                             <syncfusion:GridTextColumn HeaderText="Group"
                                                        helpers:DataGridColumnKey.Key="group"
-                                                       MappingName="GroupDisplayName"
-                                                       IsReadOnly="True"
-                                                       AllowEditing="False"
-                                                       HorizontalHeaderContentAlignment="Left"
-                                                       TextAlignment="Left"
-                                                       Width="90"
+                                                      MappingName="GroupDisplayName"
+                                                      ColumnMemberType="{x:Type sys:String}"
+                                                      IsReadOnly="True"
+                                                      AllowEditing="False"
+                                                      FilterPopupStyle="{StaticResource SalaryChoiceFilterPopup}"
+                                                      HorizontalHeaderContentAlignment="Left"
+                                                      TextAlignment="Left"
+                                                      Width="90"
                                                        MinimumWidth="82"/>
 
                             <syncfusion:GridTemplateColumn HeaderText="Pay"
                                                            helpers:DataGridColumnKey.Key="payment"
                                                            MappingName="PaymentModeLabel"
+                                                           ColumnMemberType="{x:Type sys:String}"
                                                            IsReadOnly="True"
                                                            AllowEditing="False"
+                                                           FilterPopupStyle="{StaticResource SalaryChoiceFilterPopup}"
                                                            HorizontalHeaderContentAlignment="Center"
                                                            Width="82"
                                                            MinimumWidth="82">
@@ -519,9 +607,11 @@
                             <syncfusion:GridTextColumn HeaderText="Base (₹)"
                                                        helpers:DataGridColumnKey.Key="baseSalary"
                                                        MappingName="EmployeeBaseSalary"
+                                                       ColumnMemberType="{x:Type sys:Decimal}"
                                                        DisplayBinding="{Binding EmployeeBaseSalary, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                        IsReadOnly="True"
                                                        AllowEditing="False"
+                                                       FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                        CellStyle="{StaticResource SfNumericReadOnlyCell}"
                                                        HorizontalHeaderContentAlignment="Right"
                                                        TextAlignment="Right"
@@ -531,7 +621,9 @@
                             <syncfusion:GridTemplateColumn HeaderText="Absent"
                                                            helpers:DataGridColumnKey.Key="absent"
                                                            MappingName="DaysAbsent"
+                                                           ColumnMemberType="{x:Type sys:Int32}"
                                                            AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfSalaryEditableCell}"
                                                            HorizontalHeaderContentAlignment="Center"
                                                            TextAlignment="Center"
@@ -560,7 +652,9 @@
                             <syncfusion:GridTemplateColumn HeaderText="Salary Paid"
                                                            helpers:DataGridColumnKey.Key="salaryPaid"
                                                            MappingName="SalaryPaid"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfSalaryPaidCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -568,7 +662,7 @@
                                                            MinimumWidth="104">
                                 <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding SalaryPaid, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                        <TextBlock Text="{Binding SalaryPaid, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain0}"
                                                    Style="{StaticResource RightCellText}"/>
                                     </DataTemplate>
                                 </syncfusion:GridTemplateColumn.CellTemplate>
@@ -587,40 +681,12 @@
                                 </syncfusion:GridTemplateColumn.EditTemplate>
                             </syncfusion:GridTemplateColumn>
 
-                            <syncfusion:GridTemplateColumn HeaderText="ESIC"
-                                                           helpers:DataGridColumnKey.Key="esic"
-                                                           MappingName="EsicDeduction"
-                                                           AllowEditing="True"
-                                                           CellStyle="{StaticResource SfEsicPfCell}"
-                                                           HorizontalHeaderContentAlignment="Right"
-                                                           TextAlignment="Right"
-                                                           Width="78"
-                                                           MinimumWidth="70">
-                                <syncfusion:GridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding EsicDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
-                                                   Style="{StaticResource RightCellText}"/>
-                                    </DataTemplate>
-                                </syncfusion:GridTemplateColumn.CellTemplate>
-                                <syncfusion:GridTemplateColumn.EditTemplate>
-                                    <DataTemplate>
-                                        <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 syncfusion:FocusManagerHelper.FocusedElement="True"
-                                                  IsEnabled="{Binding UsesEsicPf}"
-                                                  TextAlignment="Right"
-                                                  VerticalContentAlignment="Center"
-                                                  FontSize="13"
-                                                  Foreground="{StaticResource TextBrush}"
-                                                  BorderThickness="0"
-                                                  Padding="8,0"/>
-                                    </DataTemplate>
-                                </syncfusion:GridTemplateColumn.EditTemplate>
-                            </syncfusion:GridTemplateColumn>
-
                             <syncfusion:GridTemplateColumn HeaderText="PF"
                                                            helpers:DataGridColumnKey.Key="pf"
                                                            MappingName="PfDeduction"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfEsicPfCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -647,10 +713,44 @@
                                 </syncfusion:GridTemplateColumn.EditTemplate>
                             </syncfusion:GridTemplateColumn>
 
+                            <syncfusion:GridTemplateColumn HeaderText="ESIC"
+                                                           helpers:DataGridColumnKey.Key="esic"
+                                                           MappingName="EsicDeduction"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
+                                                           AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
+                                                           CellStyle="{StaticResource SfEsicPfCell}"
+                                                           HorizontalHeaderContentAlignment="Right"
+                                                           TextAlignment="Right"
+                                                           Width="78"
+                                                           MinimumWidth="70">
+                                <syncfusion:GridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding EsicDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
+                                                   Style="{StaticResource RightCellText}"/>
+                                    </DataTemplate>
+                                </syncfusion:GridTemplateColumn.CellTemplate>
+                                <syncfusion:GridTemplateColumn.EditTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding EsicDeduction, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 syncfusion:FocusManagerHelper.FocusedElement="True"
+                                                  IsEnabled="{Binding UsesEsicPf}"
+                                                  TextAlignment="Right"
+                                                  VerticalContentAlignment="Center"
+                                                  FontSize="13"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  BorderThickness="0"
+                                                  Padding="8,0"/>
+                                    </DataTemplate>
+                                </syncfusion:GridTemplateColumn.EditTemplate>
+                            </syncfusion:GridTemplateColumn>
+
                             <syncfusion:GridTemplateColumn HeaderText="TDS"
                                                            helpers:DataGridColumnKey.Key="tds"
                                                            MappingName="TdsDeduction"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfTdsCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -680,9 +780,11 @@
                             <syncfusion:GridTextColumn HeaderText="Deduct"
                                                        helpers:DataGridColumnKey.Key="deductions"
                                                        MappingName="TotalDeductions"
+                                                       ColumnMemberType="{x:Type sys:Decimal}"
                                                        DisplayBinding="{Binding TotalDeductions, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=plain2}"
                                                        IsReadOnly="True"
                                                        AllowEditing="False"
+                                                       FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                        CellStyle="{StaticResource SfNumericReadOnlyCell}"
                                                        HorizontalHeaderContentAlignment="Right"
                                                        TextAlignment="Right"
@@ -692,7 +794,9 @@
                             <syncfusion:GridTemplateColumn HeaderText="Adv Ded"
                                                            helpers:DataGridColumnKey.Key="advanceDeduction"
                                                            MappingName="AdvanceDeductionEntry"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            AllowEditing="True"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfSalaryEditableCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -721,8 +825,10 @@
                             <syncfusion:GridTemplateColumn HeaderText="Adv Bal"
                                                            helpers:DataGridColumnKey.Key="advanceBalance"
                                                            MappingName="AdvanceBalance"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            IsReadOnly="True"
                                                            AllowEditing="False"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfAdvanceBalanceCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -750,8 +856,10 @@
                             <syncfusion:GridTemplateColumn HeaderText="Net"
                                                            helpers:DataGridColumnKey.Key="netSalary"
                                                            MappingName="NetSalary"
+                                                           ColumnMemberType="{x:Type sys:Decimal}"
                                                            IsReadOnly="True"
                                                            AllowEditing="False"
+                                                           FilterPopupStyle="{StaticResource SalaryNumberFilterPopup}"
                                                            CellStyle="{StaticResource SfNetCell}"
                                                            HorizontalHeaderContentAlignment="Right"
                                                            TextAlignment="Right"
@@ -837,12 +945,12 @@
                         <TextBlock Text="{Binding TotalAbsenceDeduction, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="10,6">
-                        <TextBlock Text="ESIC" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding TotalEsic, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Margin="10,6">
                         <TextBlock Text="PF" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding TotalPf, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="10,6">
+                        <TextBlock Text="ESIC" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalEsic, Converter={StaticResource IndianCurrencyConverter}, ConverterParameter=2}" FontSize="16" FontWeight="Bold" Margin="0,1,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="4" Margin="10,6">
                         <TextBlock Text="TDS" Foreground="{StaticResource MutedTextBrush}" FontWeight="SemiBold"/>

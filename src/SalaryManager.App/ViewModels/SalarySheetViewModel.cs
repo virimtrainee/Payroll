@@ -63,7 +63,7 @@ public partial class SalaryRowVm : ObservableObject
         => IsBaseSalaryOverrideEnabled && BaseSalaryOverride is decimal overrideSalary && overrideSalary >= 0m
             ? overrideSalary
             : DefaultSalaryPaid;
-    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveSalaryPaid > 25000m;
+    public bool UsesTds => !IsCashDeductionsDisabled && EffectiveSalaryPaid > SalaryCalculator.TdsThreshold;
     public bool UsesEsicPf => !IsCashDeductionsDisabled && !UsesTds;
     public decimal TotalDeductions => Math.Max(0, EffectiveSalaryPaid - NetSalary);
     public bool HasInvalidBaseSalaryOverride => IsBaseSalaryOverrideEnabled
@@ -83,7 +83,8 @@ public partial class SalaryRowVm : ObservableObject
         {
             if (value.HasValue)
             {
-                if (value.Value == DefaultSalaryPaid)
+                var salaryPaid = NormalizeSalaryPaid(value.Value);
+                if (salaryPaid == DefaultSalaryPaid)
                 {
                     if (IsBaseSalaryOverrideEnabled)
                     {
@@ -101,7 +102,7 @@ public partial class SalaryRowVm : ObservableObject
                     return;
                 }
 
-                BaseSalaryOverride = value;
+                BaseSalaryOverride = salaryPaid;
                 if (!IsBaseSalaryOverrideEnabled)
                     IsBaseSalaryOverrideEnabled = true;
                 else
@@ -124,6 +125,7 @@ public partial class SalaryRowVm : ObservableObject
         }
     }
     private int _recalculationSuppression;
+    private bool _updatingAutomaticTds;
     private bool IsRecalculationSuppressed => _recalculationSuppression > 0;
 
     // Editable attendance fields — trigger recalculation on change
@@ -131,6 +133,7 @@ public partial class SalaryRowVm : ObservableObject
     [ObservableProperty] private decimal esicDeduction;
     [ObservableProperty] private decimal pfDeduction;
     [ObservableProperty] private decimal tdsDeduction;
+    [ObservableProperty] private bool isTdsManualOverride;
     [ObservableProperty] private decimal advanceDeductionEntry;
     [ObservableProperty] private bool isBaseSalaryOverrideEnabled;
     [ObservableProperty] private decimal? baseSalaryOverride;
@@ -148,7 +151,8 @@ public partial class SalaryRowVm : ObservableObject
         decimal esicDeduction,
         decimal pfDeduction,
         decimal tdsDeduction,
-        decimal advanceDeductionEntry)
+        decimal advanceDeductionEntry,
+        bool isTdsManualOverride = false)
     {
         _recalculationSuppression++;
         try
@@ -156,13 +160,18 @@ public partial class SalaryRowVm : ObservableObject
             DaysAbsent = daysAbsent;
             var hasCustomSalaryPaid = isBaseSalaryOverrideEnabled
                 && baseSalaryOverride.HasValue
-                && baseSalaryOverride.Value != DefaultSalaryPaid;
+                && NormalizeSalaryPaid(baseSalaryOverride.Value) != DefaultSalaryPaid;
 
-            BaseSalaryOverride = hasCustomSalaryPaid ? baseSalaryOverride : null;
+            BaseSalaryOverride = hasCustomSalaryPaid ? NormalizeSalaryPaid(baseSalaryOverride!.Value) : null;
             IsBaseSalaryOverrideEnabled = hasCustomSalaryPaid;
             EsicDeduction = esicDeduction;
             PfDeduction = pfDeduction;
-            TdsDeduction = tdsDeduction;
+            IsTdsManualOverride = UsesTds && isTdsManualOverride;
+            SetAutomaticTds(UsesTds && IsTdsManualOverride
+                ? Math.Max(0m, tdsDeduction)
+                : UsesTds
+                    ? SalaryCalculator.CalculateDefaultTds(EffectiveSalaryPaid)
+                    : 0m);
             AdvanceDeductionEntry = advanceDeductionEntry;
         }
         finally
@@ -182,7 +191,16 @@ public partial class SalaryRowVm : ObservableObject
     }
     partial void OnEsicDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
     partial void OnPfDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
-    partial void OnTdsDeductionChanged(decimal value) => RecalculateIfNotSuppressed();
+    partial void OnTdsDeductionChanged(decimal value)
+    {
+        if (!IsRecalculationSuppressed && !_updatingAutomaticTds)
+        {
+            IsTdsManualOverride = UsesTds
+                && value != SalaryCalculator.CalculateDefaultTds(EffectiveSalaryPaid);
+        }
+
+        RecalculateIfNotSuppressed();
+    }
     partial void OnAdvanceDeductionEntryChanged(decimal value) => RecalculateIfNotSuppressed();
     partial void OnIsBaseSalaryOverrideEnabledChanged(bool value)
     {
@@ -260,10 +278,26 @@ public partial class SalaryRowVm : ObservableObject
         {
             if (EsicDeduction != 0m) EsicDeduction = 0m;
             if (PfDeduction != 0m) PfDeduction = 0m;
+            if (!IsTdsManualOverride)
+                SetAutomaticTds(SalaryCalculator.CalculateDefaultTds(EffectiveSalaryPaid));
         }
         else
         {
-            if (TdsDeduction != 0m) TdsDeduction = 0m;
+            if (IsTdsManualOverride) IsTdsManualOverride = false;
+            SetAutomaticTds(0m);
+        }
+    }
+
+    private void SetAutomaticTds(decimal value)
+    {
+        _updatingAutomaticTds = true;
+        try
+        {
+            TdsDeduction = value;
+        }
+        finally
+        {
+            _updatingAutomaticTds = false;
         }
     }
 
@@ -293,6 +327,9 @@ public partial class SalaryRowVm : ObservableObject
         OnPropertyChanged(nameof(SalaryPaid));
         OnPropertyChanged(nameof(TotalDeductions));
     }
+
+    private static decimal NormalizeSalaryPaid(decimal salaryPaid)
+        => salaryPaid < 0m ? salaryPaid : SalaryCalculator.RoundSalaryPaid(salaryPaid);
 }
 
 public partial class SalarySheetViewModel : ObservableObject
@@ -593,7 +630,8 @@ public partial class SalarySheetViewModel : ObservableObject
                     payrollRow.EsicDeduction,
                     payrollRow.PfDeduction,
                     payrollRow.TdsDeduction,
-                    payrollRow.AdvanceDeduction);
+                    payrollRow.AdvanceDeduction,
+                    attendanceState?.IsTdsManualOverride ?? payrollRow.IsTdsManualOverride);
 
                 newRows.Add(row);
             }
@@ -656,6 +694,7 @@ public partial class SalarySheetViewModel : ObservableObject
                     rec.EsicDeduction = EffectiveEsicDeduction(r);
                     rec.PfDeduction = EffectivePfDeduction(r);
                     rec.TdsDeduction = EffectiveTdsDeduction(r);
+                    rec.IsTdsManualOverride = r.UsesTds && r.IsTdsManualOverride;
                     rec.BaseSalaryOverride = EffectiveBaseSalaryOverride(r);
                     rec.NetSalaryOverride = null;
                 }
@@ -670,6 +709,7 @@ public partial class SalarySheetViewModel : ObservableObject
                         EsicDeduction = EffectiveEsicDeduction(r),
                         PfDeduction = EffectivePfDeduction(r),
                         TdsDeduction = EffectiveTdsDeduction(r),
+                        IsTdsManualOverride = r.UsesTds && r.IsTdsManualOverride,
                         BaseSalaryOverride = EffectiveBaseSalaryOverride(r),
                         NetSalaryOverride = null,
                     });
@@ -807,7 +847,7 @@ public partial class SalarySheetViewModel : ObservableObject
             .Where(a => employeeIds.Contains(a.EmployeeId)
                      && a.Year == year
                      && a.Month == month)
-            .Select(a => new AttendanceLoadState(a.EmployeeId, a.BaseSalaryOverride))
+            .Select(a => new AttendanceLoadState(a.EmployeeId, a.BaseSalaryOverride, a.IsTdsManualOverride))
             .ToDictionaryAsync(a => a.EmployeeId);
     }
 
@@ -957,7 +997,7 @@ public partial class SalarySheetViewModel : ObservableObject
             "paymentMode" => row.PaymentModeLabel,
             "baseSalary" => FormatMoney(row.EmployeeBaseSalary),
             "absent" => row.DaysAbsent.ToString(CultureInfo.CurrentCulture),
-            "salaryPaid" => FormatMoney(row.SalaryPaid),
+            "salaryPaid" => FormatWholeMoney(row.SalaryPaid),
             "esic" => FormatMoney(row.EsicDeduction),
             "pf" => FormatMoney(row.PfDeduction),
             "tds" => FormatMoney(row.TdsDeduction),
@@ -973,6 +1013,9 @@ public partial class SalarySheetViewModel : ObservableObject
 
     private static string FormatMoney(decimal? value)
         => value.HasValue ? FormatMoney(value.Value) : string.Empty;
+
+    private static string FormatWholeMoney(decimal? value)
+        => value.HasValue ? value.Value.ToString("N0", CultureInfo.CurrentCulture) : string.Empty;
 
     private static ValidationResult ValidateRows(IEnumerable<SalaryRowVm> rows, bool includeAdvance)
     {
@@ -1028,8 +1071,8 @@ public partial class SalarySheetViewModel : ObservableObject
         => row.IsBaseSalaryOverrideEnabled
             && row.BaseSalaryOverride is decimal overrideSalary
             && overrideSalary >= 0m
-            && overrideSalary != row.DefaultSalaryPaid
-            ? overrideSalary
+            && SalaryCalculator.RoundSalaryPaid(overrideSalary) != row.DefaultSalaryPaid
+            ? SalaryCalculator.RoundSalaryPaid(overrideSalary)
             : null;
 
     private static List<ValidationIssue> ValidateIciciRows(IEnumerable<SalaryRowVm> rows)
@@ -1057,5 +1100,5 @@ public partial class SalarySheetViewModel : ObservableObject
         IReadOnlyList<SalarySheetSelectionColumn> Columns,
         IReadOnlyList<SalarySheetSelectionRow> Rows);
 
-    private sealed record AttendanceLoadState(int EmployeeId, decimal? BaseSalaryOverride);
+    private sealed record AttendanceLoadState(int EmployeeId, decimal? BaseSalaryOverride, bool IsTdsManualOverride);
 }

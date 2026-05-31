@@ -186,19 +186,19 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(10000m, row.SalaryPaid);
         Assert.Equal(10000m, row.EffectiveBaseSalary);
 
-        row.SalaryPaid = 12000m;
+        row.SalaryPaid = 12000.50m;
 
         Assert.True(row.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(12000m, row.BaseSalaryOverride);
-        Assert.Equal(12000m, row.SalaryPaid);
+        Assert.Equal(12001m, row.BaseSalaryOverride);
+        Assert.Equal(12001m, row.SalaryPaid);
         Assert.Equal(10000m, row.BaseSalary);
         Assert.Equal(10000m, row.EmployeeBaseSalary);
         Assert.Equal(10000m, row.EffectiveBaseSalary);
-        Assert.Equal(12000m, row.EffectiveSalaryPaid);
-        Assert.Equal(12000m, row.NetSalary);
+        Assert.Equal(12001m, row.EffectiveSalaryPaid);
+        Assert.Equal(12001m, row.NetSalary);
         viewModel.FlushPendingTotalRefresh();
-        Assert.Equal(12000m, viewModel.TotalGross);
-        Assert.Equal(12000m, viewModel.TotalNet);
+        Assert.Equal(12001m, viewModel.TotalGross);
+        Assert.Equal(12001m, viewModel.TotalNet);
         Assert.Equal(0m, viewModel.TotalDeduction);
 
         await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
@@ -206,7 +206,7 @@ public class EmployeeSalarySheetFilterTests
         using (var verifyDb = factory.CreateDbContext())
         {
             var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
-            Assert.Equal(12000m, saved.BaseSalaryOverride);
+            Assert.Equal(12001m, saved.BaseSalaryOverride);
             Assert.Null(saved.NetSalaryOverride);
         }
 
@@ -214,14 +214,14 @@ public class EmployeeSalarySheetFilterTests
 
         var reloaded = Assert.Single(viewModel.Rows);
         Assert.True(reloaded.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(12000m, reloaded.BaseSalaryOverride);
-        Assert.Equal(12000m, reloaded.SalaryPaid);
+        Assert.Equal(12001m, reloaded.BaseSalaryOverride);
+        Assert.Equal(12001m, reloaded.SalaryPaid);
         Assert.Equal(10000m, reloaded.BaseSalary);
         Assert.Equal(10000m, reloaded.EmployeeBaseSalary);
         Assert.Equal(10000m, reloaded.EffectiveBaseSalary);
-        Assert.Equal(12000m, reloaded.EffectiveSalaryPaid);
-        Assert.Equal(12000m, reloaded.NetSalary);
-        Assert.Equal(12000m, viewModel.TotalNet);
+        Assert.Equal(12001m, reloaded.EffectiveSalaryPaid);
+        Assert.Equal(12001m, reloaded.NetSalary);
+        Assert.Equal(12001m, viewModel.TotalNet);
     }
 
     [Fact]
@@ -292,25 +292,25 @@ public class EmployeeSalarySheetFilterTests
         row.DaysAbsent = 1;
 
         Assert.False(row.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(29032.26m, row.DefaultSalaryPaid);
-        Assert.Equal(29032.26m, row.SalaryPaid);
-        Assert.Equal(29032.26m, row.EffectiveSalaryPaid);
-        Assert.Equal(29032.26m, row.NetSalary);
+        Assert.Equal(29032m, row.DefaultSalaryPaid);
+        Assert.Equal(29032m, row.SalaryPaid);
+        Assert.Equal(29032m, row.EffectiveSalaryPaid);
+        Assert.Equal(26128.80m, row.NetSalary);
 
         row.SalaryPaid = 28000m;
         row.DaysAbsent = 2;
 
         Assert.True(row.IsBaseSalaryOverrideEnabled);
-        Assert.Equal(28064.52m, row.DefaultSalaryPaid);
+        Assert.Equal(28065m, row.DefaultSalaryPaid);
         Assert.Equal(28000m, row.SalaryPaid);
         Assert.Equal(28000m, row.EffectiveSalaryPaid);
-        Assert.Equal(28000m, row.NetSalary);
+        Assert.Equal(25200m, row.NetSalary);
 
         row.SalaryPaid = row.DefaultSalaryPaid;
 
         Assert.False(row.IsBaseSalaryOverrideEnabled);
         Assert.Null(row.BaseSalaryOverride);
-        Assert.Equal(28064.52m, row.SalaryPaid);
+        Assert.Equal(28065m, row.SalaryPaid);
     }
 
     [Fact]
@@ -421,7 +421,7 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(100m, viewModel.TotalTds);
         Assert.Equal(50m, viewModel.TotalAdvanceDeduction);
         Assert.Equal(967.74m, viewModel.TotalAbsenceDeduction);
-        Assert.Equal(28882.26m, viewModel.TotalNet);
+        Assert.Equal(28882m, viewModel.TotalNet);
 
         row.SalaryPaid = 20000m;
 
@@ -432,6 +432,40 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(20000m, viewModel.TotalGross);
         Assert.Equal(19950m, viewModel.TotalNet);
         Assert.Equal(50m, viewModel.TotalDeduction);
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_PreservesManualTdsOverride()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 30000m, IsActive = true });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(3000m, row.TdsDeduction);
+        Assert.False(row.IsTdsManualOverride);
+
+        row.TdsDeduction = 100m;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var saved = await verifyDb.AttendanceRecords.AsNoTracking().SingleAsync();
+            Assert.Equal(100m, saved.TdsDeduction);
+            Assert.True(saved.IsTdsManualOverride);
+        }
+
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var reloaded = Assert.Single(viewModel.Rows);
+        Assert.Equal(100m, reloaded.TdsDeduction);
+        Assert.True(reloaded.IsTdsManualOverride);
     }
 
     [Fact]
@@ -448,20 +482,20 @@ public class EmployeeSalarySheetFilterTests
         await viewModel.LoadCommand.ExecuteAsync(null);
 
         var row = Assert.Single(viewModel.Rows);
-        Assert.Equal(30000m, viewModel.TotalNet);
+        Assert.Equal(27000m, viewModel.TotalNet);
 
         row.DaysAbsent = 1;
 
-        Assert.Equal(30000m, viewModel.TotalNet);
+        Assert.Equal(27000m, viewModel.TotalNet);
 
         await Task.Delay(SalarySheetViewModel.TotalRefreshDebounceDelay + TimeSpan.FromMilliseconds(80));
 
-        Assert.Equal(29032.26m, viewModel.TotalNet);
+        Assert.Equal(26128.80m, viewModel.TotalNet);
 
         row.DaysAbsent = 2;
         viewModel.FlushPendingTotalRefresh();
 
-        Assert.Equal(28064.52m, viewModel.TotalNet);
+        Assert.Equal(25258.50m, viewModel.TotalNet);
     }
 
     [Fact]
@@ -491,6 +525,7 @@ public class EmployeeSalarySheetFilterTests
         Assert.Null(row.BaseSalaryOverride);
         Assert.Equal(30000m, row.SalaryPaid);
         Assert.Equal(30000m, viewModel.TotalGross);
+        Assert.Equal(3000m, row.TdsDeduction);
 
         viewModel.ZeroDeductions([row], ["tds"]);
         viewModel.FlushPendingTotalRefresh();
@@ -563,6 +598,39 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(["DaysAbsent", "SalaryPaid", "TdsDeduction"], snapshot.MappingNames);
         Assert.True(snapshot.Contains(rowC, "TdsDeduction"));
         Assert.False(snapshot.Contains(rowB, "TdsDeduction"));
+    }
+
+    [Fact]
+    public void SalarySheetView_AllowsVisibleColumnFiltering()
+    {
+        var xaml = ReadSalarySheetViewXaml();
+
+        Assert.Contains("AllowFiltering=\"True\"", xaml);
+        Assert.Contains("SalaryTextFilterPopup", xaml);
+        Assert.Contains("SalaryChoiceFilterPopup", xaml);
+        Assert.Contains("SalaryNumberFilterPopup", xaml);
+        Assert.Contains("HeaderText=\"Employee\"", xaml);
+        Assert.Contains("HeaderText=\"Group\"", xaml);
+        Assert.Contains("HeaderText=\"Salary Paid\"", xaml);
+        Assert.Contains("MappingName=\"Name\"", xaml);
+        Assert.Contains("ColumnMemberType=\"{x:Type sys:String}\"", xaml);
+        Assert.Contains("MappingName=\"SalaryPaid\"", xaml);
+        Assert.Contains("ColumnMemberType=\"{x:Type sys:Decimal}\"", xaml);
+        Assert.Contains("MappingName=\"DaysAbsent\"", xaml);
+        Assert.Contains("ColumnMemberType=\"{x:Type sys:Int32}\"", xaml);
+        Assert.Contains("FilterMode\" Value=\"CheckboxFilter\"", xaml);
+    }
+
+    [Fact]
+    public void SalarySheetView_ShowsGroupSummariesWithoutTableSummary()
+    {
+        var xaml = ReadSalarySheetViewXaml();
+
+        Assert.Contains("<syncfusion:SfDataGrid.GroupSummaryRows>", xaml);
+        Assert.Contains("MappingName=\"SalaryPaid\"", xaml);
+        Assert.Contains("MappingName=\"NetSalary\"", xaml);
+        Assert.Contains("Format=\"'Total ({Count:d})'\"", xaml);
+        Assert.DoesNotContain("<syncfusion:SfDataGrid.TableSummaryRows>", xaml);
     }
 
     [Fact]
@@ -788,7 +856,7 @@ public class EmployeeSalarySheetFilterTests
         tdsRow.InitializeEditableValues(false, null, 0, 0m, 0m, 0m, 0m);
 
         Assert.Equal(
-            ["absent", "salaryPaid", "esic", "pf", "advanceDeduction"],
+            ["absent", "salaryPaid", "pf", "esic", "advanceDeduction"],
             SalarySheetGridNavigation.GetEditableColumnKeys(esicPfRow));
         Assert.Equal(
             ["absent", "salaryPaid", "tds", "advanceDeduction"],
@@ -796,9 +864,9 @@ public class EmployeeSalarySheetFilterTests
 
         var rows = new[] { esicPfRow, tdsRow };
         Assert.Equal((0, "salaryPaid"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "absent"));
-        Assert.Equal((0, "esic"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "salaryPaid"));
-        Assert.Equal((0, "pf"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "esic"));
-        Assert.Equal((0, "advanceDeduction"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "pf"));
+        Assert.Equal((0, "pf"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "salaryPaid"));
+        Assert.Equal((0, "esic"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "pf"));
+        Assert.Equal((0, "advanceDeduction"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "esic"));
         Assert.Equal((1, "absent"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 0, "advanceDeduction"));
         Assert.Equal((1, "tds"), SalarySheetGridNavigation.FindNextEditableColumnKey(rows, 1, "salaryPaid"));
         Assert.Equal(
@@ -987,7 +1055,7 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(0m, cashGroup.PfDeduction);
         Assert.Equal(0m, cashGroup.TdsDeduction);
 
-        Assert.Equal(400m, viewModel.Rows.Single(r => r.Name == "Bank High").TdsDeduction);
+        Assert.Equal(3000m, viewModel.Rows.Single(r => r.Name == "Bank High").TdsDeduction);
         Assert.Equal(50m, viewModel.Rows.Single(r => r.Name == "Bank Low").EsicDeduction);
         Assert.Equal(60m, viewModel.Rows.Single(r => r.Name == "Bank Low").PfDeduction);
 
@@ -1001,7 +1069,8 @@ public class EmployeeSalarySheetFilterTests
         Assert.Equal(0m, saved[2].EsicDeduction);
         Assert.Equal(0m, saved[2].PfDeduction);
         Assert.Equal(0m, saved[2].TdsDeduction);
-        Assert.Equal(400m, saved[3].TdsDeduction);
+        Assert.Equal(3000m, saved[3].TdsDeduction);
+        Assert.False(saved[3].IsTdsManualOverride);
         Assert.Equal(50m, saved[4].EsicDeduction);
         Assert.Equal(60m, saved[4].PfDeduction);
     }
@@ -1093,6 +1162,20 @@ public class EmployeeSalarySheetFilterTests
         initializer.StartMigration(factory);
         await initializer.ReadyTask.WaitAsync(TimeSpan.FromSeconds(10));
         return initializer;
+    }
+
+    private static string ReadSalarySheetViewXaml()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+             directory is not null;
+             directory = directory.Parent)
+        {
+            var path = Path.Combine(directory.FullName, "src", "SalaryManager.App", "Views", "SalarySheetView.xaml");
+            if (File.Exists(path))
+                return File.ReadAllText(path);
+        }
+
+        throw new FileNotFoundException("Could not locate SalarySheetView.xaml from the test output directory.");
     }
 
     private sealed class SqliteDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

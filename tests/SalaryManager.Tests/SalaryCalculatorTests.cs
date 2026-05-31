@@ -28,12 +28,12 @@ public class SalaryCalculatorTests
     [Fact]
     public void ComputeFromSalaryPaid_DoesNotApplyAbsenceTwice()
     {
-        var r = SalaryCalculator.ComputeFromSalaryPaid(30000m, 28000m, 2025, 6, daysAbsent: 3,
+        var r = SalaryCalculator.ComputeFromSalaryPaid(30000m, 28000.5m, 2025, 6, daysAbsent: 3,
             tdsDeduction: 100m);
 
         Assert.Equal(3000m, r.Deduction);
-        Assert.Equal(28000m, r.SalaryPaid);
-        Assert.Equal(27900m, r.NetSalary);
+        Assert.Equal(28001m, r.SalaryPaid);
+        Assert.Equal(27901m, r.NetSalary);
     }
 
     [Fact]
@@ -103,12 +103,18 @@ public class SalaryCalculatorTests
     [Fact]
     public void SalaryAboveThreshold_UsesTdsAndIgnoresEsicPf()
     {
-        var r = SalaryCalculator.Compute(25000.01m, 2025, 6, daysAbsent: 0,
+        var r = SalaryCalculator.Compute(25001m, 2025, 6, daysAbsent: 0,
             esicDeduction: 100m, pfDeduction: 200m, tdsDeduction: 300m);
 
         Assert.Equal(0m, r.EsicDeduction);
         Assert.Equal(0m, r.PfDeduction);
         Assert.Equal(300m, r.TdsDeduction);
-        Assert.Equal(24700.01m, r.NetSalary);
+        Assert.Equal(24701m, r.NetSalary);
+    }
+
+    [Fact]
+    public void CalculateDefaultTds_UsesRoundedSalaryPaid()
+    {
+        Assert.Equal(2903.20m, SalaryCalculator.CalculateDefaultTds(29032.26m));
     }
 }

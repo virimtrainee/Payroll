@@ -243,6 +243,10 @@ public partial class EmployeesViewModel : ObservableObject
                     AccountNumber = row.AccountNumber,
                     IfscCode = row.IfscCode,
                     PaymentMode = row.PaymentMode,
+                    AadharNumber = row.AadharNumber,
+                    UanNumber = row.UanNumber,
+                    InsuranceNumber = row.InsuranceNumber,
+                    PhoneNumber = row.PhoneNumber,
                     IsActive = true,
                     CreatedAt = System.DateTime.UtcNow
                 });
@@ -289,6 +293,10 @@ public partial class EmployeesViewModel : ObservableObject
                 BaseSalary = vm.BaseSalary,
                 AccountNumber = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim(),
                 IfscCode = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant(),
+                AadharNumber = OptionalText(vm.AadharNumber),
+                UanNumber = OptionalText(vm.UanNumber),
+                InsuranceNumber = OptionalText(vm.InsuranceNumber),
+                PhoneNumber = OptionalText(vm.PhoneNumber),
                 PaymentMode = vm.PaymentMode,
                 JoiningDate = vm.JoiningDate,
                 IsActive = vm.IsActive,
@@ -324,6 +332,10 @@ public partial class EmployeesViewModel : ObservableObject
             BaseSalary = tracked.BaseSalary,
             AccountNumber = tracked.AccountNumber ?? string.Empty,
             IfscCode = tracked.IfscCode ?? string.Empty,
+            AadharNumber = tracked.AadharNumber ?? string.Empty,
+            UanNumber = tracked.UanNumber ?? string.Empty,
+            InsuranceNumber = tracked.InsuranceNumber ?? string.Empty,
+            PhoneNumber = tracked.PhoneNumber ?? string.Empty,
             JoiningDate = tracked.JoiningDate,
             IsActive = tracked.IsActive,
             PaymentMode = tracked.PaymentMode
@@ -341,6 +353,10 @@ public partial class EmployeesViewModel : ObservableObject
         tracked.IsActive = vm.IsActive;
         tracked.AccountNumber = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.AccountNumber) ? null : vm.AccountNumber.Trim();
         tracked.IfscCode = vm.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(vm.IfscCode) ? null : vm.IfscCode.Trim().ToUpperInvariant();
+        tracked.AadharNumber = OptionalText(vm.AadharNumber);
+        tracked.UanNumber = OptionalText(vm.UanNumber);
+        tracked.InsuranceNumber = OptionalText(vm.InsuranceNumber);
+        tracked.PhoneNumber = OptionalText(vm.PhoneNumber);
         tracked.PaymentMode = vm.PaymentMode;
         tracked.JoiningDate = vm.JoiningDate;
 
@@ -406,6 +422,10 @@ public partial class EmployeesViewModel : ObservableObject
             t.IsActive = e.IsActive;
             t.AccountNumber = e.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(e.AccountNumber) ? null : e.AccountNumber.Trim();
             t.IfscCode = e.PaymentMode == PaymentMode.Cash || string.IsNullOrWhiteSpace(e.IfscCode) ? null : e.IfscCode.Trim().ToUpperInvariant();
+            t.AadharNumber = OptionalText(e.AadharNumber);
+            t.UanNumber = OptionalText(e.UanNumber);
+            t.InsuranceNumber = OptionalText(e.InsuranceNumber);
+            t.PhoneNumber = OptionalText(e.PhoneNumber);
             t.PaymentMode = e.PaymentMode;
             t.JoiningDate = e.JoiningDate;
 
@@ -736,7 +756,11 @@ public partial class EmployeesViewModel : ObservableObject
             vm.PaymentMode,
             vm.AccountNumber,
             vm.IfscCode,
-            vm.JoiningDate);
+            vm.JoiningDate,
+            vm.AadharNumber,
+            vm.UanNumber,
+            vm.InsuranceNumber,
+            vm.PhoneNumber);
 
     private static EmployeeValidationInput ToEmployeeValidationInput(Employee employee)
         => new(
@@ -745,7 +769,14 @@ public partial class EmployeesViewModel : ObservableObject
             employee.PaymentMode,
             employee.AccountNumber,
             employee.IfscCode,
-            employee.JoiningDate);
+            employee.JoiningDate,
+            employee.AadharNumber,
+            employee.UanNumber,
+            employee.InsuranceNumber,
+            employee.PhoneNumber);
+
+    private static string? OptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string FormatImportIssues(IReadOnlyList<ValidationIssue> issues)
         => ValidationResult.FromErrors(issues).ToDisplayString();

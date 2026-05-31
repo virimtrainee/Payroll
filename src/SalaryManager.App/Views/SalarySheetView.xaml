@@ -354,14 +354,15 @@
                                            ItemsSource="{Binding RowsView}"
                                            IsReadOnly="{Binding IsGridReadOnly}"
                                            AllowEditing="{Binding IsEditMode}"
-                                           AllowFiltering="True"
-                                           AllowGrouping="True"
+                                           AllowFiltering="False"
+                                           AllowGrouping="False"
                                            AllowResizingColumns="True"
                                            AllowSorting="True"
-                                           AutoExpandGroups="True"
+                                           AutoExpandGroups="False"
                                            CanUseViewFilter="True"
                                            ColumnSizer="None"
                                            FrozenColumnCount="2"
+                                           GroupCaptionTextFormat="{}{Key}"
                                            GridLinesVisibility="Horizontal"
                                            HeaderRowHeight="38"
                                            RowHeight="44"
@@ -370,15 +371,22 @@
                                            SelectionMode="Extended"
                                            SelectionUnit="Cell"
                                            ShowGroupDropArea="False"
+                                           ShowColumnWhenGrouped="False"
                                            ShowRowHeader="False"
                                            CellStyle="{StaticResource SfSalaryCell}"
                                            CurrentCellActivated="SalaryGrid_CurrentCellActivated"
                                            PreviewMouseRightButtonDown="SalaryGrid_PreviewMouseRightButtonDown">
                         <syncfusion:SfDataGrid.ContextMenu>
-                            <ContextMenu Opened="SalaryGridContextMenu_Opened">
+                            <ContextMenu Opened="SalaryGridContextMenu_Opened"
+                                         Closed="SalaryGridContextMenu_Closed">
                                 <MenuItem x:Name="ExportSelectionPdfMenuItem" Header="Export Selection to PDF" Click="ExportSelectionPdf_Click">
                                     <MenuItem.Icon>
                                         <materialDesign:PackIcon Kind="FilePdfBox" Style="{StaticResource SalaryMenuItemIcon}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="ExportSelectionExcelMenuItem" Header="Export Selection to Excel" Click="ExportSelectionExcel_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="FileExcelBox" Style="{StaticResource SalaryMenuItemIcon}"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <Separator/>
@@ -416,21 +424,6 @@
                         <syncfusion:SfDataGrid.GroupColumnDescriptions>
                             <syncfusion:GroupColumnDescription ColumnName="GroupDisplayName"/>
                         </syncfusion:SfDataGrid.GroupColumnDescriptions>
-                        <syncfusion:SfDataGrid.TableSummaryRows>
-                            <syncfusion:GridTableSummaryRow Position="Bottom" ShowSummaryInRow="False">
-                                <syncfusion:GridTableSummaryRow.SummaryColumns>
-                                    <syncfusion:GridSummaryColumn Name="BaseTotal" MappingName="EmployeeBaseSalary" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="SalaryPaidTotal" MappingName="SalaryPaid" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="EsicTotal" MappingName="EsicDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="PfTotal" MappingName="PfDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="TdsTotal" MappingName="TdsDeduction" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="DeductionTotal" MappingName="TotalDeductions" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="AdvanceDeductionTotal" MappingName="AdvanceDeductionEntry" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="AdvanceBalanceTotal" MappingName="AdvanceBalance" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                    <syncfusion:GridSummaryColumn Name="NetTotal" MappingName="NetSalary" SummaryType="DoubleAggregate" Format="{}{Sum:N2}"/>
-                                </syncfusion:GridTableSummaryRow.SummaryColumns>
-                            </syncfusion:GridTableSummaryRow>
-                        </syncfusion:SfDataGrid.TableSummaryRows>
                         <syncfusion:SfDataGrid.Columns>
                             <syncfusion:GridTextColumn HeaderText="#"
                                                        helpers:DataGridColumnKey.Key="serial"

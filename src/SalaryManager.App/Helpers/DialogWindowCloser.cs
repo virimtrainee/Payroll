@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using MaterialDesignThemes.Wpf;
 
 namespace SalaryManager.App.Helpers;
 
@@ -12,10 +11,7 @@ internal static class DialogWindowCloser
         if (window is not null && IsStandaloneDialogWindow(window, source))
         {
             window.DialogResult = result;
-            return;
         }
-
-        DialogHost.CloseDialogCommand.Execute(result, source);
     }
 
     private static bool IsStandaloneDialogWindow(Window window, FrameworkElement source)

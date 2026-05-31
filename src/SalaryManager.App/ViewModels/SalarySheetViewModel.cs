@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -396,6 +397,30 @@ public partial class SalarySheetViewModel : ObservableObject
 
         var settings = _settings.Load();
         _settings.Save(settings with { SalarySheetColumnWidths = clean });
+    }
+
+    public async Task ExportSelectionPdfAsync(string path, SalarySheetSelectionSnapshot snapshot)
+    {
+        if (!snapshot.HasSelection)
+            throw new InvalidOperationException("Select at least one salary-grid cell to export.");
+
+        var export = BuildSelectionExport(snapshot);
+        var year = SelectedYear;
+        var month = SelectedMonth.Number;
+
+        await Task.Run(() => _pdf.GenerateSalarySheetSelection(year, month, export.Columns, export.Rows, path));
+    }
+
+    public async Task ExportSelectionExcelAsync(string path, SalarySheetSelectionSnapshot snapshot)
+    {
+        if (!snapshot.HasSelection)
+            throw new InvalidOperationException("Select at least one salary-grid cell to export.");
+
+        var export = BuildSelectionExport(snapshot);
+        var year = SelectedYear;
+        var month = SelectedMonth.Number;
+
+        await Task.Run(() => _excel.ExportSalarySheetSelection(year, month, export.Columns, export.Rows, path));
     }
 
     public void ResetSalaryPaidToCalculated(IEnumerable<SalaryRowVm> rows)
@@ -893,6 +918,62 @@ public partial class SalarySheetViewModel : ObservableObject
                 Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary);
         }).ToList();
 
+    private static SalarySheetSelectionExport BuildSelectionExport(SalarySheetSelectionSnapshot snapshot)
+    {
+        var columns = snapshot.Columns
+            .Select(column => new SalarySheetSelectionColumn(
+                column.Header,
+                IsRightAlignedSelectionColumn(column.Key)))
+            .ToList();
+        var rows = snapshot.Rows
+            .Select(row => new SalarySheetSelectionRow(
+                snapshot.Columns
+                    .Select(column => FormatSelectionValue(row, column.Key))
+                    .ToList()))
+            .ToList();
+
+        return new SalarySheetSelectionExport(columns, rows);
+    }
+
+    private static bool IsRightAlignedSelectionColumn(string key)
+        => key is "serial"
+            or "baseSalary"
+            or "absent"
+            or "salaryPaid"
+            or "esic"
+            or "pf"
+            or "tds"
+            or "deductions"
+            or "advanceDeduction"
+            or "advanceBalance"
+            or "netSalary";
+
+    private static string FormatSelectionValue(SalaryRowVm row, string key)
+        => key switch
+        {
+            "serial" => row.SerialNumber.ToString(CultureInfo.CurrentCulture),
+            "employee" => row.Name,
+            "group" => row.GroupDisplayName,
+            "paymentMode" => row.PaymentModeLabel,
+            "baseSalary" => FormatMoney(row.EmployeeBaseSalary),
+            "absent" => row.DaysAbsent.ToString(CultureInfo.CurrentCulture),
+            "salaryPaid" => FormatMoney(row.SalaryPaid),
+            "esic" => FormatMoney(row.EsicDeduction),
+            "pf" => FormatMoney(row.PfDeduction),
+            "tds" => FormatMoney(row.TdsDeduction),
+            "deductions" => FormatMoney(row.TotalDeductions),
+            "advanceDeduction" => FormatMoney(row.AdvanceDeductionEntry),
+            "advanceBalance" => FormatMoney(row.AdvanceBalance),
+            "netSalary" => FormatMoney(row.NetSalary),
+            _ => string.Empty
+        };
+
+    private static string FormatMoney(decimal value)
+        => value.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string FormatMoney(decimal? value)
+        => value.HasValue ? FormatMoney(value.Value) : string.Empty;
+
     private static ValidationResult ValidateRows(IEnumerable<SalaryRowVm> rows, bool includeAdvance)
     {
         var rowList = rows.ToList();
@@ -971,6 +1052,10 @@ public partial class SalarySheetViewModel : ObservableObject
 
         return issues;
     }
+
+    private sealed record SalarySheetSelectionExport(
+        IReadOnlyList<SalarySheetSelectionColumn> Columns,
+        IReadOnlyList<SalarySheetSelectionRow> Rows);
 
     private sealed record AttendanceLoadState(int EmployeeId, decimal? BaseSalaryOverride);
 }

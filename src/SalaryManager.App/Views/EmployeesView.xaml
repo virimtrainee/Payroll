@@ -8,6 +8,80 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
         </Style>
+        <Style x:Key="NeutralChecklistItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="GridRowButton" TargetType="Button">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="44"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#94A3B8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#E2E8F0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="GridRowDangerButton" TargetType="Button" BasedOn="{StaticResource GridRowButton}">
+            <Setter Property="Background" Value="#FEF2F2"/>
+            <Setter Property="BorderBrush" Value="#FECACA"/>
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+        </Style>
+        <Style x:Key="GridRowChipButton" TargetType="Button" BasedOn="{StaticResource GridRowButton}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="{StaticResource BackgroundBrush}" Margin="32,24,32,18">
@@ -181,7 +255,7 @@
                                                                 Command="{Binding DataContext.CyclePaymentModeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}">
                                                             <Button.Style>
-                                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                                <Style TargetType="Button" BasedOn="{StaticResource GridRowChipButton}">
                                                                     <Setter Property="Background" Value="#D1FAE5"/>
                                                                     <Setter Property="BorderBrush" Value="#A7F3D0"/>
                                                                     <Setter Property="Foreground" Value="#047857"/>
@@ -257,19 +331,19 @@
                                                     <DataTemplate>
                                                         <StackPanel Orientation="Horizontal">
                                                             <Button Content="Edit"
-                                                                    Style="{StaticResource SecondaryButton}"
+                                                                    Style="{StaticResource GridRowButton}"
                                                                     Padding="8,4"
                                                                     Margin="0,0,4,0"
                                                                     Command="{Binding DataContext.OpenEditEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"/>
                                                             <Button Content="Active"
-                                                                    Style="{StaticResource SecondaryButton}"
+                                                                    Style="{StaticResource GridRowButton}"
                                                                     Padding="8,4"
                                                                     Margin="0,0,4,0"
                                                                     Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"/>
                                                             <Button Content="Del"
-                                                                    Style="{StaticResource DangerButton}"
+                                                                    Style="{StaticResource GridRowDangerButton}"
                                                                     Padding="8,4"
                                                                     Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"/>
@@ -435,21 +509,43 @@
                                     <TextBlock Style="{StaticResource EmptyStateTitle}" Text="Select a group"/>
                                     <TextBlock Style="{StaticResource EmptyStateSubtitle}" Text="Choose or create a group before assigning employees."/>
                                 </StackPanel>
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <ItemsControl ItemsSource="{Binding GroupAssignmentRows}" Margin="20,0,20,20">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderBrush="{StaticResource BorderBrush}"
-                                                        BorderThickness="0,0,0,1"
-                                                        Padding="0,10">
-                                                    <CheckBox Content="{Binding EmployeeName}"
-                                                              IsChecked="{Binding IsMember}"
-                                                              FontSize="14"/>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                <ListBox ItemsSource="{Binding GroupAssignmentRows}"
+                                         ItemContainerStyle="{StaticResource NeutralChecklistItem}"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Margin="20,0,20,20"
+                                         Padding="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.CanContentScroll="True"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <ListBox.Style>
+                                        <Style TargetType="ListBox">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSelectedGroup}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.Style>
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource BorderBrush}"
+                                                    BorderThickness="0,0,0,1"
+                                                    Padding="0,10">
+                                                <CheckBox Content="{Binding EmployeeName}"
+                                                          IsChecked="{Binding IsMember}"
+                                                          FontSize="14"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                             </Grid>
                         </DockPanel>
                     </Border>

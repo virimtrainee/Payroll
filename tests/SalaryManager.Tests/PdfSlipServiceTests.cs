@@ -56,4 +56,33 @@ public class PdfSlipServiceTests
                 File.Delete(path);
         }
     }
+
+    [Fact]
+    public void GenerateSalarySheetSelection_WritesPdf()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
+        try
+        {
+            var columns = new[]
+            {
+                new SalarySheetSelectionColumn("Employee", false),
+                new SalarySheetSelectionColumn("Salary Paid", true),
+                new SalarySheetSelectionColumn("Net", true)
+            };
+            var rows = new[]
+            {
+                new SalarySheetSelectionRow(["A", "10,000.00", "9,500.00"]),
+                new SalarySheetSelectionRow(["B", "20,000.00", "18,750.00"])
+            };
+
+            new PdfSlipService().GenerateSalarySheetSelection(2026, 5, columns, rows, path);
+
+            Assert.True(new FileInfo(path).Length > 0);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
 }

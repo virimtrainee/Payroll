@@ -38,6 +38,10 @@ public record SalaryRevisionReportRow(
     DateTime ChangedAt,
     string? Note);
 
+public record SalarySheetSelectionColumn(string Header, bool AlignRight);
+
+public record SalarySheetSelectionRow(IReadOnlyList<string> Values);
+
 public class PdfSlipService
 {
     public string GenerateSlip(SalarySlipData data, string? outputPath = null)
@@ -66,6 +70,24 @@ public class PdfSlipService
     {
         EnsureDirectory(outputPath);
         BuildSalaryRevisionDocument(rows).GeneratePdf(outputPath);
+        return outputPath;
+    }
+
+    public string GenerateSalarySheetSelection(
+        int year,
+        int month,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IReadOnlyList<SalarySheetSelectionRow> rows,
+        string outputPath)
+    {
+        if (columns.Count == 0)
+            throw new ArgumentException("At least one column is required.", nameof(columns));
+
+        if (rows.Count == 0)
+            throw new ArgumentException("At least one row is required.", nameof(rows));
+
+        EnsureDirectory(outputPath);
+        BuildSalarySheetSelectionDocument(year, month, columns, rows).GeneratePdf(outputPath);
         return outputPath;
     }
 
@@ -264,6 +286,77 @@ public class PdfSlipService
                 x.CurrentPageNumber().FontSize(9).FontColor("#64748B");
                 x.Span(" / ").FontSize(9).FontColor("#64748B");
                 x.TotalPages().FontSize(9).FontColor("#64748B");
+            });
+        });
+    });
+
+    private static IDocument BuildSalarySheetSelectionDocument(
+        int year,
+        int month,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IReadOnlyList<SalarySheetSelectionRow> rows) => Document.Create(c =>
+    {
+        var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+        var compact = columns.Count > 10;
+        var cellPadding = compact ? 3 : 5;
+        var fontSize = compact ? 8 : 9;
+
+        c.Page(p =>
+        {
+            p.Size(PageSizes.A4.Landscape());
+            p.Margin(24);
+            p.DefaultTextStyle(t => t.FontFamily("Segoe UI").FontSize(fontSize).FontColor("#0F172A"));
+
+            p.Header().Column(col =>
+            {
+                col.Item().Text("SALARY SHEET SELECTION").FontSize(16).Bold().FontColor("#2563EB");
+                col.Item().Text($"{monthName} {year}").FontSize(10).FontColor("#64748B");
+                col.Item().PaddingTop(8).LineHorizontal(0.6f).LineColor("#E2E8F0");
+            });
+
+            p.Content().PaddingVertical(10).Table(t =>
+            {
+                t.ColumnsDefinition(cd =>
+                {
+                    foreach (var column in columns)
+                    {
+                        var width = column.AlignRight ? 2 : Math.Max(2, Math.Min(4, column.Header.Length / 6 + 1));
+                        cd.RelativeColumn(width);
+                    }
+                });
+
+                t.Header(h =>
+                {
+                    foreach (var column in columns)
+                    {
+                        var cell = h.Cell().Background("#F1F5F9").Padding(cellPadding);
+                        if (column.AlignRight)
+                            cell.AlignRight().Text(column.Header).Bold();
+                        else
+                            cell.Text(column.Header).Bold();
+                    }
+                });
+
+                foreach (var row in rows)
+                {
+                    for (var i = 0; i < columns.Count; i++)
+                    {
+                        var value = i < row.Values.Count ? row.Values[i] : string.Empty;
+                        var cell = t.Cell().Padding(cellPadding);
+                        if (columns[i].AlignRight)
+                            cell.AlignRight().Text(value);
+                        else
+                            cell.Text(value);
+                    }
+                }
+            });
+
+            p.Footer().AlignRight().Text(x =>
+            {
+                x.Span("Page ").FontSize(8).FontColor("#64748B");
+                x.CurrentPageNumber().FontSize(8).FontColor("#64748B");
+                x.Span(" / ").FontSize(8).FontColor("#64748B");
+                x.TotalPages().FontSize(8).FontColor("#64748B");
             });
         });
     });

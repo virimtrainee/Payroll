@@ -37,12 +37,7 @@ public static class SalarySheetGridSelection
 
     public static SalarySheetSelectionSnapshot FromGrid(SfDataGrid dataGrid)
     {
-        var columns = dataGrid.Columns
-            .Where(column => !column.IsHidden)
-            .Select(ToColumnSelection)
-            .Where(column => column is not null)
-            .Cast<SalarySheetColumnSelection>()
-            .ToList();
+        var columns = GetVisibleColumnSelections(dataGrid);
 
         var selectedCells = dataGrid.GetSelectedCells()
             .Where(cell => cell.IsDataRowCell
@@ -72,15 +67,59 @@ public static class SalarySheetGridSelection
         return FromCellSelections(columns, selectedCells);
     }
 
+    public static IReadOnlyList<SalarySheetColumnSelection> GetVisibleColumnSelections(SfDataGrid dataGrid)
+        => dataGrid.Columns
+            .Where(column => !column.IsHidden)
+            .Select(ToColumnSelection)
+            .Where(column => column is not null)
+            .Cast<SalarySheetColumnSelection>()
+            .ToList();
+
+    public static bool HasCurrentGridCell(SfDataGrid dataGrid)
+        => dataGrid.CurrentItem is SalaryRowVm
+           && dataGrid.CurrentColumn is GridColumn column
+           && !column.IsHidden
+           && !string.IsNullOrWhiteSpace(column.MappingName)
+           && !string.IsNullOrWhiteSpace(DataGridColumnKey.GetKey(column));
+
+    public static SalarySheetSelectionSnapshot FromSingleCell(
+        SfDataGrid dataGrid,
+        SalaryRowVm row,
+        GridColumn column,
+        int rowOrder)
+        => FromSingleCell(
+            GetVisibleColumnSelections(dataGrid),
+            row,
+            DataGridColumnKey.GetKey(column),
+            rowOrder);
+
+    public static SalarySheetSelectionSnapshot FromSingleCell(
+        IReadOnlyList<SalarySheetColumnSelection> visibleColumns,
+        SalaryRowVm row,
+        string? columnKey,
+        int rowOrder)
+    {
+        if (string.IsNullOrWhiteSpace(columnKey))
+            return EmptySnapshot();
+
+        return FromCellSelections(
+            visibleColumns,
+            new[] { new SalarySheetCellSelection(row, columnKey, rowOrder) });
+    }
+
     public static SalarySheetSelectionSnapshot FromCellSelections(
         IReadOnlyList<SalarySheetColumnSelection> visibleColumns,
         IEnumerable<SalarySheetCellSelection> selectedCells)
     {
+        var visibleColumnKeys = visibleColumns
+            .Select(column => column.Key)
+            .ToHashSet(StringComparer.Ordinal);
         var cells = selectedCells
-            .Where(cell => !string.IsNullOrWhiteSpace(cell.ColumnKey))
+            .Where(cell => !string.IsNullOrWhiteSpace(cell.ColumnKey)
+                           && visibleColumnKeys.Contains(cell.ColumnKey))
             .ToList();
         if (cells.Count == 0 || visibleColumns.Count == 0)
-            return new SalarySheetSelectionSnapshot(Array.Empty<SalaryRowVm>(), Array.Empty<SalarySheetColumnSelection>());
+            return EmptySnapshot();
 
         var selectedColumnKeys = cells
             .Select(cell => cell.ColumnKey)
@@ -96,6 +135,9 @@ public static class SalarySheetGridSelection
 
         return new SalarySheetSelectionSnapshot(selectedRows, selectedColumns);
     }
+
+    private static SalarySheetSelectionSnapshot EmptySnapshot()
+        => new(Array.Empty<SalaryRowVm>(), Array.Empty<SalarySheetColumnSelection>());
 
     private static SalarySheetColumnSelection? ToColumnSelection(GridColumn column)
     {

@@ -103,6 +103,62 @@ public class ExcelExportService
         return path;
     }
 
+    public string ExportSalarySheetSelection(
+        int year,
+        int month,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IReadOnlyList<SalarySheetSelectionRow> rows,
+        string path)
+    {
+        if (columns.Count == 0)
+            throw new ArgumentException("At least one column is required.", nameof(columns));
+
+        if (rows.Count == 0)
+            throw new ArgumentException("At least one row is required.", nameof(rows));
+
+        var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+        using var workbook = new XLWorkbook();
+        var ws = workbook.AddWorksheet("Salary Selection");
+
+        ws.Cell(1, 1).Value = $"Salary Sheet Selection - {monthName} {year}";
+        ws.Range(1, 1, 1, columns.Count).Merge();
+        ws.Cell(1, 1).Style.Font.Bold = true;
+        ws.Cell(1, 1).Style.Font.FontSize = 14;
+        ws.Cell(1, 1).Style.Font.FontColor = XLColor.FromHtml("#2563EB");
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var cell = ws.Cell(3, i + 1);
+            cell.Value = columns[i].Header;
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#F1F5F9");
+            cell.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+            cell.Style.Alignment.Horizontal = columns[i].AlignRight
+                ? XLAlignmentHorizontalValues.Right
+                : XLAlignmentHorizontalValues.Left;
+        }
+
+        for (var r = 0; r < rows.Count; r++)
+        {
+            for (var c = 0; c < columns.Count; c++)
+            {
+                var value = c < rows[r].Values.Count ? rows[r].Values[c] : string.Empty;
+                var cell = ws.Cell(r + 4, c + 1);
+                SetSelectionCellValue(cell, columns[c], value);
+            }
+        }
+
+        ws.Range(3, 1, rows.Count + 3, columns.Count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        ws.Range(3, 1, rows.Count + 3, columns.Count).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        ws.Range(3, 1, 3, columns.Count).SetAutoFilter();
+        ws.SheetView.FreezeRows(3);
+        ApplySalarySheetSelectionLayout(ws, columns, rows);
+
+        EnsureDirectory(path);
+        workbook.SaveAs(path);
+        return path;
+    }
+
     private static void SaveReport(XLTemplate template, string path)
     {
         EnsureDirectory(path);
@@ -141,6 +197,46 @@ public class ExcelExportService
 
     private static void ApplySalaryRevisionsLayout(IXLWorksheet ws)
         => SetColumnWidths(ws, 28, 14, 14, 14, 32);
+
+    private static void ApplySalarySheetSelectionLayout(
+        IXLWorksheet ws,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IReadOnlyList<SalarySheetSelectionRow> rows)
+    {
+        for (var c = 0; c < columns.Count; c++)
+        {
+            var maxValueWidth = rows
+                .Select(row => c < row.Values.Count ? row.Values[c].Length : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+            var contentWidth = Math.Max(columns[c].Header.Length, maxValueWidth) + 2;
+            var minimumWidth = columns[c].AlignRight ? 12 : 14;
+            var maximumWidth = columns[c].AlignRight ? 18 : 32;
+            ws.Column(c + 1).Width = Math.Clamp(contentWidth, minimumWidth, maximumWidth);
+        }
+    }
+
+    private static void SetSelectionCellValue(
+        IXLCell cell,
+        SalarySheetSelectionColumn column,
+        string value)
+    {
+        if (column.AlignRight
+            && decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var number))
+        {
+            cell.Value = number;
+            if (value.Contains(CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator, StringComparison.Ordinal))
+                cell.Style.NumberFormat.Format = "#,##0.00";
+        }
+        else
+        {
+            cell.Value = value;
+        }
+
+        cell.Style.Alignment.Horizontal = column.AlignRight
+            ? XLAlignmentHorizontalValues.Right
+            : XLAlignmentHorizontalValues.Left;
+    }
 
     private static void SetColumnWidths(IXLWorksheet ws, params double[] widths)
     {

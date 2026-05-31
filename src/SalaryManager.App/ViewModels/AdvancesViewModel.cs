@@ -39,6 +39,8 @@ public partial class AdvanceEntryEditVm : ObservableObject
 
 public partial class AdvancesViewModel : ObservableObject
 {
+    public static TimeSpan SearchFilterDebounceDelay { get; } = TimeSpan.FromMilliseconds(150);
+
     private readonly IDbContextFactory<AppDbContext> _dbf;
     private readonly DatabaseInitializer _dbInit;
     private readonly DialogService _dialogs;
@@ -66,9 +68,13 @@ public partial class AdvancesViewModel : ObservableObject
     private bool _updatingGroupFilter;
     private int _loadVersion;
     private int _ledgerVersion;
+    private readonly object _filterRefreshLock = new();
+    private CancellationTokenSource? _filterRefreshCts;
+    private readonly object _loadCancellationLock = new();
+    private CancellationTokenSource? _loadCts;
 
-    partial void OnSearchTextChanged(string value) => RefreshFilter();
-    partial void OnShowOnlyWithAdvancesChanged(bool value) => RefreshFilter();
+    partial void OnSearchTextChanged(string value) => ScheduleFilterRefresh();
+    partial void OnShowOnlyWithAdvancesChanged(bool value) => ScheduleFilterRefresh();
     partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
     {
         if (!_updatingGroupFilter) LoadCommand.Execute(null);
@@ -117,29 +123,31 @@ public partial class AdvancesViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
+        var loadCts = BeginLoadCancellation();
+        var ct = loadCts.Token;
         var version = Interlocked.Increment(ref _loadVersion);
         IsLoading = true;
         try
         {
-            await _dbInit.ReadyTask;
+            await _dbInit.ReadyTask.WaitAsync(ct);
 
             var prevId = SelectedEmployee?.Id;
 
-            using var db = await _dbf.CreateDbContextAsync();
-            await LoadGroupFiltersAsync(db);
+            using var db = await _dbf.CreateDbContextAsync(ct);
+            await LoadGroupFiltersAsync(db, ct);
 
             var employeeQuery = db.Employees.AsNoTracking().Where(e => e.IsActive);
             if (SelectedGroupFilter?.Id is int groupId)
                 employeeQuery = employeeQuery.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-            var list = await employeeQuery.OrderBy(e => e.Name).ToListAsync();
+            var list = await employeeQuery.OrderBy(e => e.Name).ToListAsync(ct);
 
             var ids = list.Select(e => e.Id).ToList();
             var balances = await db.Advances.AsNoTracking()
                 .Where(a => ids.Contains(a.EmployeeId))
-                .SumBalancesByEmployeeAsync();
+                .SumBalancesByEmployeeAsync(ct);
 
-            if (version != _loadVersion) return;
+            if (ct.IsCancellationRequested || version != _loadVersion) return;
             Employees.Clear();
             var rail = new List<EmployeeWithBalanceVm>(list.Count);
             foreach (var e in list)
@@ -156,6 +164,7 @@ public partial class AdvancesViewModel : ObservableObject
             }
             EmployeeRail.ReplaceAll(rail);
 
+            CancelPendingFilterRefresh();
             RefreshFilter();
 
             // Restore previous selection (or pick the first visible item)
@@ -165,15 +174,19 @@ public partial class AdvancesViewModel : ObservableObject
             toSelect ??= EmployeeRailView.Cast<EmployeeWithBalanceVm>().FirstOrDefault();
             SelectedRailItem = toSelect;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
         catch (Exception ex)
         {
-            if (version == _loadVersion)
+            if (version == _loadVersion && !ct.IsCancellationRequested)
                 await _dialogs.ErrorAsync(ex.Message);
         }
         finally
         {
             if (version == _loadVersion)
                 IsLoading = false;
+            EndLoadCancellation(loadCts);
         }
     }
 
@@ -267,13 +280,13 @@ public partial class AdvancesViewModel : ObservableObject
         await LoadAsync();
     }
 
-    private async Task LoadGroupFiltersAsync(AppDbContext db)
+    private async Task LoadGroupFiltersAsync(AppDbContext db, CancellationToken cancellationToken)
     {
         var selectedId = SelectedGroupFilter?.Id;
         var groups = await db.EmployeeGroups.AsNoTracking()
             .OrderBy(g => g.Name)
             .Select(g => new GroupFilterOptionVm(g.Id, g.Name))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         var options = new List<GroupFilterOptionVm> { new(null, "All Groups") };
         options.AddRange(groups);
@@ -294,5 +307,81 @@ public partial class AdvancesViewModel : ObservableObject
     {
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+    }
+
+    private void ScheduleFilterRefresh()
+    {
+        CancellationTokenSource cts;
+        lock (_filterRefreshLock)
+        {
+            _filterRefreshCts?.Cancel();
+            _filterRefreshCts?.Dispose();
+            _filterRefreshCts = new CancellationTokenSource();
+            cts = _filterRefreshCts;
+        }
+
+        _ = RefreshFilterAfterDelayAsync(cts, cts.Token);
+    }
+
+    private async Task RefreshFilterAfterDelayAsync(CancellationTokenSource cts, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SearchFilterDebounceDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        lock (_filterRefreshLock)
+        {
+            if (!ReferenceEquals(_filterRefreshCts, cts))
+                return;
+
+            _filterRefreshCts = null;
+        }
+
+        cts.Dispose();
+        RefreshFilter();
+    }
+
+    private void CancelPendingFilterRefresh()
+    {
+        CancellationTokenSource? cts;
+        lock (_filterRefreshLock)
+        {
+            cts = _filterRefreshCts;
+            _filterRefreshCts = null;
+        }
+
+        if (cts is null)
+            return;
+
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    private CancellationTokenSource BeginLoadCancellation()
+    {
+        var cts = new CancellationTokenSource();
+        lock (_loadCancellationLock)
+        {
+            _loadCts?.Cancel();
+            _loadCts = cts;
+        }
+
+        return cts;
+    }
+
+    private void EndLoadCancellation(CancellationTokenSource cts)
+    {
+        lock (_loadCancellationLock)
+        {
+            if (ReferenceEquals(_loadCts, cts))
+                _loadCts = null;
+        }
+
+        cts.Dispose();
     }
 }

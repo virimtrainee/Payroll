@@ -96,11 +96,6 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Padding" Value="20"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="#0F172A" Opacity="0.08" BlurRadius="16" ShadowDepth="2"/>
-                </Setter.Value>
-            </Setter>
         </Style>
 
         <!-- FilterBar: flat single-row toolbar strip -->

@@ -31,6 +31,8 @@ public sealed class EmployeeDeletedEventArgs(int employeeId) : EventArgs
 
 public partial class EmployeesViewModel : ObservableObject
 {
+    public static TimeSpan SearchReloadDebounceDelay { get; } = TimeSpan.FromMilliseconds(200);
+
     private readonly IDbContextFactory<AppDbContext> _dbf;
     private readonly DatabaseInitializer _dbInit;
     private readonly DialogService _dialogs;
@@ -64,6 +66,10 @@ public partial class EmployeesViewModel : ObservableObject
     private bool _updatingSelectedGroupFromLoad;
     private bool _groupsLoaded;
     private IReadOnlyList<EmployeeGroup> _groupOptionSnapshot = [];
+    private readonly object _searchReloadLock = new();
+    private CancellationTokenSource? _searchReloadCts;
+    private readonly object _loadCancellationLock = new();
+    private CancellationTokenSource? _loadCts;
 
     public event EventHandler<EmployeeDeletedEventArgs>? EmployeePermanentlyDeleted;
     public event EventHandler? EmployeeDataChanged;
@@ -95,7 +101,7 @@ public partial class EmployeesViewModel : ObservableObject
         ShowInactive = value == EmployeeStatusFilter.Inactive;
         LoadCommand.Execute(null);
     }
-    partial void OnSearchTextChanged(string value) => LoadCommand.Execute(null);
+    partial void OnSearchTextChanged(string value) => ScheduleSearchReload();
     partial void OnSelectedGroupFilterChanged(GroupFilterOptionVm? value)
     {
         if (!_updatingGroupFilter) LoadCommand.Execute(null);
@@ -110,12 +116,15 @@ public partial class EmployeesViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadAsync()
     {
+        CancelPendingSearchReload();
+        var loadCts = BeginLoadCancellation();
+        var ct = loadCts.Token;
         var version = Interlocked.Increment(ref _loadVersion);
         try
         {
-            await _dbInit.ReadyTask;
+            await _dbInit.ReadyTask.WaitAsync(ct);
 
-            using var db = await _dbf.CreateDbContextAsync();
+            using var db = await _dbf.CreateDbContextAsync(ct);
             IQueryable<Employee> query = db.Employees.AsNoTracking()
                 .Include(e => e.GroupMemberships)
                     .ThenInclude(m => m.EmployeeGroup)
@@ -129,7 +138,7 @@ public partial class EmployeesViewModel : ObservableObject
             if (SelectedGroupFilter?.Id is int groupId)
                 query = query.Where(e => e.GroupMemberships.Any(m => m.EmployeeGroupId == groupId));
 
-            var list = await query.ToListAsync();
+            var list = await query.ToListAsync(ct);
             var search = SearchText.Trim();
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -137,13 +146,13 @@ public partial class EmployeesViewModel : ObservableObject
                     .Where(e => e.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
-            var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+            var groups = await db.EmployeeGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync(ct);
             var groupCounts = await db.EmployeeGroupMemberships.AsNoTracking()
                 .GroupBy(m => m.EmployeeGroupId)
                 .Select(g => new { GroupId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(g => g.GroupId, g => g.Count);
+                .ToDictionaryAsync(g => g.GroupId, g => g.Count, ct);
 
-            if (version != _loadVersion) return;
+            if (ct.IsCancellationRequested || version != _loadVersion) return;
             _groupOptionSnapshot = groups;
             _groupsLoaded = true;
             var selectedFilterId = SelectedGroupFilter?.Id;
@@ -179,10 +188,17 @@ public partial class EmployeesViewModel : ObservableObject
 
             await LoadGroupAssignmentsAsync();
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
         catch (Exception ex)
         {
-            if (version == _loadVersion)
+            if (version == _loadVersion && !ct.IsCancellationRequested)
                 await _dialogs.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            EndLoadCancellation(loadCts);
         }
     }
 
@@ -736,6 +752,82 @@ public partial class EmployeesViewModel : ObservableObject
 
     private void NotifyEmployeeDataChanged()
         => EmployeeDataChanged?.Invoke(this, EventArgs.Empty);
+
+    private void ScheduleSearchReload()
+    {
+        CancellationTokenSource cts;
+        lock (_searchReloadLock)
+        {
+            _searchReloadCts?.Cancel();
+            _searchReloadCts?.Dispose();
+            _searchReloadCts = new CancellationTokenSource();
+            cts = _searchReloadCts;
+        }
+
+        _ = ReloadAfterSearchDelayAsync(cts, cts.Token);
+    }
+
+    private async Task ReloadAfterSearchDelayAsync(CancellationTokenSource cts, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SearchReloadDebounceDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        lock (_searchReloadLock)
+        {
+            if (!ReferenceEquals(_searchReloadCts, cts))
+                return;
+
+            _searchReloadCts = null;
+        }
+
+        cts.Dispose();
+        await LoadAsync();
+    }
+
+    private void CancelPendingSearchReload()
+    {
+        CancellationTokenSource? cts;
+        lock (_searchReloadLock)
+        {
+            cts = _searchReloadCts;
+            _searchReloadCts = null;
+        }
+
+        if (cts is null)
+            return;
+
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    private CancellationTokenSource BeginLoadCancellation()
+    {
+        var cts = new CancellationTokenSource();
+        lock (_loadCancellationLock)
+        {
+            _loadCts?.Cancel();
+            _loadCts = cts;
+        }
+
+        return cts;
+    }
+
+    private void EndLoadCancellation(CancellationTokenSource cts)
+    {
+        lock (_loadCancellationLock)
+        {
+            if (ReferenceEquals(_loadCts, cts))
+                _loadCts = null;
+        }
+
+        cts.Dispose();
+    }
 
     private sealed record EmployeeDeleteImpact(
         int AttendanceRecords,

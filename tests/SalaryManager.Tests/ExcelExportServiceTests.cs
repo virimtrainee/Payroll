@@ -150,6 +150,43 @@ public class ExcelExportServiceTests
         }
     }
 
+    [Fact]
+    public void ExportSalarySheetSelection_WritesSelectedCells()
+    {
+        var path = TempPath();
+        try
+        {
+            var columns = new[]
+            {
+                new SalarySheetSelectionColumn("Employee", false),
+                new SalarySheetSelectionColumn("Net Salary", true)
+            };
+            var rows = new[]
+            {
+                new SalarySheetSelectionRow(["A", 9500m.ToString("N2")]),
+                new SalarySheetSelectionRow(["B", 18750m.ToString("N2")])
+            };
+
+            new ExcelExportService().ExportSalarySheetSelection(2026, 5, columns, rows, path);
+
+            using var workbook = new XLWorkbook(path);
+            var ws = workbook.Worksheet("Salary Selection");
+            Assert.Equal("Salary Sheet Selection - May 2026", ws.Cell(1, 1).GetString());
+            Assert.Equal("Employee", ws.Cell(3, 1).GetString());
+            Assert.Equal("Net Salary", ws.Cell(3, 2).GetString());
+            Assert.Equal("A", ws.Cell(4, 1).GetString());
+            Assert.Equal(9500m, ws.Cell(4, 2).GetValue<decimal>());
+            Assert.Equal("B", ws.Cell(5, 1).GetString());
+            Assert.Equal(18750m, ws.Cell(5, 2).GetValue<decimal>());
+            Assert.True(ws.Column(1).Width >= 14d);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
     private static string TempPath()
         => Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.xlsx");
 }

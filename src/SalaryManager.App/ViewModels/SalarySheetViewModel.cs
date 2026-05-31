@@ -32,8 +32,18 @@ public partial class SalaryRowVm : ObservableObject
     public decimal EffectiveBaseSalary => EmployeeBaseSalary;
     public int Year { get; init; }
     public int Month { get; init; }
-    public decimal AdvanceBalance { get; init; }
-    public decimal ExistingSalaryAdvanceDeduction { get; init; }
+    private decimal _advanceBalance;
+    private decimal _existingSalaryAdvanceDeduction;
+    public decimal AdvanceBalance
+    {
+        get => _advanceBalance;
+        init => _advanceBalance = value;
+    }
+    public decimal ExistingSalaryAdvanceDeduction
+    {
+        get => _existingSalaryAdvanceDeduction;
+        init => _existingSalaryAdvanceDeduction = value;
+    }
     public decimal? HistoricalNetSalaryOverride { get; init; }
     public string? AccountNumber { get; init; }
     public string? IfscCode { get; init; }
@@ -326,6 +336,17 @@ public partial class SalaryRowVm : ObservableObject
         OnPropertyChanged(nameof(EffectiveSalaryPaid));
         OnPropertyChanged(nameof(SalaryPaid));
         OnPropertyChanged(nameof(TotalDeductions));
+    }
+
+    public void MarkSalaryAdvanceDeductionSaved(decimal amount)
+    {
+        amount = Math.Max(0, amount);
+        _advanceBalance += Math.Max(0, _existingSalaryAdvanceDeduction) - amount;
+        if (_advanceBalance < 0m)
+            _advanceBalance = 0m;
+        _existingSalaryAdvanceDeduction = amount;
+        OnPropertyChanged(nameof(AdvanceBalance));
+        OnPropertyChanged(nameof(ExistingSalaryAdvanceDeduction));
     }
 
     private static decimal NormalizeSalaryPaid(decimal salaryPaid)
@@ -698,7 +719,7 @@ public partial class SalarySheetViewModel : ObservableObject
         try
         {
             using var db = await _dbf.CreateDbContextAsync();
-            var validation = ValidateRows(Rows, includeAdvance: false);
+            var validation = ValidateRows(Rows, includeAdvance: true);
             if (!validation.IsValid) { await _dialogs.ErrorAsync(validation.ToMessage()); return false; }
 
             var empIds = Rows.Select(r => r.EmployeeId).ToList();
@@ -708,7 +729,15 @@ public partial class SalarySheetViewModel : ObservableObject
                          && empIds.Contains(a.EmployeeId))
                 .ToDictionaryAsync(a => a.EmployeeId);
 
+            var sourceKey = AdvanceSourceKeys.Salary(SelectedYear, SelectedMonth.Number);
+            var existingSalaryAdvances = await db.Advances
+                .Where(a => a.SourceKey == sourceKey
+                         && empIds.Contains(a.EmployeeId))
+                .ToDictionaryAsync(a => a.EmployeeId);
+
             var daysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth.Number);
+            var salaryAdvanceDate = new DateTime(SelectedYear, SelectedMonth.Number, daysInMonth);
+            var savedAdvanceDeductions = new Dictionary<int, decimal>(Rows.Count);
 
             foreach (var r in Rows)
             {
@@ -738,9 +767,41 @@ public partial class SalarySheetViewModel : ObservableObject
                         NetSalaryOverride = null,
                     });
                 }
+
+                var advanceDeduction = Math.Max(0, r.AdvanceDeductionEntry);
+                savedAdvanceDeductions[r.EmployeeId] = advanceDeduction;
+                if (existingSalaryAdvances.TryGetValue(r.EmployeeId, out var advance))
+                {
+                    if (advanceDeduction == 0m)
+                    {
+                        db.Advances.Remove(advance);
+                    }
+                    else
+                    {
+                        advance.Amount = advanceDeduction;
+                        advance.EntryType = AdvanceEntryType.Deducted;
+                        advance.Date = salaryAdvanceDate;
+                        advance.Note = BuildSalaryAdvanceNote(SelectedYear, SelectedMonth.Number);
+                    }
+                }
+                else if (advanceDeduction > 0m)
+                {
+                    db.Advances.Add(new Advance
+                    {
+                        EmployeeId = r.EmployeeId,
+                        Amount = advanceDeduction,
+                        EntryType = AdvanceEntryType.Deducted,
+                        Date = salaryAdvanceDate,
+                        SourceKey = sourceKey,
+                        Note = BuildSalaryAdvanceNote(SelectedYear, SelectedMonth.Number),
+                    });
+                }
             }
 
             await db.SaveChangesAsync();
+            foreach (var row in Rows)
+                row.MarkSalaryAdvanceDeductionSaved(savedAdvanceDeductions.GetValueOrDefault(row.EmployeeId));
+            RefreshTotals();
             if (showSuccessMessage)
                 await _dialogs.InfoAsync("Attendance saved.");
             return true;
@@ -856,6 +917,12 @@ public partial class SalarySheetViewModel : ObservableObject
     private static void OpenFile(string path)
     {
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
+    }
+
+    private static string BuildSalaryAdvanceNote(int year, int month)
+    {
+        var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+        return $"Salary deduction - {monthName} {year}";
     }
 
     private static async Task<Dictionary<int, AttendanceLoadState>> LoadAttendanceStatesAsync(
@@ -987,7 +1054,8 @@ public partial class SalarySheetViewModel : ObservableObject
         var columns = snapshot.Columns
             .Select(column => new SalarySheetSelectionColumn(
                 column.Header,
-                IsRightAlignedSelectionColumn(column.Key)))
+                IsRightAlignedSelectionColumn(column.Key),
+                IsTotaledSelectionColumn(column.Key)))
             .ToList();
         var rows = snapshot.Rows
             .Select(row => new SalarySheetSelectionRow(
@@ -1002,6 +1070,18 @@ public partial class SalarySheetViewModel : ObservableObject
     private static bool IsRightAlignedSelectionColumn(string key)
         => key is "serial"
             or "baseSalary"
+            or "absent"
+            or "salaryPaid"
+            or "esic"
+            or "pf"
+            or "tds"
+            or "deductions"
+            or "advanceDeduction"
+            or "advanceBalance"
+            or "netSalary";
+
+    private static bool IsTotaledSelectionColumn(string key)
+        => key is "baseSalary"
             or "absent"
             or "salaryPaid"
             or "esic"

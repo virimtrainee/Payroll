@@ -33,6 +33,7 @@ public class ExcelExportServiceTests
             Assert.Equal("B", ws.Cell(5, 1).GetString());
             Assert.Equal("TOTAL", ws.Cell(6, 1).GetString());
             Assert.Equal(30000m, ws.Cell(6, 2).GetValue<decimal>());
+            Assert.Equal(2, ws.Cell(6, 3).GetValue<int>());
             Assert.Equal(500m, ws.Cell(6, 4).GetValue<decimal>());
             Assert.Equal(29500m, ws.Cell(6, 5).GetValue<decimal>());
             Assert.Equal(45m, ws.Cell(6, 6).GetValue<decimal>());
@@ -163,7 +164,7 @@ public class ExcelExportServiceTests
             var columns = new[]
             {
                 new SalarySheetSelectionColumn("Employee", false),
-                new SalarySheetSelectionColumn("Net Salary", true)
+                new SalarySheetSelectionColumn("Net Salary", true, true)
             };
             var rows = new[]
             {
@@ -182,6 +183,8 @@ public class ExcelExportServiceTests
             Assert.Equal(9500m, ws.Cell(4, 2).GetValue<decimal>());
             Assert.Equal("B", ws.Cell(5, 1).GetString());
             Assert.Equal(18750m, ws.Cell(5, 2).GetValue<decimal>());
+            Assert.Equal("TOTAL", ws.Cell(6, 1).GetString());
+            Assert.Equal(28250m, ws.Cell(6, 2).GetValue<decimal>());
             Assert.True(ws.Column(1).Width >= 14d);
         }
         finally

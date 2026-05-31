@@ -148,8 +148,10 @@ public class ExcelExportService
             }
         }
 
-        ws.Range(3, 1, rows.Count + 3, columns.Count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-        ws.Range(3, 1, rows.Count + 3, columns.Count).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        var totalRow = rows.Count + 4;
+        ApplySalarySheetSelectionTotals(ws, columns, rows, totalRow);
+        ws.Range(3, 1, totalRow, columns.Count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        ws.Range(3, 1, totalRow, columns.Count).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
         ws.Range(3, 1, 3, columns.Count).SetAutoFilter();
         ws.SheetView.FreezeRows(3);
         ApplySalarySheetSelectionLayout(ws, columns, rows);
@@ -177,6 +179,7 @@ public class ExcelExportService
         var totalRow = 4 + rows.Count;
         ws.Cell(totalRow, 1).Value = "TOTAL";
         ws.Cell(totalRow, 2).Value = rows.Sum(row => row.BaseSalary);
+        ws.Cell(totalRow, 3).Value = rows.Sum(row => row.DaysAbsent);
         ws.Cell(totalRow, 4).Value = rows.Sum(row => row.Deduction);
         ws.Cell(totalRow, 5).Value = rows.Sum(row => row.SalaryPaid);
         ws.Cell(totalRow, 6).Value = rows.Sum(row => row.PfDeduction);
@@ -213,6 +216,60 @@ public class ExcelExportService
             var minimumWidth = columns[c].AlignRight ? 12 : 14;
             var maximumWidth = columns[c].AlignRight ? 18 : 32;
             ws.Column(c + 1).Width = Math.Clamp(contentWidth, minimumWidth, maximumWidth);
+        }
+    }
+
+    private static void ApplySalarySheetSelectionTotals(
+        IXLWorksheet ws,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IReadOnlyList<SalarySheetSelectionRow> rows,
+        int totalRow)
+    {
+        var labelColumn = columns
+            .Select((column, index) => new { column, index })
+            .FirstOrDefault(item => !item.column.AlignRight)?.index + 1;
+
+        for (var c = 0; c < columns.Count; c++)
+        {
+            var cell = ws.Cell(totalRow, c + 1);
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#2563EB");
+            cell.Style.Alignment.Horizontal = columns[c].AlignRight
+                ? XLAlignmentHorizontalValues.Right
+                : XLAlignmentHorizontalValues.Left;
+
+            if (labelColumn.HasValue && c + 1 == labelColumn.Value)
+            {
+                cell.Value = "TOTAL";
+                continue;
+            }
+
+            if (!columns[c].IncludeInTotal)
+                continue;
+
+            decimal total = 0;
+            var hasValue = false;
+            var hasDecimalValue = false;
+            foreach (var row in rows)
+            {
+                if (c >= row.Values.Count)
+                    continue;
+
+                var value = row.Values[c];
+                if (!decimal.TryParse(value, NumberStyles.Currency, CultureInfo.CurrentCulture, out var number))
+                    continue;
+
+                total += number;
+                hasValue = true;
+                hasDecimalValue |= value.Contains(CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator, StringComparison.Ordinal);
+            }
+
+            if (!hasValue)
+                continue;
+
+            cell.Value = total;
+            cell.Style.NumberFormat.Format = hasDecimalValue ? "#,##0.00" : "#,##0";
         }
     }
 

@@ -33,7 +33,7 @@ internal static class ExcelReportTemplateFactory
         AddRow(ws, 4, expressions);
 
         ws.Cell(5, 1).Value = "TOTAL";
-        foreach (var column in new[] { 2, 4, 5, 6, 7, 8, 9, 10 })
+        foreach (var column in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10 })
             ws.Cell(5, column).Value = "<<sum>>";
         ws.Range(5, 1, 5, 10).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#2563EB"))
             .Font.SetFontColor(XLColor.White);

@@ -11,6 +11,7 @@ using SalaryManager.App.Services;
 using SalaryManager.App.ViewModels;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
+using SalaryManager.Data.Services;
 using Xunit;
 
 namespace SalaryManager.Tests;
@@ -510,6 +511,107 @@ public class EmployeeSalarySheetFilterTests
         var reloaded = Assert.Single(viewModel.Rows);
         Assert.Equal(100m, reloaded.TdsDeduction);
         Assert.True(reloaded.IsTdsManualOverride);
+    }
+
+    [Fact]
+    public async Task SalarySheetSave_PersistsAdvanceDeductionToLedger()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.Advances.Add(new Advance
+            {
+                EmployeeId = 1,
+                Amount = 1000m,
+                EntryType = AdvanceEntryType.Given,
+                Date = new DateTime(2026, 5, 1)
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(1000m, row.AdvanceBalance);
+
+        row.AdvanceDeductionEntry = 250m;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var entries = await verifyDb.Advances.AsNoTracking().OrderBy(a => a.Id).ToListAsync();
+            var salaryEntry = Assert.Single(entries, a => a.SourceKey == AdvanceSourceKeys.Salary(2026, 5));
+            Assert.Equal(AdvanceEntryType.Deducted, salaryEntry.EntryType);
+            Assert.Equal(250m, salaryEntry.Amount);
+            Assert.Equal(new DateTime(2026, 5, 31), salaryEntry.Date);
+            Assert.Equal(750m, AdvanceLedger.Balance(entries));
+        }
+
+        Assert.Equal(250m, row.ExistingSalaryAdvanceDeduction);
+        Assert.Equal(750m, row.AdvanceBalance);
+
+        row.AdvanceDeductionEntry = 100m;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var entries = await verifyDb.Advances.AsNoTracking().OrderBy(a => a.Id).ToListAsync();
+            var salaryEntry = Assert.Single(entries, a => a.SourceKey == AdvanceSourceKeys.Salary(2026, 5));
+            Assert.Equal(100m, salaryEntry.Amount);
+            Assert.Equal(900m, AdvanceLedger.Balance(entries));
+        }
+
+        Assert.Equal(100m, row.ExistingSalaryAdvanceDeduction);
+        Assert.Equal(900m, row.AdvanceBalance);
+
+        row.AdvanceDeductionEntry = 0m;
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        using (var verifyDb = factory.CreateDbContext())
+        {
+            var entries = await verifyDb.Advances.AsNoTracking().OrderBy(a => a.Id).ToListAsync();
+            Assert.DoesNotContain(entries, a => a.SourceKey == AdvanceSourceKeys.Salary(2026, 5));
+            Assert.Equal(1000m, AdvanceLedger.Balance(entries));
+        }
+
+        Assert.Equal(0m, row.ExistingSalaryAdvanceDeduction);
+        Assert.Equal(1000m, row.AdvanceBalance);
+    }
+
+    [Fact]
+    public async Task SalarySheetLoad_DoesNotRegressSavedAdvanceDeduction()
+    {
+        using var factory = new SqliteDbContextFactory();
+        var initializer = await ReadyInitializerAsync(factory);
+        await SeedAsync(factory, db =>
+        {
+            db.Employees.Add(new Employee { Id = 1, Name = "A", BaseSalary = 10000m, IsActive = true });
+            db.Advances.Add(new Advance
+            {
+                EmployeeId = 1,
+                Amount = 1000m,
+                EntryType = AdvanceEntryType.Given,
+                Date = new DateTime(2026, 5, 1)
+            });
+        });
+
+        var viewModel = NewSalarySheetViewModel(factory, initializer);
+        await viewModel.LoadCommand.ExecuteAsync(null);
+        Assert.Single(viewModel.Rows).AdvanceDeductionEntry = 300m;
+
+        await viewModel.SaveAttendanceCommand.ExecuteAsync(null);
+
+        var reloadedViewModel = NewSalarySheetViewModel(factory, initializer);
+        await reloadedViewModel.LoadCommand.ExecuteAsync(null);
+
+        var reloaded = Assert.Single(reloadedViewModel.Rows);
+        Assert.Equal(300m, reloaded.AdvanceDeductionEntry);
+        Assert.Equal(300m, reloaded.ExistingSalaryAdvanceDeduction);
+        Assert.Equal(700m, reloaded.AdvanceBalance);
+        Assert.Equal(300m, reloadedViewModel.TotalAdvanceDeduction);
+        Assert.Equal(9700m, reloadedViewModel.TotalNet);
     }
 
     [Fact]

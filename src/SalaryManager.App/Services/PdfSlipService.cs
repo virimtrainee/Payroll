@@ -38,7 +38,7 @@ public record SalaryRevisionReportRow(
     DateTime ChangedAt,
     string? Note);
 
-public record SalarySheetSelectionColumn(string Header, bool AlignRight);
+public record SalarySheetSelectionColumn(string Header, bool AlignRight, bool IncludeInTotal = false);
 
 public record SalarySheetSelectionRow(IReadOnlyList<string> Values);
 

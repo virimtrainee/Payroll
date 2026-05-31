@@ -21,6 +21,26 @@ namespace SalaryManager.App.Views;
 
 public partial class SalarySheetView : UserControl
 {
+    private static readonly HashSet<string> GridTotalColumns = new(StringComparer.Ordinal)
+    {
+        nameof(SalaryRowVm.EmployeeBaseSalary),
+        nameof(SalaryRowVm.DaysAbsent),
+        nameof(SalaryRowVm.SalaryPaid),
+        nameof(SalaryRowVm.PfDeduction),
+        nameof(SalaryRowVm.EsicDeduction),
+        nameof(SalaryRowVm.TdsDeduction),
+        nameof(SalaryRowVm.TotalDeductions),
+        nameof(SalaryRowVm.AdvanceDeductionEntry),
+        nameof(SalaryRowVm.AdvanceBalance),
+        nameof(SalaryRowVm.NetSalary)
+    };
+
+    private static readonly HashSet<string> GridWholeNumberTotalColumns = new(StringComparer.Ordinal)
+    {
+        nameof(SalaryRowVm.DaysAbsent),
+        nameof(SalaryRowVm.SalaryPaid)
+    };
+
     private bool _initialized;
     private bool _columnPreferencesReady;
     private bool _columnWidthHandlersAttached;
@@ -531,6 +551,7 @@ public partial class SalarySheetView : UserControl
 
     private void ExportSalaryGrid(string path, IEnumerable<string> columnMappings)
     {
+        var selectedMappings = columnMappings.ToList();
         var options = new ExcelExportingOptions
         {
             AllowOutlining = true,
@@ -538,11 +559,102 @@ public partial class SalarySheetView : UserControl
             ExportStackedHeaders = false,
             ExcelVersion = ExcelVersion.Xlsx
         };
-        options.Columns.AddRange(columnMappings);
+        options.Columns.AddRange(selectedMappings);
 
-        using var engine = SalaryGrid.ExportToExcel(SalaryGrid.View, options);
-        engine.Excel.Workbooks[0].SaveAs(path);
+        using (var engine = SalaryGrid.ExportToExcel(SalaryGrid.View, options))
+        {
+            engine.Excel.Workbooks[0].SaveAs(path);
+        }
+
+        AppendSalaryGridTotals(path, selectedMappings, GetVisibleSalaryRows());
     }
+
+    private IReadOnlyList<SalaryRowVm> GetVisibleSalaryRows()
+    {
+        var rows = new List<SalaryRowVm>();
+        if (SalaryGrid.View?.Records is not null)
+        {
+            foreach (var record in SalaryGrid.View.Records)
+            {
+                if (record.Data is SalaryRowVm entryRow)
+                {
+                    rows.Add(entryRow);
+                }
+            }
+        }
+
+        if (rows.Count > 0)
+            return rows;
+
+        return DataContext is SalarySheetViewModel vm
+            ? vm.RowsView.Cast<SalaryRowVm>().ToList()
+            : [];
+    }
+
+    private static void AppendSalaryGridTotals(
+        string path,
+        IReadOnlyList<string> columnMappings,
+        IReadOnlyList<SalaryRowVm> rows)
+    {
+        if (columnMappings.Count == 0 || rows.Count == 0)
+            return;
+
+        using var workbook = new ClosedXML.Excel.XLWorkbook(path);
+        var ws = workbook.Worksheet(1);
+        var lastRow = ws.LastRowUsed()?.RowNumber() ?? 0;
+        if (lastRow < 1)
+        {
+            workbook.SaveAs(path);
+            return;
+        }
+
+        var totalRow = lastRow + 1;
+        var labelColumn = columnMappings
+            .Select((mapping, index) => new { mapping, index })
+            .FirstOrDefault(item => !GridTotalColumns.Contains(item.mapping))?.index + 1;
+
+        for (var c = 0; c < columnMappings.Count; c++)
+        {
+            var cell = ws.Cell(totalRow, c + 1);
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+            cell.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromHtml("#2563EB");
+            cell.Style.Border.TopBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+
+            if (labelColumn.HasValue && c + 1 == labelColumn.Value)
+            {
+                cell.Value = "TOTAL";
+                continue;
+            }
+
+            var mapping = columnMappings[c];
+            if (!GridTotalColumns.Contains(mapping))
+                continue;
+
+            var total = rows.Sum(row => GetGridTotalValue(row, mapping));
+            cell.Value = total;
+            cell.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Right;
+            cell.Style.NumberFormat.Format = GridWholeNumberTotalColumns.Contains(mapping) ? "#,##0" : "#,##0.00";
+        }
+
+        workbook.SaveAs(path);
+    }
+
+    private static decimal GetGridTotalValue(SalaryRowVm row, string mapping)
+        => mapping switch
+        {
+            nameof(SalaryRowVm.EmployeeBaseSalary) => row.EmployeeBaseSalary,
+            nameof(SalaryRowVm.DaysAbsent) => row.DaysAbsent,
+            nameof(SalaryRowVm.SalaryPaid) => row.SalaryPaid ?? 0m,
+            nameof(SalaryRowVm.PfDeduction) => row.PfDeduction,
+            nameof(SalaryRowVm.EsicDeduction) => row.EsicDeduction,
+            nameof(SalaryRowVm.TdsDeduction) => row.TdsDeduction,
+            nameof(SalaryRowVm.TotalDeductions) => row.TotalDeductions,
+            nameof(SalaryRowVm.AdvanceDeductionEntry) => row.AdvanceDeductionEntry,
+            nameof(SalaryRowVm.AdvanceBalance) => row.AdvanceBalance,
+            nameof(SalaryRowVm.NetSalary) => row.NetSalary,
+            _ => 0m
+        };
 
     private void SalaryGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {

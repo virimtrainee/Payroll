@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -747,6 +748,30 @@ public class EmployeeSalarySheetFilterTests
     }
 
     [Fact]
+    public void SalarySheetPdfSelectionExport_RemovesPayColumnAndResetsSerialsByGroup()
+    {
+        var rowA = new SalaryRowVm { SerialNumber = 99, Name = "A", GroupDisplayName = "Factory", EmployeeBaseSalary = 10000m };
+        var rowB = new SalaryRowVm { SerialNumber = 100, Name = "B", GroupDisplayName = "Night", EmployeeBaseSalary = 10000m };
+        var rowC = new SalaryRowVm { SerialNumber = 101, Name = "C", GroupDisplayName = "Factory", EmployeeBaseSalary = 10000m };
+        var snapshot = new SalarySheetSelectionSnapshot(
+            [rowA, rowB, rowC],
+            [
+                new SalarySheetColumnSelection("serial", "SerialNumber", "#"),
+                new SalarySheetColumnSelection("employee", "Name", "Employee"),
+                new SalarySheetColumnSelection("group", "GroupDisplayName", "Group"),
+                new SalarySheetColumnSelection("payment", "PaymentModeLabel", "Pay"),
+                new SalarySheetColumnSelection("salaryPaid", "SalaryPaid", "Salary Paid")
+            ]);
+
+        var export = InvokeBuildPdfSelectionExport(snapshot);
+
+        Assert.DoesNotContain(export.Columns, column => column.Key == "payment");
+        Assert.Equal(["serial", "employee", "group", "salaryPaid"], export.Columns.Select(column => column.Key));
+        Assert.Equal(["1", "1", "2"], export.Rows.Select(row => row.Values[0]));
+        Assert.Equal(["Factory", "Night", "Factory"], export.Rows.Select(row => row.GroupName));
+    }
+
+    [Fact]
     public void SalarySheetView_AllowsVisibleColumnFiltering()
     {
         var xaml = ReadSalarySheetViewXaml();
@@ -1378,6 +1403,26 @@ public class EmployeeSalarySheetFilterTests
         }
 
         throw new FileNotFoundException("Could not locate SalarySheetView.xaml from the test output directory.");
+    }
+
+    private static (IReadOnlyList<SalarySheetSelectionColumn> Columns, IReadOnlyList<SalarySheetSelectionRow> Rows)
+        InvokeBuildPdfSelectionExport(SalarySheetSelectionSnapshot snapshot)
+    {
+        var method = typeof(SalarySheetViewModel).GetMethod(
+            "BuildPdfSelectionExport",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var export = method!.Invoke(null, [snapshot]);
+        Assert.NotNull(export);
+
+        var columns = (IReadOnlyList<SalarySheetSelectionColumn>)export!.GetType()
+            .GetProperty("Columns")!
+            .GetValue(export)!;
+        var rows = (IReadOnlyList<SalarySheetSelectionRow>)export.GetType()
+            .GetProperty("Rows")!
+            .GetValue(export)!;
+        return (columns, rows);
     }
 
     private sealed class SqliteDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable

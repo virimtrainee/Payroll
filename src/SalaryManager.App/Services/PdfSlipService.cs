@@ -29,7 +29,8 @@ public record MonthlySummaryRow(
     decimal PfDeduction,
     decimal TdsDeduction,
     decimal AdvanceDeduction,
-    decimal NetSalary);
+    decimal NetSalary,
+    string GroupName = "");
 
 public record SalaryRevisionReportRow(
     string EmployeeName,
@@ -38,12 +39,14 @@ public record SalaryRevisionReportRow(
     DateTime ChangedAt,
     string? Note);
 
-public record SalarySheetSelectionColumn(string Header, bool AlignRight, bool IncludeInTotal = false);
+public record SalarySheetSelectionColumn(string Header, bool AlignRight, bool IncludeInTotal = false, string Key = "");
 
-public record SalarySheetSelectionRow(IReadOnlyList<string> Values);
+public record SalarySheetSelectionRow(IReadOnlyList<string> Values, string GroupName = "");
 
 public class PdfSlipService
 {
+    private const string TableBorderColor = "#CBD5E1";
+
     public string GenerateSlip(SalarySlipData data, string? outputPath = null)
     {
         outputPath ??= DefaultSlipPath(data);
@@ -133,11 +136,6 @@ public class PdfSlipService
                         c2.Item().Text("EMPLOYEE").FontSize(8).FontColor("#64748B").Bold();
                         c2.Item().Text(d.Employee.Name).FontSize(14).Bold();
                     });
-                    row.RelativeItem().AlignRight().Column(c2 =>
-                    {
-                        c2.Item().Text("EMPLOYEE ID").FontSize(8).FontColor("#64748B").Bold();
-                        c2.Item().Text($"#{d.Employee.Id:D4}").FontSize(14).Bold();
-                    });
                 });
 
                 col.Item().PaddingTop(6).Background("#F8FAFC").Padding(12).Column(box =>
@@ -217,6 +215,11 @@ public class PdfSlipService
 
             p.Content().PaddingVertical(12).Table(t =>
             {
+                var groupedRows = rows
+                    .GroupBy(r => PdfGroupName(r.GroupName))
+                    .ToList();
+                var showGroupTotals = rows.Any(r => !string.IsNullOrWhiteSpace(r.GroupName));
+
                 t.ColumnsDefinition(cd =>
                 {
                     cd.RelativeColumn(3);
@@ -233,51 +236,45 @@ public class PdfSlipService
 
                 t.Header(h =>
                 {
-                    h.Cell().Background("#F1F5F9").Padding(6).Text("Employee").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Base Salary").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Absent").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Deduction").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Salary Paid").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("PF").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("ESIC").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("TDS").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Adv. Ded").Bold();
-                    h.Cell().Background("#F1F5F9").Padding(6).AlignRight().Text("Net Salary").Bold();
+                    SummaryHeaderCell(h.Cell()).Text("Employee").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Base Salary").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Absent").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Deduction").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Salary Paid").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("PF").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("ESIC").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("TDS").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Adv. Ded").Bold();
+                    SummaryHeaderCell(h.Cell()).AlignRight().Text("Net Salary").Bold();
                 });
 
-                decimal totalBase = 0, totalSalaryPaid = 0, totalDed = 0, totalEsic = 0, totalPf = 0, totalTds = 0, totalAdvance = 0, totalNet = 0;
-                foreach (var r in rows)
+                foreach (var group in groupedRows)
                 {
-                    t.Cell().Padding(6).Text(r.EmployeeName);
-                    t.Cell().Padding(6).AlignRight().Text(r.BaseSalary.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.DaysAbsent.ToString());
-                    t.Cell().Padding(6).AlignRight().Text(r.Deduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.SalaryPaid.ToString("N0"));
-                    t.Cell().Padding(6).AlignRight().Text(r.PfDeduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.TdsDeduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
-                    t.Cell().Padding(6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
-                    totalBase += r.BaseSalary;
-                    totalSalaryPaid += r.SalaryPaid;
-                    totalDed += r.Deduction;
-                    totalEsic += r.EsicDeduction;
-                    totalPf += r.PfDeduction;
-                    totalTds += r.TdsDeduction;
-                    totalAdvance += r.AdvanceDeduction;
-                    totalNet += r.NetSalary;
+                    if (showGroupTotals)
+                    {
+                        PdfTableCell(t.Cell().ColumnSpan(10u), 6, "#E0F2FE")
+                            .Text(group.Key).Bold().FontColor("#0F172A");
+                    }
+
+                    foreach (var r in group)
+                    {
+                        PdfTableCell(t.Cell(), 6).Text(r.EmployeeName);
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.BaseSalary.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.DaysAbsent.ToString(CultureInfo.CurrentCulture));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.Deduction.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.SalaryPaid.ToString("N0"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.PfDeduction.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.EsicDeduction.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.TdsDeduction.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.AdvanceDeduction.ToString("N2"));
+                        PdfTableCell(t.Cell(), 6).AlignRight().Text(r.NetSalary.ToString("N2")).Bold();
+                    }
+
+                    if (showGroupTotals)
+                        SummaryTotalRow(t, "Group Total", group, "#F8FAFC", "#0F172A");
                 }
 
-                t.Cell().Background("#2563EB").Padding(6).Text("TOTAL").Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text("").FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalDed.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalSalaryPaid.ToString("N0")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor(Colors.White);
-                t.Cell().Background("#2563EB").Padding(6).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor(Colors.White);
+                SummaryTotalRow(t, showGroupTotals ? "Final Total" : "TOTAL", rows, "#2563EB", "#FFFFFF");
             });
 
             p.Footer().AlignRight().Text(x =>
@@ -316,6 +313,12 @@ public class PdfSlipService
 
             p.Content().PaddingVertical(10).Table(t =>
             {
+                var groupedRows = rows
+                    .GroupBy(r => PdfGroupName(r.GroupName))
+                    .ToList();
+                var showGroupTotals = rows.Any(r => !string.IsNullOrWhiteSpace(r.GroupName));
+                var showTotals = columns.Any(column => column.IncludeInTotal);
+
                 t.ColumnsDefinition(cd =>
                 {
                     foreach (var column in columns)
@@ -329,7 +332,7 @@ public class PdfSlipService
                 {
                     foreach (var column in columns)
                     {
-                        var cell = h.Cell().Background("#F1F5F9").Padding(cellPadding);
+                        var cell = PdfTableCell(h.Cell(), cellPadding, "#F1F5F9");
                         if (column.AlignRight)
                             cell.AlignRight().Text(column.Header).Bold();
                         else
@@ -337,18 +340,33 @@ public class PdfSlipService
                     }
                 });
 
-                foreach (var row in rows)
+                foreach (var group in groupedRows)
                 {
-                    for (var i = 0; i < columns.Count; i++)
+                    if (showGroupTotals)
                     {
-                        var value = i < row.Values.Count ? row.Values[i] : string.Empty;
-                        var cell = t.Cell().Padding(cellPadding);
-                        if (columns[i].AlignRight)
-                            cell.AlignRight().Text(value);
-                        else
-                            cell.Text(value);
+                        PdfTableCell(t.Cell().ColumnSpan((uint)columns.Count), cellPadding, "#E0F2FE")
+                            .Text(group.Key).Bold().FontColor("#0F172A");
                     }
+
+                    foreach (var row in group)
+                    {
+                        for (var i = 0; i < columns.Count; i++)
+                        {
+                            var value = i < row.Values.Count ? row.Values[i] : string.Empty;
+                            var cell = PdfTableCell(t.Cell(), cellPadding);
+                            if (columns[i].AlignRight)
+                                cell.AlignRight().Text(value);
+                            else
+                                cell.Text(value);
+                        }
+                    }
+
+                    if (showGroupTotals && showTotals)
+                        SelectionTotalRow(t, columns, group, "Group Total", "#F8FAFC", "#0F172A", cellPadding);
                 }
+
+                if (showTotals)
+                    SelectionTotalRow(t, columns, rows, showGroupTotals ? "Final Total" : "TOTAL", "#2563EB", "#FFFFFF", cellPadding);
             });
 
             p.Footer().AlignRight().Text(x =>
@@ -360,6 +378,124 @@ public class PdfSlipService
             });
         });
     });
+
+    private static IContainer SummaryHeaderCell(IContainer cell)
+        => PdfTableCell(cell, 6, "#F1F5F9");
+
+    private static IContainer PdfTableCell(IContainer cell, float padding, string? background = null)
+    {
+        var styled = cell.Border(0.5f).BorderColor(TableBorderColor);
+        if (!string.IsNullOrWhiteSpace(background))
+            styled = styled.Background(background);
+
+        return styled.Padding(padding);
+    }
+
+    private static void SummaryTotalRow(
+        QuestPDF.Fluent.TableDescriptor table,
+        string label,
+        IEnumerable<MonthlySummaryRow> rows,
+        string background,
+        string fontColor)
+    {
+        var rowList = rows.ToList();
+        var totalBase = rowList.Sum(row => row.BaseSalary);
+        var totalSalaryPaid = rowList.Sum(row => row.SalaryPaid);
+        var totalDaysAbsent = rowList.Sum(row => row.DaysAbsent);
+        var totalDeduction = rowList.Sum(row => row.Deduction);
+        var totalPf = rowList.Sum(row => row.PfDeduction);
+        var totalEsic = rowList.Sum(row => row.EsicDeduction);
+        var totalTds = rowList.Sum(row => row.TdsDeduction);
+        var totalAdvance = rowList.Sum(row => row.AdvanceDeduction);
+        var totalNet = rowList.Sum(row => row.NetSalary);
+
+        PdfTableCell(table.Cell(), 6, background).Text(label).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalBase.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalDaysAbsent.ToString(CultureInfo.CurrentCulture)).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalDeduction.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalSalaryPaid.ToString("N0")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalPf.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalEsic.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalTds.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalAdvance.ToString("N2")).Bold().FontColor(fontColor);
+        PdfTableCell(table.Cell(), 6, background).AlignRight().Text(totalNet.ToString("N2")).Bold().FontColor(fontColor);
+    }
+
+    private static void SelectionTotalRow(
+        QuestPDF.Fluent.TableDescriptor table,
+        IReadOnlyList<SalarySheetSelectionColumn> columns,
+        IEnumerable<SalarySheetSelectionRow> rows,
+        string label,
+        string background,
+        string fontColor,
+        float cellPadding)
+    {
+        var labelColumn = columns
+            .Select((column, index) => new { column, index })
+            .FirstOrDefault(item => !item.column.AlignRight)?.index;
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var cell = PdfTableCell(table.Cell(), cellPadding, background);
+            if (labelColumn.HasValue && i == labelColumn.Value)
+            {
+                cell.Text(label).Bold().FontColor(fontColor);
+                continue;
+            }
+
+            if (!columns[i].IncludeInTotal)
+            {
+                cell.Text(string.Empty);
+                continue;
+            }
+
+            var total = CalculateSelectionTotal(rows, i, columns[i]);
+            if (columns[i].AlignRight)
+                cell.AlignRight().Text(total).Bold().FontColor(fontColor);
+            else
+                cell.Text(total).Bold().FontColor(fontColor);
+        }
+    }
+
+    private static string CalculateSelectionTotal(
+        IEnumerable<SalarySheetSelectionRow> rows,
+        int columnIndex,
+        SalarySheetSelectionColumn column)
+    {
+        decimal total = 0;
+        var hasValue = false;
+        var hasDecimalValue = false;
+        var decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+
+        foreach (var row in rows)
+        {
+            if (columnIndex >= row.Values.Count)
+                continue;
+
+            var value = row.Values[columnIndex];
+            if (!decimal.TryParse(value, NumberStyles.Currency, CultureInfo.CurrentCulture, out var number))
+                continue;
+
+            total += number;
+            hasValue = true;
+            hasDecimalValue |= value.Contains(decimalSeparator, StringComparison.Ordinal);
+        }
+
+        if (!hasValue)
+            return string.Empty;
+
+        return IsWholeNumberTotalColumn(column)
+            ? total.ToString("N0", CultureInfo.CurrentCulture)
+            : hasDecimalValue
+                ? total.ToString("N2", CultureInfo.CurrentCulture)
+                : total.ToString("N0", CultureInfo.CurrentCulture);
+    }
+
+    private static bool IsWholeNumberTotalColumn(SalarySheetSelectionColumn column)
+        => column.Key is "absent" or "salaryPaid";
+
+    private static string PdfGroupName(string? groupName)
+        => string.IsNullOrWhiteSpace(groupName) ? "Other" : groupName.Trim();
 
     private static IDocument BuildLedgerDocument(Employee emp, IReadOnlyList<LedgerRow> rows, decimal balance) => Document.Create(c =>
     {

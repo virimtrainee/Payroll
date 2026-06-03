@@ -367,6 +367,13 @@ public partial class SalarySheetViewModel : ObservableObject
     private CancellationTokenSource? _totalRefreshCts;
     private int _totalRefreshSuppression;
     private bool _suppressedTotalRefreshRequested;
+    private static readonly HashSet<string> PdfExcludedSelectionColumnKeys = new(StringComparer.Ordinal)
+    {
+        "employeeId",
+        "id",
+        "payment",
+        "paymentMode"
+    };
 
     public static TimeSpan TotalRefreshDebounceDelay { get; } = TimeSpan.FromMilliseconds(150);
 
@@ -462,7 +469,7 @@ public partial class SalarySheetViewModel : ObservableObject
         if (!snapshot.HasSelection)
             throw new InvalidOperationException("Select at least one salary-grid cell to export.");
 
-        var export = BuildSelectionExport(snapshot);
+        var export = BuildPdfSelectionExport(snapshot);
         var year = SelectedYear;
         var month = SelectedMonth.Number;
 
@@ -624,10 +631,14 @@ public partial class SalarySheetViewModel : ObservableObject
             var payrollRows = snapshot.Rows.OrderBy(r => r.Name).ToList();
 
             var newRows = new List<SalaryRowVm>(payrollRows.Count);
-            int serial = 0;
+            var groupSerials = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
             foreach (var payrollRow in payrollRows)
             {
                 attendanceStates.TryGetValue(payrollRow.EmployeeId, out var attendanceState);
+                var groupName = rowGroups[payrollRow.EmployeeId];
+                groupSerials.TryGetValue(groupName, out var serial);
+                groupSerials[groupName] = ++serial;
+
                 int proRata = 0;
                 if (payrollRow.JoiningDate.HasValue && attendanceState is null)
                 {
@@ -638,10 +649,10 @@ public partial class SalarySheetViewModel : ObservableObject
 
                 var row = new SalaryRowVm
                 {
-                    SerialNumber = ++serial,
+                    SerialNumber = serial,
                     EmployeeId = payrollRow.EmployeeId,
                     Name = payrollRow.Name,
-                    GroupDisplayName = rowGroups[payrollRow.EmployeeId],
+                    GroupDisplayName = groupName,
                     EmployeeBaseSalary = payrollRow.EmployeeBaseSalary,
                     Year = year,
                     Month = month,
@@ -1046,7 +1057,7 @@ public partial class SalarySheetViewModel : ObservableObject
                 EffectiveEsicDeduction(r), EffectivePfDeduction(r), EffectiveTdsDeduction(r));
             return new MonthlySummaryRow(r.Name, r.EffectiveBaseSalary, b.SalaryPaid, r.DaysAbsent, b.Deduction,
                 b.EsicDeduction, b.PfDeduction, b.TdsDeduction,
-                Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary);
+                Math.Max(0, r.AdvanceDeductionEntry), r.NetSalary, r.GroupDisplayName);
         }).ToList();
 
     private static SalarySheetSelectionExport BuildSelectionExport(SalarySheetSelectionSnapshot snapshot)
@@ -1055,13 +1066,51 @@ public partial class SalarySheetViewModel : ObservableObject
             .Select(column => new SalarySheetSelectionColumn(
                 column.Header,
                 IsRightAlignedSelectionColumn(column.Key),
-                IsTotaledSelectionColumn(column.Key)))
+                IsTotaledSelectionColumn(column.Key),
+                column.Key))
             .ToList();
         var rows = snapshot.Rows
             .Select(row => new SalarySheetSelectionRow(
                 snapshot.Columns
                     .Select(column => FormatSelectionValue(row, column.Key))
-                    .ToList()))
+                    .ToList(),
+                row.GroupDisplayName))
+            .ToList();
+
+        return new SalarySheetSelectionExport(columns, rows);
+    }
+
+    private static SalarySheetSelectionExport BuildPdfSelectionExport(SalarySheetSelectionSnapshot snapshot)
+    {
+        var exportColumns = snapshot.Columns
+            .Where(column => !PdfExcludedSelectionColumnKeys.Contains(column.Key))
+            .ToList();
+        if (exportColumns.Count == 0)
+            throw new InvalidOperationException("The selected columns are hidden in salary-sheet PDF export.");
+
+        var groupSerials = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
+        var columns = exportColumns
+            .Select(column => new SalarySheetSelectionColumn(
+                column.Header,
+                IsRightAlignedSelectionColumn(column.Key),
+                IsTotaledSelectionColumn(column.Key),
+                column.Key))
+            .ToList();
+        var rows = snapshot.Rows
+            .Select(row =>
+            {
+                var groupName = string.IsNullOrWhiteSpace(row.GroupDisplayName) ? "Other" : row.GroupDisplayName;
+                groupSerials.TryGetValue(groupName, out var serial);
+                groupSerials[groupName] = ++serial;
+
+                return new SalarySheetSelectionRow(
+                    exportColumns
+                        .Select(column => column.Key == "serial"
+                            ? serial.ToString(CultureInfo.CurrentCulture)
+                            : FormatSelectionValue(row, column.Key))
+                        .ToList(),
+                    groupName);
+            })
             .ToList();
 
         return new SalarySheetSelectionExport(columns, rows);
@@ -1098,7 +1147,7 @@ public partial class SalarySheetViewModel : ObservableObject
             "serial" => row.SerialNumber.ToString(CultureInfo.CurrentCulture),
             "employee" => row.Name,
             "group" => row.GroupDisplayName,
-            "paymentMode" => row.PaymentModeLabel,
+            "payment" or "paymentMode" => row.PaymentModeLabel,
             "baseSalary" => FormatMoney(row.EmployeeBaseSalary),
             "absent" => row.DaysAbsent.ToString(CultureInfo.CurrentCulture),
             "salaryPaid" => FormatWholeMoney(row.SalaryPaid),

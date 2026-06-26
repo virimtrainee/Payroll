@@ -8,7 +8,8 @@ namespace SalaryManager.App.Services;
 
 public record AppSettings(
     string? IciciDebitAccountNo,
-    Dictionary<string, double>? SalarySheetColumnWidths = null);
+    Dictionary<string, double>? SalarySheetColumnWidths = null,
+    string? FirmName = null);
 
 public class AppSettingsService
 {
@@ -81,9 +82,14 @@ public class AppSettingsService
             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
             ?? new Dictionary<string, double>();
 
+        var firmName = string.IsNullOrWhiteSpace(settings.FirmName)
+            ? null
+            : settings.FirmName.Trim();
+
         return settings with
         {
-            SalarySheetColumnWidths = widths
+            SalarySheetColumnWidths = widths,
+            FirmName = firmName
         };
     }
 }

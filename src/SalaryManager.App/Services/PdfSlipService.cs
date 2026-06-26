@@ -17,7 +17,8 @@ public record SalarySlipData(
     SalaryBreakdown Breakdown,
     decimal AdvanceBalance,
     decimal SalaryAdvanceDeduction,
-    decimal? NetSalaryOverride = null);
+    decimal? NetSalaryOverride = null,
+    string? FirmName = null);
 
 public record MonthlySummaryRow(
     string EmployeeName,
@@ -111,6 +112,7 @@ public class PdfSlipService
     private static IDocument BuildSlipDocument(SalarySlipData d) => Document.Create(c =>
     {
         var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(d.Month);
+        var firmName = NormalizeSlipText(d.FirmName);
         c.Page(p =>
         {
             p.Size(PageSizes.A5);
@@ -120,6 +122,8 @@ public class PdfSlipService
 
             p.Header().Column(col =>
             {
+                if (firmName is not null)
+                    col.Item().Text(firmName).FontSize(14).Bold().FontColor("#0F172A");
                 col.Item().Text("SALARY SLIP").FontSize(20).Bold().FontColor("#2563EB");
                 col.Item().Text($"{monthName} {d.Year}").FontSize(11).FontColor("#64748B");
                 col.Item().PaddingTop(8).LineHorizontal(0.6f).LineColor("#E2E8F0");
@@ -181,12 +185,26 @@ public class PdfSlipService
                 col.Item().PaddingTop(20).LineHorizontal(0.4f).LineColor("#E2E8F0");
                 col.Item().PaddingTop(10).Row(r =>
                 {
-                    r.RelativeItem().Text("Employee Signature").FontSize(9).FontColor("#64748B");
-                    r.RelativeItem().AlignRight().Text("Authorized Signatory").FontSize(9).FontColor("#64748B");
+                    r.RelativeItem().Column(c2 =>
+                    {
+                        c2.Item().Text("FIRM").FontSize(8).FontColor("#64748B").Bold();
+                        c2.Item().Text(firmName ?? string.Empty).FontSize(10).Bold();
+                    });
+                    r.RelativeItem().Column(c2 =>
+                    {
+                        c2.Item().AlignRight().Text("EMPLOYEE").FontSize(8).FontColor("#64748B").Bold();
+                        c2.Item().AlignRight().Text(d.Employee.Name).FontSize(10).Bold();
+                    });
                 });
             });
         });
     });
+
+    private static string? NormalizeSlipText(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
 
     private static void DetailRow(QuestPDF.Fluent.ColumnDescriptor parent, string label, string value)
     {

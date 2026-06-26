@@ -44,7 +44,7 @@ public class PdfSlipServiceTests
         {
             var employee = new Employee { Id = 1, Name = "A", BaseSalary = 10000m };
             var breakdown = SalaryCalculator.Compute(10000m, 2026, 5, 0);
-            var data = new SalarySlipData(employee, 2026, 5, breakdown, 0m, 0m, 8750m);
+            var data = new SalarySlipData(employee, 2026, 5, breakdown, 0m, 0m, 8750m, "Acme Textiles");
 
             new PdfSlipService().GenerateSlip(data, path);
 

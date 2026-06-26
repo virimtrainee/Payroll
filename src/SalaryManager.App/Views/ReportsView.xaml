@@ -124,6 +124,8 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="10"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="10"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <StackPanel>
                                 <TextBlock Text="Salary Slip" Style="{StaticResource ReportCardTitle}"/>
@@ -132,6 +134,16 @@
                                            Margin="0,6,0,0"/>
                             </StackPanel>
                             <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="320"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Firm name" Style="{StaticResource FieldLabel}"/>
+                                    <TextBox Text="{Binding FirmName, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </Grid>
+                            <Grid Grid.Row="4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120"/>
                                     <ColumnDefinition Width="100"/>

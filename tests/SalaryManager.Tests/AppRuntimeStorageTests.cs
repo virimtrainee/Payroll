@@ -64,9 +64,11 @@ public class AppRuntimeStorageTests
             Assert.Equal("1234567890", oldSettings.IciciDebitAccountNo);
             Assert.NotNull(oldSettings.SalarySheetColumnWidths);
             Assert.Empty(oldSettings.SalarySheetColumnWidths);
+            Assert.Null(oldSettings.FirmName);
 
             service.Save(oldSettings with
             {
+                FirmName = "  Acme Textiles  ",
                 SalarySheetColumnWidths = new Dictionary<string, double>
                 {
                     ["employee"] = 260,
@@ -78,6 +80,7 @@ public class AppRuntimeStorageTests
 
             Assert.Equal(260, saved.SalarySheetColumnWidths!["employee"]);
             Assert.Equal(150, saved.SalarySheetColumnWidths["netSalary"]);
+            Assert.Equal("Acme Textiles", saved.FirmName);
         }
         finally
         {

@@ -40,6 +40,7 @@ public partial class ReportsViewModel : ObservableObject
     public RangeObservableCollection<GroupFilterOptionVm> GroupFilterOptions { get; } = new();
     [ObservableProperty] private Employee? selectedEmployee;
     [ObservableProperty] private GroupFilterOptionVm? selectedGroupFilter;
+    [ObservableProperty] private string firmName = string.Empty;
 
     [ObservableProperty] private string kpiTotalPayable = "₹0.00";
     [ObservableProperty] private string kpiGross = "₹0.00";
@@ -75,6 +76,7 @@ public partial class ReportsViewModel : ObservableObject
         try
         {
             await _dbInit.ReadyTask;
+            LoadFirmName();
             using (var db = await _dbf.CreateDbContextAsync())
                 await LoadGroupFiltersAsync(db);
             await LoadEmployeesAsync();
@@ -296,7 +298,9 @@ public partial class ReportsViewModel : ObservableObject
         try
         {
             if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
-            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
+            var firmName = SaveFirmNameForSlip();
+            if (firmName is null) { await _dialogs.ErrorAsync("Enter the firm name before generating the salary slip."); return; }
+            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id, firmName);
             var name = $"SalarySlip-{Sanitize(SelectedEmployee.Name)}-{SelectedYear:0000}-{SelectedMonth.Number:00}.pdf";
             var path = _dialogs.AskSavePath("PDF (*.pdf)|*.pdf", name);
             if (path is null) return;
@@ -312,7 +316,9 @@ public partial class ReportsViewModel : ObservableObject
         try
         {
             if (SelectedEmployee is null) { await _dialogs.ErrorAsync("Pick an employee."); return; }
-            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id);
+            var firmName = SaveFirmNameForSlip();
+            if (firmName is null) { await _dialogs.ErrorAsync("Enter the firm name before generating the salary slip."); return; }
+            var data = await BuildSalarySlipDataAsync(SelectedEmployee.Id, firmName);
             var path = await Task.Run(() => _pdf.GenerateSlip(data));
             PrintFile(path);
         }
@@ -425,7 +431,7 @@ public partial class ReportsViewModel : ObservableObject
         return (rows, rows.LastOrDefault()?.RunningBalance ?? 0m);
     }
 
-    private async Task<SalarySlipData> BuildSalarySlipDataAsync(int employeeId)
+    private async Task<SalarySlipData> BuildSalarySlipDataAsync(int employeeId, string firmName)
     {
         using var db = await _dbf.CreateDbContextAsync();
         var employee = await db.Employees.AsNoTracking()
@@ -496,7 +502,8 @@ public partial class ReportsViewModel : ObservableObject
             breakdown,
             advanceBalance,
             advanceDeduction,
-            slipNetOverride);
+            slipNetOverride,
+            firmName);
     }
 
     private async Task<List<SalaryRevisionReportRow>> BuildRevisionRowsAsync()
@@ -519,6 +526,23 @@ public partial class ReportsViewModel : ObservableObject
     }
 
     private static string Sanitize(string s) => string.Join("_", s.Split(Path.GetInvalidFileNameChars()));
+
+    private void LoadFirmName()
+        => FirmName = _settings.Load().FirmName ?? string.Empty;
+
+    private string? SaveFirmNameForSlip()
+    {
+        var name = FirmName.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var settings = _settings.Load();
+        if (!string.Equals(settings.FirmName, name, StringComparison.Ordinal))
+            _settings.Save(settings with { FirmName = name });
+
+        FirmName = name;
+        return name;
+    }
 
     private static string FormatCurrency(decimal value) =>
         $"₹{value.ToString("N0", CultureInfo.GetCultureInfo("en-IN"))}";

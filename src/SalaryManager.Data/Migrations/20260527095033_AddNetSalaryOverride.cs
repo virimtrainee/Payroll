@@ -1,28 +1,27 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SalaryManager.Data.Migrations
+namespace SalaryManager.Data.Migrations;
+
+/// <inheritdoc />
+public partial class AddNetSalaryOverride : Migration
 {
     /// <inheritdoc />
-    public partial class AddNetSalaryOverride : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.AddColumn<decimal>(
-                name: "NetSalaryOverride",
-                table: "AttendanceRecords",
-                type: "DECIMAL(18,2)",
-                nullable: true);
-        }
+        migrationBuilder.AddColumn<decimal>(
+            name: "NetSalaryOverride",
+            table: "AttendanceRecords",
+            type: "DECIMAL(18,2)",
+            nullable: true);
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(
-                name: "NetSalaryOverride",
-                table: "AttendanceRecords");
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropColumn(
+            name: "NetSalaryOverride",
+            table: "AttendanceRecords");
     }
 }

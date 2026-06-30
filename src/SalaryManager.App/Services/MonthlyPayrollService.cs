@@ -1,9 +1,9 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using SalaryManager.Data;
 using SalaryManager.Data.Entities;
 using SalaryManager.Data.Services;
 using SalaryManager.Data.Validation;
-using System.Diagnostics;
 
 namespace SalaryManager.App.Services;
 

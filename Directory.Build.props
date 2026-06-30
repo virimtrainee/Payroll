@@ -1,0 +1,20 @@
+<Project>
+
+  <!-- Security checks: fail the build when a referenced package (direct or
+       transitive) has a known vulnerability advisory. -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Remediate GHSA-2m69-gcr7-jv3q: EF Core 10.0.8 transitively pins the
+       vulnerable native SQLite library SQLitePCLRaw 2.1.11 (advisory range
+       <= 2.1.11). Pin the whole SQLitePCLRaw family to a patched version. -->
+  <ItemGroup>
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="3.0.3" />
+  </ItemGroup>
+
+</Project>
